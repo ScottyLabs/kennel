@@ -5,3 +5,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+tokio = { version = "1.49.0", features = ["full", "signal"] }
+tracing = "0.1.44"

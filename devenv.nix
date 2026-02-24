@@ -1,4 +1,4 @@
-{ pkgs, config, ... }:
+{ pkgs, config, inputs, ... }:
 
 let
   cargoNix = pkgs.callPackage ./Cargo.nix { };
@@ -9,11 +9,14 @@ in
 
   packages = [
     kennel
+    inputs.bun2nix.packages.${pkgs.stdenv.system}.default
   ] ++ (with pkgs; [
     pkg-config
     openssl
     postgresql_18
     sea-orm-cli
+    bun
+    just
   ]);
 
   outputs = { inherit kennel; };
@@ -61,10 +64,18 @@ in
     config.programs = {
       nixpkgs-fmt = {
         enable = true;
-        excludes = [ "Cargo.nix" ];
+        excludes = [ "Cargo.nix" "bun.nix" ];
       };
       rustfmt.enable = true;
-      mdformat.enable = true;
+      mdformat = {
+        enable = true;
+        excludes = [ "sites/docs/src/content/**" ];
+      };
+    };
+    config.settings.formatter.biome = {
+      command = "${pkgs.biome}/bin/biome";
+      options = [ "check" "--write" "--no-errors-on-unmatched" "--config-path" "${config.devenv.root}/biome.json" ];
+      includes = [ "*.js" "*.ts" "*.mjs" "*.mts" "*.cjs" "*.cts" "*.jsx" "*.tsx" "*.d.ts" "*.d.cts" "*.d.mts" "*.json" "*.jsonc" "*.css" ];
     };
   };
 
