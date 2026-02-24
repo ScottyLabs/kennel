@@ -1,0 +1,10 @@
+[package]
+name = "entity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sea-orm = "1.1.19"
+serde = "1.0.228"
+utoipa = { version = "5.4.0", features = ["chrono"] }

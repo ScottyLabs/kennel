@@ -26,8 +26,9 @@ in
     CARGO_PROFILE_DEV_CODEGEN_BACKEND = "cranelift";
     CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND = "llvm";
 
-    DATABASE_URL = "postgres:///kennel?host=$PGHOST";
+    DATABASE_URL = "postgresql://127.0.0.1:5432/kennel";
     RUST_LOG = "kennel=debug";
+    DYLD_LIBRARY_PATH = "${config.languages.rust.toolchainPackage}/lib";
   };
 
   languages.rust = {
