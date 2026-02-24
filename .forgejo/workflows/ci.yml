@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main, staging, dev]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: nix develop -c treefmt --fail-on-change
+
+      - name: Clippy
+        run: nix develop -c cargo clippy -- -D warnings
+
+      - name: Test
+        run: nix develop -c cargo test
+
+      - name: Verify Cargo.nix is up to date
+        run: |
+          nix develop -c crate2nix generate
+          git diff --exit-code Cargo.nix
+
+      - name: Build
+        run: nix build

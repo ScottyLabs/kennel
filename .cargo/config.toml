@@ -1,0 +1,10 @@
+# TODO: languages.rust.mold.enable exists for Linux, but no lld for Darwin
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+# TODO: Setting this via languages.rust is not yet supported
+[unstable]
+codegen-backend = true
