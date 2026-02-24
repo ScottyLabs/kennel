@@ -23,6 +23,38 @@ devenv shell -- cargo build
 - Do not manually edit `Cargo.toml` dependency sections or add inline comments to dependencies.
 - The same applies to `bun.lock` and web dependencies.
 
+## Database Migrations
+
+This project uses [SeaORM](https://www.sea-ql.org/SeaORM/) for database access and migrations. See [`crates/migration/README.md`](./crates/migration/README.md) for details.
+
+### Common Migration Commands
+
+When working with migrations, you can use either `sea-orm-cli` directly or `cargo run` from the migration crate:
+
+```bash
+# Generate a new migration
+sea-orm-cli migrate generate -d crates/migration <migration_name>
+
+# Run pending migrations
+sea-orm-cli migrate up -d crates/migration
+
+# Check migration status
+sea-orm-cli migrate status -d crates/migration
+
+# Generate entities from the database schema
+sea-orm-cli generate entity -u $DATABASE_URL -o crates/entity/src --with-serde both
+```
+
+The `cargo run --` pattern shown in SeaORM documentation can be replaced with `sea-orm-cli` commands as shown above. The `-d crates/migration` flag specifies the migration directory.
+
+### Migration Guidelines
+
+- Use SeaORM's native schema builders (`Table::create()`, `Type::create()`, etc.) whenever possible
+- Only use raw SQL statements via `Statement::from_string()` for PostgreSQL-specific features like triggers, functions, and check constraints
+- PostgreSQL enums are created using `Type::create().as_enum()` from `sea_orm_migration::prelude::extension::postgres::Type`
+- All migrations must have both `up` and `down` methods
+- Foreign keys should specify `on_delete` behavior explicitly
+
 ## Markdown Style
 
 - URLs must always be written as proper markdown links with descriptive text: `[description](url)`. Never use bare URLs or URLs in backticks as a substitute for links.

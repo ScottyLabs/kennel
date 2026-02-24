@@ -14,6 +14,14 @@ services:
 server: services
     cargo run -p kennel
 
+# Run database migrations
+migrate:
+    sea-orm-cli migrate up -d crates/migration
+
+# Generate SeaORM entities from database schema
+generate-entities:
+    sea-orm-cli generate entity -o crates/entity/src --with-serde both --lib --model-extra-derives 'utoipa::ToSchema' --enum-extra-derives 'utoipa::ToSchema'
+
 # Generate OpenAPI specs for web and docs
 generate-api:
     cd sites/web && bun run generate-api

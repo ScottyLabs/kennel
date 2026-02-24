@@ -93,6 +93,7 @@ The filename should match the branch name, e.g. `0001-dev-environment-ci.md`.
 |--------|-------|--------|
 | 0001 | [Dev Environment & CI](./0001-dev-environment-ci.md) | Accepted |
 | 0002 | [Frontend](./0002-frontend.md) | Accepted |
+| 0003 | [Database Schema & State Management](./0003-database-schema.md) | Accepted |
 
 *(This index will be updated as RFCs are added)*
 
