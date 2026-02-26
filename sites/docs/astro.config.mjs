@@ -34,8 +34,12 @@ export default defineConfig({
                     items: [
                         { label: "Webhooks", slug: "guides/webhooks" },
                         {
-                            label: "Deployment Process",
-                            slug: "guides/deployment",
+                            label: "Usage",
+                            slug: "guides/usage",
+                        },
+                        {
+                            label: "NixOS Deployment",
+                            slug: "guides/nixos-deployment",
                         },
                     ],
                 },
