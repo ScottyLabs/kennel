@@ -1,9 +1,9 @@
 ---
-title: Deployment Process
-description: How deployments work from push to live
+title: Usage
+description: How to use Kennel to deploy your applications
 ---
 
-This guide explains what happens when you push code and how deployments reach production.
+This guide explains how to use Kennel to deploy your applications, from configuring your project to accessing deployments.
 
 ## Push to Deploy
 
