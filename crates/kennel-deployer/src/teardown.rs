@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{DeployerConfig, secrets, systemd, user};
+use crate::{DeployerConfig, secrets, systemd, user, utils};
 use entity::sea_orm_active_enums::DeploymentStatus;
 use sea_orm::{ActiveValue::Set, IntoActiveModel};
 use std::path::{Path, PathBuf};
@@ -84,8 +84,11 @@ async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) ->
 
         // Release port
         if let Some(port) = deployment.port {
-            config.port_allocator.release(port as u16).await;
-            info!("Released port {}", port);
+            if let Err(e) = config.store.port_allocations().release_port(port).await {
+                warn!("Failed to release port {}: {}", port, e);
+            } else {
+                info!("Released port {}", port);
+            }
         }
     }
 
@@ -150,7 +153,7 @@ async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) ->
         }
 
         // No more deployments for this project+branch+service, remove system user
-        let username = user::sanitize_username(
+        let username = utils::sanitize_username(
             &deployment.project_name,
             &deployment.branch,
             &deployment.service_name,
@@ -160,6 +163,22 @@ async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) ->
             warn!("Failed to remove system user {}: {}", username, e);
         } else {
             info!("Removed system user: {}", username);
+        }
+    }
+
+    // Delete DNS records for custom domains
+    if let Some(dns_manager) = &config.dns_manager {
+        info!(
+            "Deleting DNS records for deployment {}",
+            request.deployment_id
+        );
+        if let Err(e) = dns_manager
+            .delete_record_for_deployment(request.deployment_id)
+            .await
+        {
+            warn!("Failed to delete DNS records: {}", e);
+        } else {
+            info!("DNS records deleted successfully");
         }
     }
 

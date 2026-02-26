@@ -62,6 +62,46 @@ in
       };
     };
 
+    projects = mkOption {
+      type = types.attrsOf (types.submodule {
+        options = {
+          repoUrl = mkOption {
+            type = types.str;
+            example = "https://codeberg.org/ScottyLabs/kennel";
+            description = "Git repository URL";
+          };
+
+          repoType = mkOption {
+            type = types.enum [ "forgejo" "github" ];
+            default = "forgejo";
+            description = "Repository type (forgejo or github)";
+          };
+
+          webhookSecretFile = mkOption {
+            type = types.path;
+            example = "/run/secrets/kennel-webhook-secret";
+            description = "Path to file containing webhook secret";
+          };
+
+          defaultBranch = mkOption {
+            type = types.str;
+            default = "main";
+            description = "Default branch name";
+          };
+        };
+      });
+      default = { };
+      example = {
+        kennel = {
+          repoUrl = "https://codeberg.org/ScottyLabs/kennel";
+          repoType = "forgejo";
+          webhookSecretFile = "/run/secrets/kennel-webhook";
+          defaultBranch = "main";
+        };
+      };
+      description = "Projects to deploy with Kennel";
+    };
+
     router = {
       address = mkOption {
         type = types.str;
@@ -133,6 +173,47 @@ in
       };
     };
 
+    dns = {
+      enable = mkEnableOption "Automatic DNS management";
+
+      provider = mkOption {
+        type = types.enum [ "cloudflare" ];
+        default = "cloudflare";
+        description = "DNS provider to use";
+      };
+
+      cloudflare = {
+        apiTokenFile = mkOption {
+          type = types.nullOr types.path;
+          default = null;
+          example = "/run/secrets/cloudflare-api-token";
+          description = "Path to file containing Cloudflare API token";
+        };
+
+        zones = mkOption {
+          type = types.attrsOf types.str;
+          default = { };
+          example = {
+            "scottylabs.org" = "abc123def456";
+            "example.com" = "xyz789ghi012";
+          };
+          description = "Map of domain names to Cloudflare zone IDs";
+        };
+      };
+
+      serverIpv4 = mkOption {
+        type = types.str;
+        example = "1.2.3.4";
+        description = "Server IPv4 address for DNS records";
+      };
+
+      serverIpv6 = mkOption {
+        type = types.str;
+        example = "2001:db8::1";
+        description = "Server IPv6 address for DNS records";
+      };
+    };
+
     user = mkOption {
       type = types.str;
       default = "kennel";
@@ -159,6 +240,14 @@ in
       {
         assertion = cfg.builder.cachix.enable -> cfg.builder.cachix.authTokenFile != null;
         message = "services.kennel.builder.cachix.authTokenFile must be set when Cachix is enabled";
+      }
+      {
+        assertion = cfg.dns.enable -> cfg.dns.cloudflare.apiTokenFile != null;
+        message = "services.kennel.dns.cloudflare.apiTokenFile must be set when DNS is enabled";
+      }
+      {
+        assertion = cfg.dns.enable -> cfg.dns.cloudflare.zones != { };
+        message = "services.kennel.dns.cloudflare.zones must be configured when DNS is enabled";
       }
     ];
 
@@ -220,15 +309,37 @@ in
           "ACME_STAGING=${if cfg.router.tls.staging then "true" else "false"}"
         ] ++ optionals cfg.builder.cachix.enable [
           "CACHIX_CACHE_NAME=${cfg.builder.cachix.cacheName}"
+        ] ++ optionals cfg.dns.enable [
+          "DNS_ENABLED=true"
+          "DNS_PROVIDER=${cfg.dns.provider}"
+          "CLOUDFLARE_ZONES=${concatStringsSep "," (mapAttrsToList (domain: zoneId: "${domain}:${zoneId}") cfg.dns.cloudflare.zones)}"
+          "SERVER_IPV4=${cfg.dns.serverIpv4}"
+          "SERVER_IPV6=${cfg.dns.serverIpv6}"
         ];
 
-        EnvironmentFile = optionals (cfg.builder.cachix.authTokenFile != null) [
-          cfg.builder.cachix.authTokenFile
-        ];
+        EnvironmentFile =
+          (optionals (cfg.builder.cachix.authTokenFile != null) [ cfg.builder.cachix.authTokenFile ])
+          ++ (optionals cfg.dns.enable [ cfg.dns.cloudflare.apiTokenFile ]);
 
         AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
         CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
       };
+    };
+
+    # Create projects configuration file for Kennel to read on startup
+    environment.etc."kennel/projects.json" = mkIf (cfg.projects != { }) {
+      text = builtins.toJSON (mapAttrsToList
+        (name: proj: {
+          inherit name;
+          repo_url = proj.repoUrl;
+          repo_type = proj.repoType;
+          webhook_secret_file = proj.webhookSecretFile;
+          default_branch = proj.defaultBranch;
+        })
+        cfg.projects);
+      mode = "0440";
+      user = cfg.user;
+      group = cfg.group;
     };
 
     systemd.tmpfiles.rules = [

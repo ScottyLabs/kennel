@@ -1,18 +1,18 @@
 mod error;
 mod health;
-mod ports;
 mod secrets;
 mod service;
 mod static_site;
 mod systemd;
 mod teardown;
 mod user;
+mod utils;
 
 pub use error::{DeployerError, Result};
 pub use kennel_builder::DeploymentRequest;
-pub use ports::PortAllocator;
 pub use teardown::{TeardownRequest, run_teardown_worker};
 
+use kennel_dns::DnsManager;
 use kennel_router::RouterUpdate;
 use kennel_store::Store;
 use std::sync::Arc;
@@ -22,8 +22,8 @@ use tracing::{error, info};
 #[derive(Clone)]
 pub struct DeployerConfig {
     pub store: Arc<Store>,
-    pub port_allocator: Arc<PortAllocator>,
     pub router_tx: Option<tokio::sync::broadcast::Sender<RouterUpdate>>,
+    pub dns_manager: Option<Arc<DnsManager>>,
     pub base_domain: String,
 }
 

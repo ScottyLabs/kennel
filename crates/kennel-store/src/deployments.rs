@@ -141,4 +141,30 @@ impl<'a> DeploymentRepository<'a> {
             .await
             .map(|result| result.rows_affected)?)
     }
+
+    pub async fn find_by_dns_status(
+        &self,
+        dns_status: &str,
+    ) -> crate::Result<Vec<deployments::Model>> {
+        Ok(Deployments::find()
+            .filter(deployments::Column::DnsStatus.eq(dns_status))
+            .all(self.db)
+            .await?)
+    }
+
+    pub async fn update_dns_status(&self, id: i32, dns_status: &str) -> crate::Result<()> {
+        use chrono::Utc;
+
+        Deployments::update_many()
+            .filter(deployments::Column::Id.eq(id))
+            .col_expr(deployments::Column::DnsStatus, Expr::value(dns_status))
+            .col_expr(
+                deployments::Column::UpdatedAt,
+                Expr::value(Utc::now().naive_utc()),
+            )
+            .exec(self.db)
+            .await?;
+
+        Ok(())
+    }
 }

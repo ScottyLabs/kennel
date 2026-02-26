@@ -47,6 +47,7 @@ pub struct ForgejoPullRequestEvent {
     pub action: String,
     pub number: u64,
     pub pull_request: ForgejoPullRequest,
+    pub sender: ForgejoSender,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,10 +56,13 @@ pub struct ForgejoPullRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ForgejoSender {
+    pub login: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ForgejoHead {
     pub sha: String,
-    #[serde(rename = "ref")]
-    pub git_ref: String,
 }
 
 #[derive(Debug, Deserialize)]

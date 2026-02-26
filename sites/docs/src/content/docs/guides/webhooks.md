@@ -119,31 +119,7 @@ Same verification process, just different header format.
 
 ## Troubleshooting
 
-### 401 Unauthorized
-
-Signature verification failed. Check:
-- Webhook secret matches between Git server and Kennel database
-- Payload URL is correct
-- No proxy is modifying the request body
-
-Kennel logs signature failures with project name, IP address, and event type for debugging.
-
-### 404 Not Found
-
-Project doesn't exist in Kennel's database. Verify the project name in the URL matches exactly.
-
-### 503 Service Unavailable
-
-Builder queue is full or unavailable. This is rare and usually means Kennel is overloaded. The webhook sender will retry.
-
-### No Deployment Happens
-
-Check:
-- Webhook was sent (check delivery history in Git server settings)
-- Kennel received it (check logs for "Received webhook for project: ...")
-- Build succeeded (check build logs at `/var/lib/kennel/logs/<build-id>/`)
-- `kennel.toml` exists in repository root
-- Nix packages are defined for all services/sites
+For webhook issues, see the [Troubleshooting Guide](./troubleshooting.md#webhook-issues).
 
 ## Webhook Retries
 

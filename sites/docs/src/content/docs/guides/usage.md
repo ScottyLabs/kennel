@@ -47,6 +47,23 @@ curl -X POST https://kennel.example.com/builds/<id>/cancel
 
 The builder checks for cancellation before each major step and stops gracefully.
 
+## Deployment Environments
+
+Kennel automatically assigns deployments to environments based on the branch name:
+
+| Branch | Environment | Description |
+|--------|-------------|-------------|
+| `main` | `prod` | Production deployments |
+| `staging` | `staging` | Staging deployments |
+| `dev` | `dev` | Development deployments |
+| `pr-*` | `preview` | Pull request preview deployments |
+| Other branches | `dev` | All other branches default to dev environment |
+
+The environment affects:
+- **Secrets isolation**: Secrets are scoped per project and environment
+- **Auto-expiry**: Preview and dev deployments may auto-expire after inactivity
+- **Resource limits**: Production deployments are protected from auto-cleanup
+
 ## Deployment Process
 
 ### For Services

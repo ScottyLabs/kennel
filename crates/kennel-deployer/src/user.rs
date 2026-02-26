@@ -44,35 +44,3 @@ pub async fn remove_user(username: &str) -> Result<()> {
 
     Ok(())
 }
-
-pub fn sanitize_username(project: &str, branch: &str, service: &str) -> String {
-    let combined = format!("kennel-{}-{}-{}", project, branch, service);
-    combined
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect::<String>()
-        .to_lowercase()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_username() {
-        assert_eq!(
-            sanitize_username("my-project", "main", "api"),
-            "kennel-my-project-main-api"
-        );
-        assert_eq!(
-            sanitize_username("Project_1", "feature/new", "web"),
-            "kennel-project-1-feature-new-web"
-        );
-    }
-}

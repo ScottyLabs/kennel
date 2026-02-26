@@ -1,39 +1,16 @@
+mod channels;
+mod config;
+mod dns;
+mod reconcile;
+mod signal;
+
 use kennel_config::constants;
-use kennel_deployer::PortAllocator;
 use kennel_store::Store;
 use migration::MigratorTrait;
 use sea_orm::Database;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::signal;
-use tokio::sync::mpsc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-
-    tracing::info!("shutdown signal received");
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,49 +32,36 @@ async fn main() -> anyhow::Result<()> {
 
     let store = Arc::new(Store::new(db));
 
-    let (build_tx, build_rx) = mpsc::channel(1000);
-    let (deploy_tx, deploy_rx) = mpsc::channel(100);
-    let (teardown_tx, teardown_rx) = mpsc::channel(100);
-    let (router_update_tx, router_update_rx) = tokio::sync::broadcast::channel(100);
+    tracing::info!("Database migrations complete");
+
+    // Reconcile projects from NixOS configuration
+    if let Err(e) = reconcile::reconcile_projects(store.clone()).await {
+        tracing::error!("Project reconciliation failed: {}", e);
+        return Err(e);
+    }
+
+    // Reconcile deployments and resources on startup
+    if let Err(e) = reconcile::reconcile_deployments(store.clone()).await {
+        tracing::error!("Startup reconciliation failed: {}", e);
+    }
+
+    let channels = channels::create_channels();
+    let base_domain =
+        std::env::var("BASE_DOMAIN").unwrap_or_else(|_| constants::DEFAULT_BASE_DOMAIN.into());
+
+    let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
+    let builder_config = config::create_builder_config(store.clone(), channels.deploy_tx.clone());
+    let deployer_config = config::create_deployer_config(
+        store.clone(),
+        channels.router_update_tx.clone(),
+        dns_manager,
+        base_domain,
+    );
+    let router_config = config::create_router_config(store.clone());
 
     let webhook_config = kennel_webhook::WebhookConfig {
         store: store.clone(),
-        build_tx,
-    };
-
-    let builder_config = kennel_builder::BuilderConfig {
-        store: store.clone(),
-        deploy_tx,
-        max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(constants::DEFAULT_MAX_CONCURRENT_BUILDS),
-        work_dir: std::env::var("WORK_DIR").unwrap_or_else(|_| constants::DEFAULT_WORK_DIR.into()),
-    };
-
-    let port_allocator = Arc::new(PortAllocator::new());
-    let deployer_config = kennel_deployer::DeployerConfig {
-        store: store.clone(),
-        port_allocator,
-        router_tx: Some(router_update_tx.clone()),
-        base_domain: std::env::var("BASE_DOMAIN")
-            .unwrap_or_else(|_| constants::DEFAULT_BASE_DOMAIN.into()),
-    };
-
-    let router_config = kennel_router::RouterConfig {
-        store: store.clone(),
-        bind_addr: std::env::var("ROUTER_ADDR")
-            .unwrap_or_else(|_| constants::DEFAULT_ROUTER_ADDR.into()),
-        tls_enabled: std::env::var("TLS_ENABLED")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false),
-        acme_email: std::env::var("ACME_EMAIL").ok(),
-        acme_production: std::env::var("ACME_PRODUCTION")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false),
-        acme_cache_dir: std::env::var("ACME_CACHE_DIR")
-            .ok()
-            .map(std::path::PathBuf::from),
+        build_tx: channels.build_tx,
     };
 
     let api_host = std::env::var("API_HOST").unwrap_or_else(|_| constants::DEFAULT_API_HOST.into());
@@ -108,28 +72,27 @@ async fn main() -> anyhow::Result<()> {
     let api_router = kennel_api::router(store.clone()).merge(webhook_router);
 
     // Spawn builder worker pool
-    let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(build_rx, builder_config));
+    let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(
+        channels.build_rx,
+        builder_config,
+    ));
 
     // Spawn deployer
-    let deployer_config_clone = deployer_config.clone();
     let deployer_handle = tokio::spawn(kennel_deployer::run_deployer(
-        deploy_rx,
-        deployer_config_clone,
+        channels.deploy_rx,
+        deployer_config.clone(),
     ));
 
     // Spawn teardown worker
-    let deployer_config_clone = deployer_config.clone();
     let teardown_handle = tokio::spawn(kennel_deployer::run_teardown_worker(
-        teardown_rx,
-        deployer_config_clone,
+        channels.teardown_rx,
+        deployer_config.clone(),
     ));
 
     // Spawn cleanup job
-    let deployer_config_clone = deployer_config.clone();
-    let teardown_tx_clone = teardown_tx.clone();
     let cleanup_handle = tokio::spawn(kennel_deployer::run_cleanup_job(
-        deployer_config_clone,
-        teardown_tx_clone,
+        deployer_config.clone(),
+        channels.teardown_tx.clone(),
     ));
 
     // Spawn router
@@ -137,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
     let routing_table = Arc::new(kennel_router::RoutingTable::new());
     let routing_table_clone = routing_table.clone();
     let router_handle = tokio::spawn(async move {
-        if let Err(e) = kennel_router::run_router(router_config, router_update_rx).await {
+        if let Err(e) = kennel_router::run_router(router_config, channels.router_update_rx).await {
             tracing::error!("Router failed: {}", e);
         }
     });
@@ -155,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
             listener,
             api_router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
         )
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(signal::shutdown_signal())
         .await
         {
             tracing::error!("API server failed: {}", e);

@@ -18,10 +18,16 @@ use std::sync::Arc;
         (status = BAD_REQUEST, description = "Build cannot be cancelled"),
     )
 )]
+#[allow(unreachable_code, unused_variables)]
 pub async fn cancel_build(
     State(store): State<Arc<Store>>,
     Path(build_id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    return Err((
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({ "error": "Authentication not implemented" })),
+    ));
+
     let build = store
         .builds()
         .find_by_id(build_id)

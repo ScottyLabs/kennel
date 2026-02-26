@@ -91,7 +91,7 @@ impl<'a> BuildRepository<'a> {
         let count = Builds::find()
             .filter(builds::Column::ProjectName.eq(project_name))
             .filter(builds::Column::GitRef.eq(git_ref))
-            .filter(builds::Column::Branch.eq(commit_sha))
+            .filter(builds::Column::CommitSha.eq(commit_sha))
             .count(self.db)
             .await?;
 

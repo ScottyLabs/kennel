@@ -80,7 +80,7 @@ fn parse_pull_request_event(headers: &HeaderMap, body: &[u8]) -> Result<WebhookE
             action: event.action,
             pr_number: event.number,
             commit_sha: event.pull_request.head.sha,
-            author: event.pull_request.head.git_ref,
+            author: event.sender.login,
         })
     } else {
         let event: GitHubPullRequestEvent = serde_json::from_slice(body)?;

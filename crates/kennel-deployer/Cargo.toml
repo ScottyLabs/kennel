@@ -9,6 +9,7 @@ anyhow = "1.0.102"
 entity = { version = "0.1.0", path = "../entity" }
 kennel-builder = { version = "0.1.0", path = "../kennel-builder" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
+kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-router = { version = "0.1.0", path = "../kennel-router" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 reqwest = "0.13.2"

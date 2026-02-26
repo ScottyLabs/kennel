@@ -19,6 +19,12 @@ Add to your NixOS configuration:
   services.kennel = {
     enable = true;
     router.baseDomain = "example.com";
+    
+    projects.myapp = {
+      repoUrl = "https://github.com/user/myapp";
+      repoType = "github";
+      webhookSecretFile = "/run/secrets/myapp-webhook";
+    };
   };
 }
 ```
@@ -30,6 +36,7 @@ This minimal configuration:
 - Exposes the API on port 3000
 - Allows 2 concurrent builds
 - Uses default directory locations
+- Configures one project named "myapp"
 
 ## Full Configuration Example
 
@@ -37,6 +44,19 @@ This minimal configuration:
 {
   services.kennel = {
     enable = true;
+
+    projects = {
+      kennel = {
+        repoUrl = "https://codeberg.org/ScottyLabs/kennel";
+        repoType = "forgejo";
+        webhookSecretFile = "/run/secrets/kennel-webhook";
+      };
+      website = {
+        repoUrl = "https://codeberg.org/ScottyLabs/website";
+        repoType = "forgejo";
+        webhookSecretFile = "/run/secrets/website-webhook";
+      };
+    };
 
     router = {
       baseDomain = "scottylabs.org";
@@ -71,6 +91,21 @@ This minimal configuration:
         cacheName = "scottylabs";
         authTokenFile = "/run/secrets/cachix-auth-token";
       };
+    };
+
+    dns = {
+      enable = true;
+      provider = "cloudflare";
+      
+      cloudflare = {
+        apiTokenFile = "/run/secrets/cloudflare-api-token";
+        zones = {
+          "scottylabs.org" = "abc123def456";
+        };
+      };
+      
+      serverIpv4 = "1.2.3.4";
+      serverIpv6 = "2001:db8::1";
     };
 
     cleanup.interval = 600;
@@ -121,6 +156,10 @@ For testing, use the staging environment:
 
 Staging certificates won't be trusted by browsers but avoid rate limits during testing.
 
+### TLS Troubleshooting
+
+For detailed TLS troubleshooting, see the [Troubleshooting Guide](./troubleshooting.md#tls-certificate-acquisition-failed).
+
 ## Database Configuration
 
 ### Local PostgreSQL (Default)
@@ -156,6 +195,140 @@ To use an external database:
 ```
 
 You'll need to configure authentication separately (password in environment file, etc.).
+
+## Project Configuration
+
+Projects are configured declaratively in the NixOS module. Each project represents a Git repository to deploy.
+
+```nix
+{
+  services.kennel.projects = {
+    myapp = {
+      repoUrl = "https://github.com/user/myapp";
+      repoType = "github";  # or "forgejo"
+      webhookSecretFile = "/run/secrets/myapp-webhook";
+      defaultBranch = "main";  # optional, defaults to "main"
+    };
+    
+    another-app = {
+      repoUrl = "https://codeberg.org/user/another-app";
+      repoType = "forgejo";
+      webhookSecretFile = "/run/secrets/another-app-webhook";
+    };
+  };
+}
+```
+
+On startup, Kennel syncs these projects to the database. When you add a project, it's automatically configured. When you remove a project from the configuration, it's removed from Kennel (and associated wildcard DNS is cleaned up).
+
+### Webhook Secrets
+
+Each project requires a webhook secret for verifying webhook requests from Forgejo or GitHub. Store these in files:
+
+```bash
+echo "your-secret-here" > /run/secrets/myapp-webhook
+chmod 400 /run/secrets/myapp-webhook
+```
+
+Use the same secret when configuring the webhook in your Git repository.
+
+## DNS Management
+
+Kennel can automatically manage DNS records via Cloudflare. DNS uses **wildcard records per project** - when a project is configured, Kennel creates `*.project.basedomain.com` pointing to your server.
+
+### DNS Configuration
+
+```nix
+{
+  services.kennel = {
+    enable = true;
+    router.baseDomain = "example.com";
+    
+    projects.myapp = {
+      repoUrl = "https://github.com/user/myapp";
+      repoType = "github";
+      webhookSecretFile = "/run/secrets/myapp-webhook";
+    };
+    
+    dns = {
+      enable = true;
+      provider = "cloudflare";
+      
+      cloudflare = {
+        apiTokenFile = "/run/secrets/cloudflare-api-token";
+        zones = {
+          "example.com" = "your-zone-id";
+        };
+      };
+      
+      serverIpv4 = "1.2.3.4";
+      serverIpv6 = "2001:db8::1";
+    };
+  };
+}
+```
+
+The Cloudflare API token needs DNS edit permissions. Create it at [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens).
+
+### How DNS Works
+
+Kennel creates **one wildcard DNS record per project**:
+
+```
+*.myapp.example.com -> 1.2.3.4 (A record)
+*.myapp.example.com -> 2001:db8::1 (AAAA record)
+```
+
+This allows all branch deployments to resolve automatically:
+- `api-main.myapp.example.com` -> resolves via wildcard
+- `api-feature-x.myapp.example.com` -> resolves via wildcard
+- `web-main.myapp.example.com` -> resolves via wildcard
+
+No individual DNS records are created per deployment. The wildcard covers all branches and services.
+
+When you remove a project from the configuration, Kennel automatically deletes the wildcard DNS records.
+
+### Custom Domain DNS
+
+Custom domains specified in `kennel.toml` require individual DNS records because they fall outside the wildcard pattern:
+
+```toml
+[services.api]
+custom_domain = "api.mycompany.com"
+
+[static_sites.web]
+custom_domain = "mycompany.com"
+```
+
+**Behavior:**
+- **Auto-generated domain**: `api-main.myapp.example.com` uses wildcard DNS (no individual record)
+- **Custom domain**: `api.mycompany.com` gets individual A and AAAA records created
+
+When deploying a service or static site with a custom domain:
+1. Kennel creates A and AAAA records pointing to the server IP
+2. Records are stored in the database linked to the deployment
+3. When the deployment is torn down, DNS records are automatically deleted
+
+**Important:** The custom domain must be in a DNS zone configured in `services.kennel.dns.cloudflare.zones`. Kennel cannot create DNS records for domains in zones it doesn't manage.
+
+### Multiple Zones
+
+Kennel supports multiple DNS zones for different base domains:
+
+```nix
+{
+  services.kennel.dns.cloudflare.zones = {
+    "example.com" = "zone-id-1";
+    "another-domain.org" = "zone-id-2";
+  };
+}
+```
+
+Projects are assigned to zones based on the `router.baseDomain` setting.
+
+### Cloudflare Proxy
+
+DNS records are created with `proxied: true`, enabling Cloudflare's CDN and DDoS protection.
 
 ## Cachix Integration
 
@@ -271,57 +444,4 @@ Change how often expired deployments are checked:
 
 ## Troubleshooting
 
-### Service fails to start
-
-Check logs:
-
-```bash
-journalctl -u kennel -n 50
-```
-
-Common issues:
-
-- Database connection failed -> Check PostgreSQL is running
-- Permission denied -> Check directory ownership
-- Port already in use -> Check if another service is using port 80/443
-
-### Database connection issues
-
-Verify PostgreSQL is running:
-
-```bash
-systemctl status postgresql
-```
-
-Check database exists:
-
-```bash
-sudo -u postgres psql -c '\l' | grep kennel
-```
-
-### TLS certificate issues
-
-View ACME logs in journal:
-
-```bash
-journalctl -u kennel | grep -i acme
-```
-
-Ensure DNS points to your server before enabling TLS.
-
-### Port binding issues
-
-If port 80 or 443 is already in use:
-
-```bash
-sudo lsof -i :80
-sudo lsof -i :443
-```
-
-You can change the router port:
-
-```nix
-{
-  services.kennel.router.address = "0.0.0.0:8080";
-}
-```
+For deployment and operational issues, see the [Troubleshooting Guide](./troubleshooting.md).
