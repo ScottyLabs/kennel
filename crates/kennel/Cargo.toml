@@ -8,15 +8,19 @@ license.workspace = true
 anyhow = "1.0.102"
 axum = "0.8.8"
 dotenvy = "0.15.7"
+entity = { version = "0.1.0", path = "../entity" }
 kennel-api = { version = "0.1.0", path = "../kennel-api" }
 kennel-builder = { version = "0.1.0", path = "../kennel-builder" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-deployer = { version = "0.1.0", path = "../kennel-deployer" }
+kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-router = { version = "0.1.0", path = "../kennel-router" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-webhook = { version = "0.1.0", path = "../kennel-webhook" }
 migration = { version = "0.1.0", path = "../migration" }
 sea-orm = "1.1.19"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 tokio = { version = "1.49.0", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }

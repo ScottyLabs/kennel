@@ -70,22 +70,8 @@ pub async fn handle_webhook(
                 return Ok(StatusCode::ACCEPTED);
             }
 
-            // Check for duplicate build
-            if config
-                .store
-                .builds()
-                .exists(&project.name, &git_ref, &commit_sha)
-                .await?
-            {
-                info!(
-                    "Build already exists for {}/{}/{}",
-                    project_name, git_ref, commit_sha
-                );
-                return Ok(StatusCode::OK);
-            }
-
             // Create build record
-            let build = config
+            let build = match config
                 .store
                 .builds()
                 .create_build(
@@ -94,7 +80,20 @@ pub async fn handle_webhook(
                     commit_sha.clone(),
                     author,
                 )
-                .await?;
+                .await
+            {
+                Ok(b) => b,
+                Err(e) => {
+                    if e.to_string().contains("duplicate") || e.to_string().contains("unique") {
+                        info!(
+                            "Build already exists for {}/{}/{}",
+                            project_name, git_ref, commit_sha
+                        );
+                        return Ok(StatusCode::OK);
+                    }
+                    return Err(e.into());
+                }
+            };
 
             info!(
                 "Created build {} for {}/{}/{}",
@@ -104,7 +103,7 @@ pub async fn handle_webhook(
             // Send to builder
             config
                 .build_tx
-                .send(build.id as i64)
+                .send(build.id)
                 .await
                 .map_err(|_| WebhookError::BuilderUnavailable)?;
 
@@ -120,22 +119,8 @@ pub async fn handle_webhook(
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
                     let git_ref = format!("pr-{}", pr_number);
 
-                    // Check for duplicate build
-                    if config
-                        .store
-                        .builds()
-                        .exists(&project.name, &git_ref, &commit_sha)
-                        .await?
-                    {
-                        info!(
-                            "Build already exists for {}/{}/{}",
-                            project_name, git_ref, commit_sha
-                        );
-                        return Ok(StatusCode::OK);
-                    }
-
                     // Create build record
-                    let build = config
+                    let build = match config
                         .store
                         .builds()
                         .create_build(
@@ -144,7 +129,22 @@ pub async fn handle_webhook(
                             commit_sha.clone(),
                             author,
                         )
-                        .await?;
+                        .await
+                    {
+                        Ok(b) => b,
+                        Err(e) => {
+                            if e.to_string().contains("duplicate")
+                                || e.to_string().contains("unique")
+                            {
+                                info!(
+                                    "Build already exists for {}/{}/{}",
+                                    project_name, git_ref, commit_sha
+                                );
+                                return Ok(StatusCode::OK);
+                            }
+                            return Err(e.into());
+                        }
+                    };
 
                     info!(
                         "Created PR build {} for {}/PR#{}/{}",
@@ -154,7 +154,7 @@ pub async fn handle_webhook(
                     // Send to builder
                     config
                         .build_tx
-                        .send(build.id as i64)
+                        .send(build.id)
                         .await
                         .map_err(|_| WebhookError::BuilderUnavailable)?;
 

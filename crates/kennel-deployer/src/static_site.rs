@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest};
+use crate::{DeployerConfig, DeploymentRequest, utils};
 use entity::sea_orm_active_enums::DeploymentStatus;
 use entity::{build_results, deployments};
 use kennel_config::KennelConfig;
@@ -25,7 +25,7 @@ pub async fn deploy_site(
         build_result.service_name, store_path
     );
 
-    let branch_sanitized = sanitize_identifier(&request.git_ref);
+    let branch_sanitized = utils::sanitize_identifier(&request.git_ref);
     let site_base_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(&request.project_name)
         .join(&branch_sanitized);
@@ -61,13 +61,17 @@ pub async fn deploy_site(
         service_name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
         branch: sea_orm::ActiveValue::Set(request.git_ref.clone()),
         branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
-        environment: sea_orm::ActiveValue::Set("production".to_string()),
+        environment: sea_orm::ActiveValue::Set(crate::service::determine_environment(
+            &request.git_ref,
+        )),
         store_path: sea_orm::ActiveValue::Set(Some(store_path.clone())),
         port: sea_orm::ActiveValue::Set(None),
         status: sea_orm::ActiveValue::Set(DeploymentStatus::Active),
-        domain: sea_orm::ActiveValue::Set(format!(
-            "{}-{}.{}.{}",
-            build_result.service_name, branch_sanitized, request.project_name, config.base_domain
+        domain: sea_orm::ActiveValue::Set(utils::generate_deployment_domain(
+            &build_result.service_name,
+            &branch_sanitized,
+            &request.project_name,
+            &config.base_domain,
         )),
         ..Default::default()
     };
@@ -84,9 +88,33 @@ pub async fn deploy_site(
         site_link.display()
     );
 
+    // Create DNS records for custom domain if configured
+    let site_config = kennel_config.static_sites.get(&build_result.service_name);
+    if let Some(dns_manager) = &config.dns_manager
+        && let Some(custom_domain) = site_config.and_then(|s| s.custom_domain.as_ref())
+    {
+        info!("Creating DNS records for custom domain: {}", custom_domain);
+        match dns_manager
+            .create_record_for_deployment(new_deployment.id, custom_domain)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    "DNS records created successfully for custom domain {}",
+                    custom_domain
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to create DNS records for custom domain {}: {}",
+                    custom_domain, e
+                );
+            }
+        }
+    }
+
     // Notify router of new deployment
     if let Some(ref router_tx) = config.router_tx {
-        let site_config = kennel_config.static_sites.get(&build_result.service_name);
         let update = kennel_router::RouterUpdate::DeploymentActive {
             deployment_id: new_deployment.id,
             domain: new_deployment.domain.clone(),
@@ -101,29 +129,4 @@ pub async fn deploy_site(
     }
 
     Ok(())
-}
-
-fn sanitize_identifier(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect::<String>()
-        .to_lowercase()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_identifier() {
-        assert_eq!(sanitize_identifier("main"), "main");
-        assert_eq!(sanitize_identifier("feature/new"), "feature-new");
-        assert_eq!(sanitize_identifier("fix_bug"), "fix-bug");
-    }
 }

@@ -1,5 +1,7 @@
 use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest, health, secrets, static_site, systemd, user};
+use crate::{
+    DeployerConfig, DeploymentRequest, health, secrets, static_site, systemd, user, utils,
+};
 use entity::sea_orm_active_enums::DeploymentStatus;
 use entity::{build_results, deployments};
 use kennel_config::parse_kennel_toml;
@@ -7,13 +9,21 @@ use sea_orm::IntoActiveModel;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
 
-pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) -> Result<()> {
-    let build_id_i32 = request.build_id as i32;
+pub(crate) fn determine_environment(git_ref: &str) -> String {
+    match git_ref {
+        "main" => "prod".to_string(),
+        "staging" => "staging".to_string(),
+        "dev" => "dev".to_string(),
+        ref s if s.starts_with("pr-") => "preview".to_string(),
+        _ => "dev".to_string(),
+    }
+}
 
+pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) -> Result<()> {
     let build_results = config
         .store
         .build_results()
-        .find_successful_by_build_id(build_id_i32)
+        .find_successful_by_build_id(request.build_id)
         .await?;
 
     if build_results.is_empty() {
@@ -27,9 +37,9 @@ pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) 
     let _build = config
         .store
         .builds()
-        .find_by_id(build_id_i32)
+        .find_by_id(request.build_id)
         .await?
-        .ok_or_else(|| crate::DeployerError::NotFound(format!("Build {}", build_id_i32)))?;
+        .ok_or_else(|| crate::DeployerError::NotFound(format!("Build {}", request.build_id)))?;
 
     let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
         .join(request.build_id.to_string());
@@ -92,7 +102,7 @@ async fn deploy_service(
         build_result.service_name, store_path
     );
 
-    let branch_sanitized = sanitize_identifier(&request.git_ref);
+    let branch_sanitized = utils::sanitize_identifier(&request.git_ref);
 
     // Check for existing active deployment (blue-green)
     let existing_deployment = config
@@ -110,7 +120,7 @@ async fn deploy_service(
         "kennel-{}-{}-{}",
         request.project_name, branch_sanitized, build_result.service_name
     );
-    let username = user::sanitize_username(
+    let username = utils::sanitize_username(
         &request.project_name,
         &branch_sanitized,
         &build_result.service_name,
@@ -124,7 +134,12 @@ async fn deploy_service(
         .join(&build_result.service_name);
     tokio::fs::create_dir_all(&work_dir).await?;
 
-    let port = config.port_allocator.allocate().await?;
+    let port = config
+        .store
+        .port_allocations()
+        .find_available_port()
+        .await
+        .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))? as u16;
 
     // Check if service needs preview database
     let service_config = config_file.services.get(&build_result.service_name);
@@ -146,7 +161,6 @@ async fn deploy_service(
             }
             Err(e) => {
                 error!("Failed to allocate preview database: {}", e);
-                config.port_allocator.release(port).await;
                 return Err(crate::DeployerError::Other(anyhow::anyhow!(
                     "Failed to allocate preview database: {}",
                     e
@@ -198,10 +212,17 @@ async fn deploy_service(
     systemd::enable_unit(&unit_name).await?;
     systemd::start_unit(&unit_name).await?;
 
-    if let Err(e) = health::check_health(port, "/health", 30).await {
+    let service_config = config_file.services.get(&build_result.service_name);
+    let health_check_path = service_config
+        .map(|s| s.health_check_path.as_str())
+        .unwrap_or("/health");
+    let health_check_timeout = service_config
+        .map(|s| s.health_check_timeout_secs)
+        .unwrap_or(30);
+
+    if let Err(e) = health::check_health(port, health_check_path, health_check_timeout).await {
         error!("Health check failed for {}: {}", unit_name, e);
         systemd::stop_unit(&unit_name).await?;
-        config.port_allocator.release(port).await;
         return Err(e);
     }
 
@@ -211,13 +232,15 @@ async fn deploy_service(
         service_name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
         branch: sea_orm::ActiveValue::Set(request.git_ref.clone()),
         branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
-        environment: sea_orm::ActiveValue::Set("production".to_string()),
+        environment: sea_orm::ActiveValue::Set(determine_environment(&request.git_ref)),
         store_path: sea_orm::ActiveValue::Set(Some(store_path.clone())),
         port: sea_orm::ActiveValue::Set(Some(port as i32)),
         status: sea_orm::ActiveValue::Set(DeploymentStatus::Active),
-        domain: sea_orm::ActiveValue::Set(format!(
-            "{}-{}.{}.{}",
-            build_result.service_name, branch_sanitized, request.project_name, config.base_domain
+        domain: sea_orm::ActiveValue::Set(utils::generate_deployment_domain(
+            &build_result.service_name,
+            &branch_sanitized,
+            &request.project_name,
+            &config.base_domain,
         )),
         ..Default::default()
     };
@@ -229,20 +252,57 @@ async fn deploy_service(
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
+    config
+        .store
+        .port_allocations()
+        .allocate_for_deployment(
+            port as i32,
+            new_deployment.id,
+            &request.project_name,
+            &build_result.service_name,
+            &branch_sanitized,
+        )
+        .await
+        .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
+
     info!(
         "Successfully deployed service '{}' on port {}",
         build_result.service_name, port
     );
 
+    // Create DNS records for custom domain if configured
+    let service_config = config_file.services.get(&build_result.service_name);
+    if let Some(dns_manager) = &config.dns_manager
+        && let Some(custom_domain) = service_config.and_then(|s| s.custom_domain.as_ref())
+    {
+        info!("Creating DNS records for custom domain: {}", custom_domain);
+        match dns_manager
+            .create_record_for_deployment(new_deployment.id, custom_domain)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    "DNS records created successfully for custom domain {}",
+                    custom_domain
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to create DNS records for custom domain {}: {}",
+                    custom_domain, e
+                );
+            }
+        }
+    }
+
     // Notify router of new deployment
     if let Some(ref router_tx) = config.router_tx {
-        let service_config = config_file.services.get(&build_result.service_name);
         let update = kennel_router::RouterUpdate::DeploymentActive {
             deployment_id: new_deployment.id,
             domain: new_deployment.domain.clone(),
             port: Some(port),
             store_path: Some(store_path.clone()),
-            spa: service_config.map(|s| s.spa).unwrap_or(false),
+            spa: false,
         };
 
         if let Err(e) = router_tx.send(update) {
@@ -291,34 +351,13 @@ async fn deploy_service(
         if let Some(old_port_val) = old_port
             && old_port_val as u16 != port
         {
-            config.port_allocator.release(old_port_val as u16).await;
+            let _ = config
+                .store
+                .port_allocations()
+                .release_port(old_port_val)
+                .await;
         }
     }
 
     Ok(())
-}
-
-fn sanitize_identifier(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect::<String>()
-        .to_lowercase()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_identifier() {
-        assert_eq!(sanitize_identifier("main"), "main");
-        assert_eq!(sanitize_identifier("feature/new"), "feature-new");
-        assert_eq!(sanitize_identifier("fix_bug"), "fix-bug");
-    }
 }

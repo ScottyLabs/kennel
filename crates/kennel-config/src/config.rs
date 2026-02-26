@@ -28,7 +28,7 @@ pub struct ServiceConfig {
     pub preview_database: bool,
 
     #[serde(default)]
-    pub spa: bool,
+    pub custom_domain: Option<String>,
 
     #[serde(default)]
     pub env: HashMap<String, String>,
@@ -43,12 +43,15 @@ pub struct StaticSiteConfig {
 
     #[serde(default)]
     pub spa: bool,
+
+    #[serde(default)]
+    pub custom_domain: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CachixConfig {
     pub cache_name: String,
-    pub auth_token: Option<String>,
+    pub auth_token_file: Option<String>,
 }
 
 fn default_health_check_path() -> String {
@@ -140,13 +143,13 @@ spa = true
         let toml_str = r#"
 [cachix]
 cache_name = "my-cache"
-auth_token = "secret-token"
+auth_token_file = "/path/to/token"
 "#;
         let config: KennelConfig = toml::from_str(toml_str).unwrap();
         assert!(config.cachix.is_some());
 
         let cachix = config.cachix.unwrap();
         assert_eq!(cachix.cache_name, "my-cache");
-        assert_eq!(cachix.auth_token, Some("secret-token".to_string()));
+        assert_eq!(cachix.auth_token_file, Some("/path/to/token".to_string()));
     }
 }

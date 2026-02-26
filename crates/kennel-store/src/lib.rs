@@ -2,6 +2,7 @@ pub mod build_results;
 pub mod builds;
 pub mod cleanup;
 pub mod deployments;
+pub mod dns_records;
 pub mod error;
 pub mod port_allocations;
 pub mod preview_databases;
@@ -54,5 +55,9 @@ impl Store {
 
     pub fn preview_databases(&self) -> preview_databases::PreviewDatabaseRepository<'_> {
         preview_databases::PreviewDatabaseRepository::new(&self.db)
+    }
+
+    pub fn dns_records(&self) -> dns_records::Repository<'_> {
+        dns_records::Repository { db: &self.db }
     }
 }

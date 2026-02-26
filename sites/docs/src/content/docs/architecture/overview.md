@@ -11,71 +11,25 @@ Kennel runs as a single binary with four subsystems: webhook receiver, builder, 
 Git Push -> Webhook -> Builder -> Deployer -> Router -> Live Site
 ```
 
-When you push to a Git repository:
-
-1. Forgejo/GitHub sends a webhook to Kennel
-2. Kennel verifies the signature and creates a build record
-3. The builder clones your repo and runs `nix build` for each service
-4. The deployer creates systemd units (for services) or symlinks (for static sites)
-5. The router starts sending traffic to your new deployment
+See the [usage guide](../guides/usage#push-to-deploy) for a detailed explanation of the deployment process.
 
 ## Component Responsibilities
 
 ### Webhook Receiver
 
-Accepts POST requests at `/webhook/:project`. Verifies HMAC-SHA256 signatures against the project's webhook secret. Creates build records and enqueues them for building.
-
-Supports push events (new commits) and pull request events (opened, synchronized, closed). Branch deletions trigger teardown of existing deployments.
+Accepts webhook events from Git servers, verifies signatures, and creates build records. See the [webhooks guide](../guides/webhooks) for configuration details.
 
 ### Builder
 
-Runs a worker pool that processes builds concurrently (default: 2 at a time). For each build:
-
-- Clones the repository at the specified commit
-- Parses `kennel.toml` to discover services and static sites
-- Runs `nix build .#packages.x86_64-linux.<name>` for each
-- Compares store paths to detect unchanged builds
-- Records success/failure per service
-- Triggers deployment on success
-
-Checks for cancellation before each major step (clone, parse, each build).
+Runs Nix builds in a worker pool with configurable concurrency. Clones repositories, parses kennel.toml, and builds all services and static sites. See the [usage guide](../guides/usage#build-process) for details.
 
 ### Deployer
 
-Manages the deployment lifecycle. For services:
-
-- Allocates a port from the 18000-19999 range
-- Creates a system user `kennel-<project>-<branch>-<service>`
-- Generates environment file with PORT, DATABASE_URL, etc.
-- Writes systemd unit file
-- Starts the service and polls `/health` endpoint
-- Updates database to mark deployment as active
-- Notifies router to start sending traffic
-
-For static sites:
-
-- Creates symlink at `/var/lib/kennel/sites/<project>/<branch>/<site>`
-- Points symlink to Nix store path
-- Records deployment with SPA flag for router
-
-Implements blue-green deployment: when deploying a new version of an existing service, the new version starts first, then after 30 seconds the old version stops.
-
-Runs cleanup job every 10 minutes to tear down expired deployments.
+Creates systemd units for services and symlinks for static sites. Implements blue-green deployment for zero downtime. See the [usage guide](../guides/usage#deployment-process) for the full deployment flow.
 
 ### Router
 
-Reverse proxy listening on port 80 (and 443 with TLS). Routes based on Host header:
-
-- `<service>-<branch>.<project>.scottylabs.org` - auto-generated subdomain
-- Custom domains configured per service
-
-For services: proxies to `http://127.0.0.1:<port>` with X-Forwarded-* headers
-
-For static sites: serves files from symlink path with SPA fallback (returns index.html for 404s)
-
-Monitors health continuously and removes unhealthy deployments after 3 consecutive failures.
-
-Obtains TLS certificates automatically via ACME HTTP-01 and TLS-ALPN-01 challenges.
+Reverse proxy that routes traffic based on Host header. Handles both auto-generated subdomains and custom domains. Automatically obtains TLS certificates via ACME. See the [usage guide](../guides/usage#routing) for routing details.
 
 ## Database State
 

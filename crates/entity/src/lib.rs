@@ -5,6 +5,7 @@ pub mod prelude;
 pub mod build_results;
 pub mod builds;
 pub mod deployments;
+pub mod dns_records;
 pub mod port_allocations;
 pub mod preview_databases;
 pub mod projects;

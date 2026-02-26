@@ -1,0 +1,9 @@
+[static_sites.docs]
+flake_output = "kennelDocs"
+custom_domain = "docs.kennel.scottylabs.org"
+spa = false
+
+[static_sites.web]
+flake_output = "kennelWeb"
+custom_domain = "kennel.scottylabs.org"
+spa = true

@@ -41,31 +41,46 @@ impl<'a> PortAllocationRepository<'a> {
         service_name: &str,
         branch: &str,
     ) -> Result<i32> {
-        let allocated_ports: Vec<i32> = PortAllocations::find()
-            .select_only()
-            .column(port_allocations::Column::Port)
-            .into_tuple()
-            .all(self.db)
-            .await?;
+        const MAX_RETRIES: u32 = 5;
 
-        let allocated_set: HashSet<i32> = allocated_ports.into_iter().collect();
+        for attempt in 0..MAX_RETRIES {
+            let allocated_ports: Vec<i32> = PortAllocations::find()
+                .select_only()
+                .column(port_allocations::Column::Port)
+                .into_tuple()
+                .all(self.db)
+                .await?;
 
-        let port = (PORT_MIN..=PORT_MAX)
-            .find(|p| !allocated_set.contains(p))
-            .ok_or(StoreError::PortPoolExhausted)?;
+            let allocated_set: HashSet<i32> = allocated_ports.into_iter().collect();
 
-        port_allocations::ActiveModel {
-            port: Set(port),
-            deployment_id: Set(Some(deployment_id)),
-            project_name: Set(Some(project_name.to_string())),
-            service_name: Set(Some(service_name.to_string())),
-            branch: Set(Some(branch.to_string())),
-            ..Default::default()
+            let port = (PORT_MIN..=PORT_MAX)
+                .find(|p| !allocated_set.contains(p))
+                .ok_or(StoreError::PortPoolExhausted)?;
+
+            let result = port_allocations::ActiveModel {
+                port: Set(port),
+                deployment_id: Set(Some(deployment_id)),
+                project_name: Set(Some(project_name.to_string())),
+                service_name: Set(Some(service_name.to_string())),
+                branch: Set(Some(branch.to_string())),
+                ..Default::default()
+            }
+            .insert(self.db)
+            .await;
+
+            match result {
+                Ok(_) => return Ok(port),
+                Err(DbErr::RecordNotInserted) | Err(DbErr::Exec(_)) => {
+                    if attempt == MAX_RETRIES - 1 {
+                        return Err(StoreError::PortAllocationConflict);
+                    }
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            }
         }
-        .insert(self.db)
-        .await?;
 
-        Ok(port)
+        Err(StoreError::PortAllocationConflict)
     }
 
     pub async fn release_port(&self, port: i32) -> Result<()> {
@@ -83,5 +98,42 @@ impl<'a> PortAllocationRepository<'a> {
 
     pub fn is_port_in_range(port: i32) -> bool {
         (PORT_MIN..=PORT_MAX).contains(&port)
+    }
+
+    pub async fn find_available_port(&self) -> Result<i32> {
+        let allocated_ports: Vec<i32> = PortAllocations::find()
+            .select_only()
+            .column(port_allocations::Column::Port)
+            .into_tuple()
+            .all(self.db)
+            .await?;
+
+        let allocated_set: HashSet<i32> = allocated_ports.into_iter().collect();
+
+        (PORT_MIN..=PORT_MAX)
+            .find(|p| !allocated_set.contains(p))
+            .ok_or(StoreError::PortPoolExhausted)
+    }
+
+    pub async fn allocate_for_deployment(
+        &self,
+        port: i32,
+        deployment_id: i32,
+        project_name: &str,
+        service_name: &str,
+        branch: &str,
+    ) -> Result<()> {
+        port_allocations::ActiveModel {
+            port: Set(port),
+            deployment_id: Set(Some(deployment_id)),
+            project_name: Set(Some(project_name.to_string())),
+            service_name: Set(Some(service_name.to_string())),
+            branch: Set(Some(branch.to_string())),
+            ..Default::default()
+        }
+        .insert(self.db)
+        .await?;
+
+        Ok(())
     }
 }

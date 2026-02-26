@@ -96,6 +96,7 @@ The filename should match the branch name, e.g. `0001-dev-environment-ci.md`.
 | 0003 | [Database Schema & State Management](./0003-database-schema.md) | Accepted |
 | 0004 | [Core Pipeline Architecture](./0004-core-pipeline.md) | Accepted |
 | 0005 | [NixOS Module](./0005-nixos-module.md) | Accepted |
+| 0006 | [DNS Management](./0006-dns-management.md) | Accepted |
 
 *(This index will be updated as RFCs are added)*
 

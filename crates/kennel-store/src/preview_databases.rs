@@ -129,7 +129,7 @@ impl<'a> PreviewDatabaseRepository<'a> {
             .find_by_project_and_branch(project_name, branch)
             .await?
         {
-            return Ok(existing.valkey_db.unwrap_or(0));
+            return existing.valkey_db.ok_or(StoreError::ValkeyDbNotAssigned);
         }
 
         let valkey_db = self.allocate_valkey_db().await?;

@@ -32,10 +32,14 @@ pub struct Model {
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub last_activity: DateTime,
+    #[sea_orm(column_type = "Text")]
+    pub dns_status: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::dns_records::Entity")]
+    DnsRecords,
     #[sea_orm(has_many = "super::port_allocations::Entity")]
     PortAllocations,
     #[sea_orm(
@@ -46,6 +50,12 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Services,
+}
+
+impl Related<super::dns_records::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DnsRecords.def()
+    }
 }
 
 impl Related<super::port_allocations::Entity> for Entity {

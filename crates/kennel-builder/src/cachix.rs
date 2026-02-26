@@ -17,7 +17,18 @@ pub async fn push_to_cachix(config: &CachixConfig, store_paths: &[String]) -> Re
     let mut cmd = Command::new("cachix");
     cmd.arg("push").arg(&config.cache_name);
 
-    if let Some(auth_token) = &config.auth_token {
+    if let Some(auth_token_file) = &config.auth_token_file {
+        let auth_token = tokio::fs::read_to_string(auth_token_file)
+            .await
+            .map_err(|e| {
+                crate::BuilderError::Other(anyhow::anyhow!(
+                    "Failed to read Cachix auth token from {}: {}",
+                    auth_token_file,
+                    e
+                ))
+            })?
+            .trim()
+            .to_string();
         cmd.env("CACHIX_AUTH_TOKEN", auth_token);
     }
 
@@ -48,7 +59,7 @@ mod tests {
     async fn test_push_empty_paths() {
         let config = CachixConfig {
             cache_name: "test-cache".to_string(),
-            auth_token: None,
+            auth_token_file: None,
         };
 
         let result = push_to_cachix(&config, &[]).await;

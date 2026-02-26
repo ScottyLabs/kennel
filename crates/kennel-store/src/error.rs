@@ -11,11 +11,17 @@ pub enum StoreError {
     #[error("port {0} already allocated")]
     PortAlreadyAllocated(i32),
 
+    #[error("port allocation conflict after retries")]
+    PortAllocationConflict,
+
     #[error("valkey database pool exhausted (0-15)")]
     ValkeyDbPoolExhausted,
 
     #[error("valkey database {0} already allocated")]
     ValkeyDbAlreadyAllocated(i32),
+
+    #[error("preview database has no valkey db assigned")]
+    ValkeyDbNotAssigned,
 
     #[error("deployment not found: {0}")]
     DeploymentNotFound(i32),

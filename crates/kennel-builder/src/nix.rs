@@ -3,7 +3,7 @@ use std::path::Path;
 use tokio::process::Command;
 use tracing::{debug, info};
 
-pub async fn build(work_dir: &Path, service_name: &str, build_id: i64) -> Result<String> {
+pub async fn build(work_dir: &Path, service_name: &str, build_id: i32) -> Result<String> {
     info!("Building Nix package for service: {}", service_name);
 
     let repo_path = work_dir.join("repo");

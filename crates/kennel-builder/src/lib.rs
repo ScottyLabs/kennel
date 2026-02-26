@@ -21,12 +21,12 @@ pub struct BuilderConfig {
 
 #[derive(Debug, Clone)]
 pub struct DeploymentRequest {
-    pub build_id: i64,
+    pub build_id: i32,
     pub project_name: String,
     pub git_ref: String,
 }
 
-pub async fn run_worker_pool(mut build_rx: mpsc::Receiver<i64>, config: BuilderConfig) {
+pub async fn run_worker_pool(mut build_rx: mpsc::Receiver<i32>, config: BuilderConfig) {
     info!(
         "Starting builder worker pool with max_concurrent_builds={}",
         config.max_concurrent_builds
