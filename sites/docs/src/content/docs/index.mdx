@@ -1,16 +1,14 @@
 ---
 title: Kennel
-description: Get started building your docs site with Starlight.
+description: Branch-based deployment platform powered by Nix
 template: splash
 hero:
-  tagline: Documentation for the Kennel platform
-  # image:
-  #   file: ../../assets/houston.webp
+  tagline: Push to deploy with blue-green deployments and automatic preview environments
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Architecture Overview
+      link: /architecture/overview/
       icon: right-arrow
-    - text: Visit the repository
+    - text: View on Codeberg
       link: https://codeberg.org/ScottyLabs/kennel
       icon: external
       variant: minimal
@@ -18,23 +16,19 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## Documentation
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="Architecture" icon="puzzle">
+		Learn how Kennel transforms Git pushes into running deployments.
 	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
+	<Card title="kennel.toml" icon="setting">
+		Configure your services and static sites.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="Webhooks" icon="rocket">
+		Set up Forgejo or GitHub webhooks to trigger deployments.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="Deployment Process" icon="approve-check">
+		Understand how builds and deployments work.
 	</Card>
 </CardGrid>

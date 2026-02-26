@@ -21,6 +21,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Builds::ProjectName).text().not_null())
                     .col(ColumnDef::new(Builds::Branch).text().not_null())
                     .col(ColumnDef::new(Builds::GitRef).text().not_null())
+                    .col(ColumnDef::new(Builds::CommitSha).text().not_null())
                     .col(
                         ColumnDef::new(Builds::Status)
                             .custom(Alias::new("build_status"))
@@ -100,6 +101,7 @@ enum Builds {
     ProjectName,
     Branch,
     GitRef,
+    CommitSha,
     Status,
     StartedAt,
     FinishedAt,

@@ -122,4 +122,32 @@ impl<'a> PreviewDatabaseRepository<'a> {
     pub fn is_valkey_db_in_range(db: i32) -> bool {
         (VALKEY_DB_MIN..=VALKEY_DB_MAX).contains(&db)
     }
+
+    pub async fn allocate(&self, project_name: &str, branch: &str) -> Result<i32> {
+        // Check if already allocated
+        if let Some(existing) = self
+            .find_by_project_and_branch(project_name, branch)
+            .await?
+        {
+            return Ok(existing.valkey_db.unwrap_or(0));
+        }
+
+        let valkey_db = self.allocate_valkey_db().await?;
+        let database_name = format!(
+            "{}_{}",
+            project_name.replace('-', "_"),
+            branch.replace('-', "_")
+        );
+
+        let preview_db = preview_databases::ActiveModel {
+            project_name: Set(project_name.to_string()),
+            branch: Set(branch.to_string()),
+            database_name: Set(database_name),
+            valkey_db: Set(Some(valkey_db)),
+            ..Default::default()
+        };
+
+        preview_db.insert(self.db).await?;
+        Ok(valkey_db)
+    }
 }

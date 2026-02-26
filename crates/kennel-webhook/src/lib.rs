@@ -1,14 +1,25 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+mod error;
+mod events;
+mod handler;
+mod parse;
+mod verify;
+
+pub use error::{Result, WebhookError};
+pub use events::WebhookEvent;
+
+use axum::{Router, routing::post};
+use kennel_store::Store;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+
+#[derive(Clone)]
+pub struct WebhookConfig {
+    pub store: Arc<Store>,
+    pub build_tx: mpsc::Sender<i64>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub fn router(config: WebhookConfig) -> Router {
+    Router::new()
+        .route("/webhook/{project}", post(handler::handle_webhook))
+        .with_state(Arc::new(config))
 }

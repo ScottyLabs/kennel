@@ -26,12 +26,24 @@ export default defineConfig({
             ],
             sidebar: [
                 {
+                    label: "Architecture",
+                    autogenerate: { directory: "architecture" },
+                },
+                {
                     label: "Guides",
-                    items: [{ label: "Example Guide", slug: "guides/example" }],
+                    items: [
+                        { label: "Webhooks", slug: "guides/webhooks" },
+                        {
+                            label: "Deployment Process",
+                            slug: "guides/deployment",
+                        },
+                    ],
                 },
                 {
                     label: "Reference",
-                    autogenerate: { directory: "reference" },
+                    items: [
+                        { label: "kennel.toml", slug: "reference/kennel-toml" },
+                    ],
                 },
                 ...openAPISidebarGroups,
             ],

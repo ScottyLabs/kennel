@@ -5,3 +5,14 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+axum = "0.8.8"
+bytes = "1.11.1"
+hex = "0.4.3"
+hmac = "0.12.1"
+kennel-store = { version = "0.1.0", path = "../kennel-store" }
+serde = "1.0.228"
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+thiserror = "2.0.18"
+tokio = { version = "1", features = ["sync"] }
+tracing = "0.1.44"
