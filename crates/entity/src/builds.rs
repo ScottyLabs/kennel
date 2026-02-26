@@ -17,6 +17,8 @@ pub struct Model {
     pub branch: String,
     #[sea_orm(column_type = "Text")]
     pub git_ref: String,
+    #[sea_orm(column_type = "Text")]
+    pub commit_sha: String,
     pub status: BuildStatus,
     pub started_at: Option<DateTime>,
     pub finished_at: Option<DateTime>,

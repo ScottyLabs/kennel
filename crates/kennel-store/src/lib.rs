@@ -1,3 +1,4 @@
+pub mod build_results;
 pub mod builds;
 pub mod cleanup;
 pub mod deployments;
@@ -41,6 +42,10 @@ impl Store {
 
     pub fn builds(&self) -> builds::BuildRepository<'_> {
         builds::BuildRepository::new(&self.db)
+    }
+
+    pub fn build_results(&self) -> build_results::BuildResultRepository<'_> {
+        build_results::BuildResultRepository::new(&self.db)
     }
 
     pub fn port_allocations(&self) -> port_allocations::PortAllocationRepository<'_> {

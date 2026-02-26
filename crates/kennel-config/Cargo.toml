@@ -5,5 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["full", "signal"] }
+toml = "1.0.3"
 tracing = "0.1.44"

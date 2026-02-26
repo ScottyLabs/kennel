@@ -14,6 +14,10 @@ services:
 server: services
     cargo run -p kennel
 
+# Create a new database migration
+migration NAME:
+    sea-orm-cli migrate generate {{NAME}} -d crates/migration
+
 # Run database migrations
 migrate:
     sea-orm-cli migrate up -d crates/migration

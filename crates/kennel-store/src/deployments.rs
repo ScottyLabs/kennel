@@ -1,5 +1,5 @@
-use ::entity::{deployments, prelude::*, sea_orm_active_enums::DeploymentStatus};
-use sea_orm::*;
+use ::entity::{deployments, prelude::*, sea_orm_active_enums::DeploymentStatus, services};
+use sea_orm::{entity::*, query::*, sea_query::Expr, *};
 
 pub struct DeploymentRepository<'a> {
     db: &'a DatabaseConnection,
@@ -59,6 +59,31 @@ impl<'a> DeploymentRepository<'a> {
         self.list_by_status(DeploymentStatus::Active).await
     }
 
+    pub async fn list_active_with_services(
+        &self,
+    ) -> Result<Vec<(deployments::Model, Option<services::Model>)>, DbErr> {
+        Deployments::find()
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .find_also_related(services::Entity)
+            .all(self.db)
+            .await
+    }
+
+    pub async fn find_active_by_ref(
+        &self,
+        project_name: &str,
+        git_ref: &str,
+        service_name: &str,
+    ) -> Result<Option<deployments::Model>, DbErr> {
+        Deployments::find()
+            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::GitRef.eq(git_ref))
+            .filter(deployments::Column::ServiceName.eq(service_name))
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .one(self.db)
+            .await
+    }
+
     pub async fn create(
         &self,
         deployment: deployments::ActiveModel,
@@ -95,5 +120,25 @@ impl<'a> DeploymentRepository<'a> {
         }
 
         Ok(query.all(self.db).await?)
+    }
+
+    pub async fn mark_for_teardown(&self, project_name: &str, git_ref: &str) -> crate::Result<u64> {
+        use chrono::Utc;
+
+        Ok(Deployments::update_many()
+            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::Branch.eq(git_ref))
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .col_expr(
+                deployments::Column::Status,
+                Expr::value(DeploymentStatus::TearingDown),
+            )
+            .col_expr(
+                deployments::Column::UpdatedAt,
+                Expr::value(Utc::now().naive_utc()),
+            )
+            .exec(self.db)
+            .await
+            .map(|result| result.rows_affected)?)
     }
 }

@@ -23,6 +23,8 @@ pub struct Model {
     pub started_at: Option<DateTime>,
     pub finished_at: Option<DateTime>,
     pub created_at: DateTime,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub error_message: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

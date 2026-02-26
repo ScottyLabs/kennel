@@ -5,6 +5,15 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 [target.x86_64-apple-darwin]
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
+# cranelift mangles aws-lc-sys FFI symbols incorrectly on macOS (double
+# underscore prefix), force LLVM for the affected crates.
+[profile.dev.package.aws-lc-sys]
+codegen-backend = "llvm"
+[profile.dev.package.aws-lc-rs]
+codegen-backend = "llvm"
+[profile.dev.package.rustls]
+codegen-backend = "llvm"
+
 # TODO: Setting this via languages.rust is not yet supported
 [unstable]
 codegen-backend = true

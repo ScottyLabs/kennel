@@ -2,13 +2,33 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Kennel API",
-        "description": "Branch-based deployment platform",
+        "description": "Branch-based deployment platform powered by Nix",
         "license": { "name": "AGPL-3.0-or-later" },
         "version": "0.1.0"
     },
     "paths": {
+        "/builds/{build_id}/cancel": {
+            "post": {
+                "tags": ["builds"],
+                "operationId": "cancel_build",
+                "parameters": [
+                    {
+                        "name": "build_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "integer", "format": "int32" }
+                    }
+                ],
+                "responses": {
+                    "200": { "description": "Build cancelled successfully" },
+                    "400": { "description": "Build cannot be cancelled" },
+                    "404": { "description": "Build not found" }
+                }
+            }
+        },
         "/health": {
             "get": {
+                "tags": [],
                 "operationId": "health",
                 "responses": {
                     "200": {
@@ -21,5 +41,9 @@
             }
         }
     },
-    "components": {}
+    "components": {},
+    "tags": [
+        { "name": "builds", "description": "Build management endpoints" },
+        { "name": "health", "description": "Health check endpoints" }
+    ]
 }
