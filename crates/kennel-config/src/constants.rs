@@ -28,6 +28,8 @@ pub const MAX_CONSECUTIVE_HEALTH_FAILURES: u32 = 3;
 pub const ROUTER_RELOAD_INTERVAL: Duration = Duration::from_secs(60);
 
 pub const CLEANUP_JOB_INTERVAL: Duration = Duration::from_secs(600);
+pub const LOG_CLEANUP_INTERVAL: Duration = Duration::from_secs(86400);
+pub const LOG_RETENTION_DAYS: i64 = 30;
 
 pub const BUILD_CHANNEL_CAPACITY: usize = 1000;
 pub const DEPLOY_CHANNEL_CAPACITY: usize = 100;

@@ -267,7 +267,7 @@ LIMIT 10;
 -- Active deployments
 SELECT id, project_name, branch, service_name, port, status 
 FROM deployments 
-WHERE status = 'healthy' 
+WHERE status = 'active' 
 ORDER BY created_at DESC;
 
 -- Port allocations
@@ -276,9 +276,8 @@ FROM port_allocations
 ORDER BY port;
 
 -- Preview databases
-SELECT id, project_name, branch, pr_number, valkey_db, expires_at 
-FROM preview_databases 
-WHERE expires_at > NOW();
+SELECT id, project_name, branch, database_name, valkey_db, created_at
+FROM preview_databases;
 ```
 
 ### Clean Up Stale State

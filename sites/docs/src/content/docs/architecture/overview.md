@@ -64,8 +64,10 @@ All defaults are defined in `kennel-config::constants`.
 
 Components communicate via typed channels:
 
-- Webhook -> Builder: `mpsc::channel<i64>` for build IDs
-- Builder -> Deployer: `mpsc::channel<DeploymentRequest>` 
+- Webhook -> Builder: `mpsc::channel<i32>` for build IDs
+- Webhook -> Teardown: `mpsc::channel<i32>` for deployment IDs (on branch delete / PR close)
+- Builder -> Deployer: `mpsc::channel<DeploymentRequest>`
+- Cleanup -> Teardown: same `mpsc::channel<i32>` for auto-expired deployment IDs
 - Deployer -> Router: `broadcast::channel<RouterUpdate>` for routing table changes
 - All -> Database: shared `Arc<Store>` with SeaORM repository pattern
 

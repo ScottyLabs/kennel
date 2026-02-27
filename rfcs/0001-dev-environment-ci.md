@@ -232,29 +232,40 @@ jobs:
   check:
     runs-on: docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Install Nix
+        uses: https://github.com/cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            extra-substituters = https://scottylabs.cachix.org
+            extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
+
+      - name: Install devenv
+        run: nix profile install nixpkgs#devenv
 
       - name: Check formatting
-        run: nix develop -c treefmt --fail-on-change
+        run: devenv shell treefmt --fail-on-change
 
       - name: Clippy
-        run: nix develop -c cargo clippy -- -D warnings
+        run: devenv shell cargo clippy -- -D warnings
 
       - name: Test
-        run: nix develop -c cargo test
+        run: devenv shell cargo test
 
       - name: Verify Cargo.nix is up to date
+        shell: devenv shell bash -- -e {0}
         run: |
-          nix develop -c crate2nix generate
+          crate2nix generate
           git diff --exit-code Cargo.nix
 
       - name: Build
         run: nix build
 ```
 
-All CI steps run inside `nix develop` to ensure the same toolchain as local development. The `nix build` step at the end verifies the Nix package builds successfully — this is what comin will use to deploy. The `Cargo.nix` freshness check ensures nobody forgets to regenerate after changing dependencies.
+CI installs Nix and devenv on the runner, then runs all checks inside `devenv shell` to ensure the same toolchain as local development. The `nix build` step at the end verifies the Nix package builds successfully -- this is what comin will use to deploy. The `Cargo.nix` freshness check ensures nobody forgets to regenerate after changing dependencies.
 
-The `runs-on: docker` label targets the Forgejo runner with Nix available.
+The `runs-on: docker` label targets the Forgejo runner.
 
 ### Database Migrations
 

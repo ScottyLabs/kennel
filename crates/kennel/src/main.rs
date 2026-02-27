@@ -62,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let webhook_config = kennel_webhook::WebhookConfig {
         store: store.clone(),
         build_tx: channels.build_tx,
+        teardown_tx: channels.teardown_tx.clone(),
     };
 
     let api_host = std::env::var("API_HOST").unwrap_or_else(|_| constants::DEFAULT_API_HOST.into());
@@ -93,6 +94,11 @@ async fn main() -> anyhow::Result<()> {
     let cleanup_handle = tokio::spawn(kennel_deployer::run_cleanup_job(
         deployer_config.clone(),
         channels.teardown_tx.clone(),
+    ));
+
+    // Spawn build log cleanup job
+    let log_cleanup_handle = tokio::spawn(kennel_deployer::run_log_cleanup_job(
+        deployer_config.clone(),
     ));
 
     // Spawn router
@@ -136,6 +142,7 @@ async fn main() -> anyhow::Result<()> {
                 deployer_handle,
                 teardown_handle,
                 cleanup_handle,
+                log_cleanup_handle,
                 router_handle,
                 health_handle,
             );

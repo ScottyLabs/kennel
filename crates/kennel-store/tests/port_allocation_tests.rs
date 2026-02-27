@@ -1,3 +1,4 @@
+use chrono::Utc;
 use entity::{deployments, projects, sea_orm_active_enums::*, services};
 use kennel_store::Store;
 use sea_orm::{Database, DbErr, Set};
@@ -12,11 +13,10 @@ async fn setup_test_db() -> Result<Store, DbErr> {
 
 async fn create_test_deployment(
     store: &Store,
-    id: i32,
     project: &str,
     service: &str,
     branch: &str,
-) -> Result<(), DbErr> {
+) -> Result<i32, DbErr> {
     let proj = projects::ActiveModel {
         name: Set(project.to_string()),
         repo_url: Set(format!("https://github.com/{}", project)),
@@ -38,8 +38,8 @@ async fn create_test_deployment(
 
     let _ = store.services().create(svc).await.ok();
 
+    let now = Utc::now().naive_utc();
     let dep = deployments::ActiveModel {
-        id: Set(id),
         project_name: Set(project.to_string()),
         service_name: Set(service.to_string()),
         branch: Set(branch.to_string()),
@@ -47,11 +47,16 @@ async fn create_test_deployment(
         environment: Set("test".to_string()),
         git_ref: Set("abc123".to_string()),
         domain: Set(format!("{}-{}-{}.test.com", project, service, branch)),
+        status: Set(DeploymentStatus::Active),
+        dns_status: Set("pending".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_activity: Set(now),
         ..Default::default()
     };
 
-    store.deployments().create(dep).await?;
-    Ok(())
+    let created = store.deployments().create(dep).await?;
+    Ok(created.id)
 }
 
 async fn cleanup(store: &Store, project: &str, port: Option<i32>) {
@@ -65,13 +70,13 @@ async fn cleanup(store: &Store, project: &str, port: Option<i32>) {
 async fn test_allocate_port() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_deployment(&store, 100, "test-alloc", "web", "main")
+    let deployment_id = create_test_deployment(&store, "test-alloc", "web", "main")
         .await
         .expect("Failed to create deployment");
 
     let port = store
         .port_allocations()
-        .allocate_port(100, "test-alloc", "web", "main")
+        .allocate_port(deployment_id, "test-alloc", "web", "main")
         .await
         .expect("Failed to allocate port");
 
@@ -85,7 +90,7 @@ async fn test_allocate_port() {
         .expect("Should exist");
 
     assert_eq!(allocated.port, port);
-    assert_eq!(allocated.deployment_id, Some(100));
+    assert_eq!(allocated.deployment_id, Some(deployment_id));
 
     cleanup(&store, "test-alloc", Some(port)).await;
 }
@@ -94,22 +99,22 @@ async fn test_allocate_port() {
 async fn test_allocate_multiple_ports() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_deployment(&store, 101, "test-multi1", "web", "main")
+    let id1 = create_test_deployment(&store, "test-multi1", "web", "main")
         .await
         .expect("Failed to create deployment 1");
-    create_test_deployment(&store, 102, "test-multi2", "api", "dev")
+    let id2 = create_test_deployment(&store, "test-multi2", "api", "dev")
         .await
         .expect("Failed to create deployment 2");
 
     let port1 = store
         .port_allocations()
-        .allocate_port(101, "test-multi1", "web", "main")
+        .allocate_port(id1, "test-multi1", "web", "main")
         .await
         .expect("Failed to allocate port 1");
 
     let port2 = store
         .port_allocations()
-        .allocate_port(102, "test-multi2", "api", "dev")
+        .allocate_port(id2, "test-multi2", "api", "dev")
         .await
         .expect("Failed to allocate port 2");
 
@@ -123,13 +128,13 @@ async fn test_allocate_multiple_ports() {
 async fn test_port_reuse_after_release() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_deployment(&store, 103, "test-reuse", "web", "main")
+    let deployment_id = create_test_deployment(&store, "test-reuse", "web", "main")
         .await
         .expect("Failed to create deployment");
 
     let port = store
         .port_allocations()
-        .allocate_port(103, "test-reuse", "web", "main")
+        .allocate_port(deployment_id, "test-reuse", "web", "main")
         .await
         .expect("Failed to allocate");
 

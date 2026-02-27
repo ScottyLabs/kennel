@@ -196,6 +196,9 @@ mod tests {
                     "sha": "abc123",
                     "ref": "feature-branch"
                 }
+            },
+            "sender": {
+                "login": "alice"
             }
         }"#;
 

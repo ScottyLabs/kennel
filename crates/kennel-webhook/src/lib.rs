@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 pub struct WebhookConfig {
     pub store: Arc<Store>,
     pub build_tx: mpsc::Sender<i32>,
+    pub teardown_tx: mpsc::Sender<i32>,
 }
 
 pub fn router(config: WebhookConfig) -> Router {

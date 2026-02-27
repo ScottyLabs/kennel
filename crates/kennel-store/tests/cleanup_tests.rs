@@ -1,7 +1,11 @@
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use entity::{builds, deployments, projects, sea_orm_active_enums::*, services};
 use kennel_store::Store;
 use sea_orm::{Database, DbErr, Set};
+
+fn now() -> NaiveDateTime {
+    Utc::now().naive_utc()
+}
 
 async fn setup_test_db() -> Result<Store, DbErr> {
     let db_url = std::env::var("DATABASE_URL")
@@ -146,8 +150,11 @@ async fn test_find_old_builds() {
         project_name: Set("cleanup-test3".to_string()),
         branch: Set("old-build".to_string()),
         git_ref: Set("xyz789".to_string()),
+        commit_sha: Set("abc123def456".to_string()),
         status: Set(BuildStatus::Success),
         finished_at: Set(Some(old_finish_time)),
+        created_at: Set(now()),
+        updated_at: Set(now()),
         ..Default::default()
     };
 
@@ -182,8 +189,11 @@ async fn test_find_old_builds_excludes_unfinished() {
         project_name: Set("cleanup-test4".to_string()),
         branch: Set("running".to_string()),
         git_ref: Set("abc".to_string()),
+        commit_sha: Set("def789ghi012".to_string()),
         status: Set(BuildStatus::Building),
         finished_at: Set(None),
+        created_at: Set(now()),
+        updated_at: Set(now()),
         ..Default::default()
     };
 

@@ -923,28 +923,41 @@ When deployment status is `tearing_down`:
 Run periodic task every 10 minutes using tokio interval:
 
 ```rust
-async fn run_cleanup_job(store: Arc<Store>, teardown_tx: mpsc::Sender<TeardownRequest>) {
+async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i32>) {
     let mut interval = tokio::time::interval(Duration::from_secs(600));
     
     loop {
         interval.tick().await;
         
-        match store.cleanup().find_expired_deployments().await {
-            Ok(expired) => {
-                for deployment in expired {
-                    tracing::info!("Auto-expiry: tearing down deployment {}", deployment.id);
-                    
-                    let _ = store.deployments()
-                        .update_status(deployment.id, DeploymentStatus::TearingDown)
-                        .await;
-                    
-                    let _ = teardown_tx.send(TeardownRequest {
-                        deployment_id: deployment.id,
-                    }).await;
+        match config.store.find_expired_deployments(7).await {
+            Ok(expired) if !expired.is_empty() => {
+                let ids: Vec<i32> = expired.iter().map(|d| d.id).collect();
+                let _ = config.store.deployments().mark_ids_tearing_down(&ids).await;
+                
+                for id in &ids {
+                    let _ = teardown_tx.send(*id).await;
                 }
             }
-            Err(e) => {
-                tracing::error!("Cleanup job failed: {}", e);
+            _ => {}
+        }
+    }
+}
+```
+
+A separate build log cleanup job runs daily, deleting build records and
+their log directories older than 30 days:
+
+```rust
+async fn run_log_cleanup_job(config: DeployerConfig) {
+    let mut interval = tokio::time::interval(Duration::from_secs(86400));
+    
+    loop {
+        interval.tick().await;
+        
+        if let Ok(old_builds) = config.store.find_old_builds(30).await {
+            for build in &old_builds {
+                let _ = tokio::fs::remove_dir_all(format!("/var/lib/kennel/logs/{}", build.id)).await;
+                let _ = config.store.builds().delete(build.id).await;
             }
         }
     }
@@ -1640,7 +1653,7 @@ Teardown sequence (branch deletion):
 3. Webhook Receiver:
    - Detects branch deletion
    - Updates: UPDATE deployments SET status = 'tearing_down' WHERE project_name = 'myproject' AND git_ref = 'feature-x'
-   - Sends: teardown_tx.send(TeardownRequest { deployment_id: 7 })
+   - Sends: teardown_tx.send(7)
    - Returns 202 Accepted
    |
    v
@@ -1664,49 +1677,16 @@ Teardown sequence (branch deletion):
 
 ### Startup Reconciliation
 
-On Kennel startup, use RFC 0003 reconciliation logic:
+On Kennel startup, reconciliation ensures the database matches reality:
 
-```rust
-async fn startup_reconciliation(store: Arc<Store>, teardown_tx: mpsc::Sender<TeardownRequest>) -> Result<()> {
-    let summary = store.reconciliation().get_summary().await?;
-    
-    tracing::info!("Reconciliation summary:");
-    tracing::info!("  Active deployments: {}", summary.active_deployments);
-    tracing::info!("  Allocated ports: {}", summary.allocated_ports);
-    tracing::info!("  Allocated preview DBs: {}", summary.allocated_preview_databases);
-    tracing::info!("  Pending builds: {}", summary.pending_builds);
-    tracing::info!("  Orphaned deployments: {}", summary.orphaned_deployments);
-    
-    // Clean up orphaned resources
-    if summary.orphaned_deployments > 0 {
-        tracing::warn!("Found {} orphaned deployments, cleaning up", summary.orphaned_deployments);
-        
-        let orphaned = store.reconciliation().find_orphaned_deployments().await?;
-        for deployment in orphaned {
-            tracing::info!("Tearing down orphaned deployment {}", deployment.id);
-            store.deployments()
-                .update_status(deployment.id, DeploymentStatus::TearingDown)
-                .await?;
-            teardown_tx.send(TeardownRequest {
-                deployment_id: deployment.id,
-            }).await?;
-        }
-    }
-    
-    // Clean up orphaned builds (stuck in 'building' state)
-    let orphaned_builds = store.reconciliation().find_orphaned_builds().await?;
-    if !orphaned_builds.is_empty() {
-        tracing::warn!("Found {} orphaned builds, marking as failed", orphaned_builds.len());
-        for build in orphaned_builds {
-            store.builds()
-                .update_status(build.id, BuildStatus::Failed)
-                .await?;
-        }
-    }
-    
-    Ok(())
-}
-```
+1. Sync projects from NixOS configuration (add new, remove stale)
+1. Clean up orphaned systemd units not backed by active deployments
+1. Release stale port allocations for non-existent deployments
+1. Remove orphaned static site symlinks and empty directories
+1. Mark stuck builds (in `building` state) as failed
+
+This recovers gracefully from crashes or unclean shutdowns without
+requiring manual intervention.
 
 Component-specific startup:
 

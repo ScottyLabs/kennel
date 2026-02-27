@@ -1,5 +1,6 @@
 mod error;
 mod health;
+mod log_cleanup;
 mod secrets;
 mod service;
 mod static_site;
@@ -10,7 +11,8 @@ mod utils;
 
 pub use error::{DeployerError, Result};
 pub use kennel_builder::DeploymentRequest;
-pub use teardown::{TeardownRequest, run_teardown_worker};
+pub use log_cleanup::run_log_cleanup_job;
+pub use teardown::run_teardown_worker;
 
 use kennel_dns::DnsManager;
 use kennel_router::RouterUpdate;
@@ -47,7 +49,7 @@ pub async fn run_deployer(
     info!("Deployer shutting down");
 }
 
-pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<TeardownRequest>) {
+pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i32>) {
     info!("Starting auto-expiry cleanup job");
 
     let mut interval = tokio::time::interval(kennel_config::constants::CLEANUP_JOB_INTERVAL);
@@ -58,59 +60,42 @@ pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<T
         info!("Running auto-expiry cleanup");
 
         match config.store.find_expired_deployments(7).await {
-            Ok(expired) => {
+            Ok(expired) if !expired.is_empty() => {
+                let ids: Vec<i32> = expired.iter().map(|d| d.id).collect();
+
                 for deployment in &expired {
                     info!(
-                        "Auto-expiry: marking deployment {} for teardown (project: {}, ref: {}, last_activity: {:?})",
+                        "Auto-expiry: deployment {} (project: {}, ref: {}, last_activity: {:?})",
                         deployment.id,
                         deployment.project_name,
                         deployment.git_ref,
                         deployment.last_activity
                     );
+                }
 
-                    if let Err(e) = config
-                        .store
-                        .deployments()
-                        .update({
-                            use entity::sea_orm_active_enums::DeploymentStatus;
-                            use sea_orm::{ActiveValue::Set, IntoActiveModel};
+                if let Err(e) = config.store.deployments().mark_ids_tearing_down(&ids).await {
+                    error!("Failed to mark deployments for teardown: {}", e);
+                    continue;
+                }
 
-                            let mut active = deployment.clone().into_active_model();
-                            active.status = Set(DeploymentStatus::TearingDown);
-                            active
-                        })
-                        .await
-                    {
-                        error!(
-                            "Failed to mark deployment {} for teardown: {}",
-                            deployment.id, e
-                        );
-                        continue;
-                    }
-
-                    if let Err(e) = teardown_tx
-                        .send(TeardownRequest {
-                            deployment_id: deployment.id,
-                        })
-                        .await
-                    {
+                for id in &ids {
+                    if let Err(e) = teardown_tx.send(*id).await {
                         error!(
                             "Failed to send teardown request for deployment {}: {}",
-                            deployment.id, e
+                            id, e
                         );
                     }
                 }
 
-                if !expired.is_empty() {
-                    info!(
-                        "Marked {} deployment(s) for auto-expiry teardown",
-                        expired.len()
-                    );
-                }
+                info!(
+                    "Marked {} deployment(s) for auto-expiry teardown",
+                    ids.len()
+                );
             }
             Err(e) => {
                 error!("Cleanup job failed to find expired deployments: {}", e);
             }
+            _ => {}
         }
     }
 }

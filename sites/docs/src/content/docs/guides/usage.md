@@ -161,7 +161,9 @@ Teardown process:
 5. If this was the last deployment for project+branch+service: removes system user
 6. Updates database to mark deployment as torn down
 
-The teardown worker processes teardown requests asynchronously. The cleanup job runs every 10 minutes to find expired deployments.
+The teardown worker processes teardown requests asynchronously. Branch deletions and PR closures trigger teardown immediately. The cleanup job runs every 10 minutes to find and tear down deployments that have been inactive for 7 days (excluding prod and staging).
+
+Build logs and records older than 30 days are automatically cleaned up by a daily job.
 
 ## Health Monitoring
 
