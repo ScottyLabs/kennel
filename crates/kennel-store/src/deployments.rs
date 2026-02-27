@@ -122,24 +122,45 @@ impl<'a> DeploymentRepository<'a> {
         Ok(query.all(self.db).await?)
     }
 
-    pub async fn mark_for_teardown(&self, project_name: &str, git_ref: &str) -> crate::Result<u64> {
+    pub async fn mark_ids_tearing_down(&self, ids: &[i32]) -> crate::Result<()> {
         use chrono::Utc;
 
-        Ok(Deployments::update_many()
+        if !ids.is_empty() {
+            Deployments::update_many()
+                .filter(deployments::Column::Id.is_in(ids.iter().copied()))
+                .col_expr(
+                    deployments::Column::Status,
+                    Expr::value(DeploymentStatus::TearingDown),
+                )
+                .col_expr(
+                    deployments::Column::UpdatedAt,
+                    Expr::value(Utc::now().naive_utc()),
+                )
+                .exec(self.db)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn mark_for_teardown(
+        &self,
+        project_name: &str,
+        git_ref: &str,
+    ) -> crate::Result<Vec<i32>> {
+        let ids: Vec<i32> = Deployments::find()
             .filter(deployments::Column::ProjectName.eq(project_name))
             .filter(deployments::Column::Branch.eq(git_ref))
             .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
-            .col_expr(
-                deployments::Column::Status,
-                Expr::value(DeploymentStatus::TearingDown),
-            )
-            .col_expr(
-                deployments::Column::UpdatedAt,
-                Expr::value(Utc::now().naive_utc()),
-            )
-            .exec(self.db)
-            .await
-            .map(|result| result.rows_affected)?)
+            .all(self.db)
+            .await?
+            .iter()
+            .map(|d| d.id)
+            .collect();
+
+        self.mark_ids_tearing_down(&ids).await?;
+
+        Ok(ids)
     }
 
     pub async fn find_by_dns_status(

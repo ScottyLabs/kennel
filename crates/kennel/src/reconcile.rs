@@ -179,14 +179,12 @@ async fn reconcile_systemd_units(store: &Store) -> anyhow::Result<()> {
         .difference(&expected_units)
         .collect::<Vec<_>>()
         .is_empty()
-    {
-        if let Err(e) = tokio::process::Command::new("systemctl")
+        && let Err(e) = tokio::process::Command::new("systemctl")
             .arg("daemon-reload")
             .output()
             .await
-        {
-            warn!("Failed to reload systemd daemon: {}", e);
-        }
+    {
+        warn!("Failed to reload systemd daemon: {}", e);
     }
 
     Ok(())
@@ -200,22 +198,22 @@ async fn reconcile_port_allocations(store: &Store) -> anyhow::Result<()> {
     let active_deployment_ids: HashSet<i32> = active_deployments.iter().map(|d| d.id).collect();
 
     for port_allocation in all_ports {
-        if let Some(deployment_id) = port_allocation.deployment_id {
-            if !active_deployment_ids.contains(&deployment_id) {
-                info!(
-                    "Releasing stale port {} allocated to non-existent deployment {}",
-                    port_allocation.port, deployment_id
+        if let Some(deployment_id) = port_allocation.deployment_id
+            && !active_deployment_ids.contains(&deployment_id)
+        {
+            info!(
+                "Releasing stale port {} allocated to non-existent deployment {}",
+                port_allocation.port, deployment_id
+            );
+            if let Err(e) = store
+                .port_allocations()
+                .release_port(port_allocation.port)
+                .await
+            {
+                warn!(
+                    "Failed to release stale port {}: {}",
+                    port_allocation.port, e
                 );
-                if let Err(e) = store
-                    .port_allocations()
-                    .release_port(port_allocation.port)
-                    .await
-                {
-                    warn!(
-                        "Failed to release stale port {}: {}",
-                        port_allocation.port, e
-                    );
-                }
             }
         }
     }
@@ -276,13 +274,12 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
                 .next_entry()
                 .await?
                 .is_none()
+                && let Err(e) = tokio::fs::remove_dir(&branch_path).await
             {
-                if let Err(e) = tokio::fs::remove_dir(&branch_path).await {
-                    warn!(
-                        "Failed to remove empty branch directory {}: {}",
-                        branch_name, e
-                    );
-                }
+                warn!(
+                    "Failed to remove empty branch directory {}: {}",
+                    branch_name, e
+                );
             }
         }
 
@@ -291,13 +288,12 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
             .next_entry()
             .await?
             .is_none()
+            && let Err(e) = tokio::fs::remove_dir(&project_path).await
         {
-            if let Err(e) = tokio::fs::remove_dir(&project_path).await {
-                warn!(
-                    "Failed to remove empty project directory {}: {}",
-                    project_name, e
-                );
-            }
+            warn!(
+                "Failed to remove empty project directory {}: {}",
+                project_name, e
+            );
         }
     }
 

@@ -6,54 +6,41 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-#[derive(Debug, Clone)]
-pub struct TeardownRequest {
-    pub deployment_id: i32,
-}
-
-pub async fn run_teardown_worker(
-    mut teardown_rx: mpsc::Receiver<TeardownRequest>,
-    config: DeployerConfig,
-) {
+pub async fn run_teardown_worker(mut teardown_rx: mpsc::Receiver<i32>, config: DeployerConfig) {
     info!("Starting teardown worker");
 
-    while let Some(request) = teardown_rx.recv().await {
+    while let Some(deployment_id) = teardown_rx.recv().await {
         info!(
             "Processing teardown request for deployment {}",
-            request.deployment_id
+            deployment_id
         );
 
-        if let Err(e) = process_teardown(&request, &config).await {
-            error!(
-                "Teardown failed for deployment {}: {}",
-                request.deployment_id, e
-            );
+        if let Err(e) = process_teardown(deployment_id, &config).await {
+            error!("Teardown failed for deployment {}: {}", deployment_id, e);
         }
     }
 
     info!("Teardown worker shutting down");
 }
 
-async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) -> Result<()> {
+async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result<()> {
     let deployment = config
         .store
         .deployments()
-        .find_by_id(request.deployment_id)
+        .find_by_id(deployment_id)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-        .ok_or_else(|| {
-            crate::DeployerError::NotFound(format!("Deployment {}", request.deployment_id))
-        })?;
+        .ok_or_else(|| crate::DeployerError::NotFound(format!("Deployment {}", deployment_id)))?;
 
     if deployment.status != DeploymentStatus::TearingDown {
         warn!(
             "Deployment {} is not in TearingDown status, skipping",
-            request.deployment_id
+            deployment_id
         );
         return Ok(());
     }
 
-    info!("Tearing down deployment {}", request.deployment_id);
+    info!("Tearing down deployment {}", deployment_id);
 
     let branch_sanitized = deployment.branch_slug.clone();
 
@@ -168,12 +155,9 @@ async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) ->
 
     // Delete DNS records for custom domains
     if let Some(dns_manager) = &config.dns_manager {
-        info!(
-            "Deleting DNS records for deployment {}",
-            request.deployment_id
-        );
+        info!("Deleting DNS records for deployment {}", deployment_id);
         if let Err(e) = dns_manager
-            .delete_record_for_deployment(request.deployment_id)
+            .delete_record_for_deployment(deployment_id)
             .await
         {
             warn!("Failed to delete DNS records: {}", e);
@@ -196,14 +180,11 @@ async fn process_teardown(request: &TeardownRequest, config: &DeployerConfig) ->
     config
         .store
         .deployments()
-        .delete(request.deployment_id)
+        .delete(deployment_id)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
-    info!(
-        "Successfully tore down deployment {}",
-        request.deployment_id
-    );
+    info!("Successfully tore down deployment {}", deployment_id);
 
     Ok(())
 }

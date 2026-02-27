@@ -14,7 +14,7 @@ pub(crate) fn determine_environment(git_ref: &str) -> String {
         "main" => "prod".to_string(),
         "staging" => "staging".to_string(),
         "dev" => "dev".to_string(),
-        ref s if s.starts_with("pr-") => "preview".to_string(),
+        s if s.starts_with("pr-") => "preview".to_string(),
         _ => "dev".to_string(),
     }
 }

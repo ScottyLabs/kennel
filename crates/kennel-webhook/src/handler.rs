@@ -62,11 +62,19 @@ pub async fn handle_webhook(
                     "Branch deleted: {}/{}, marking deployments for teardown",
                     project_name, git_ref
                 );
-                config
+                let ids = config
                     .store
                     .deployments()
                     .mark_for_teardown(&project.name, &git_ref)
                     .await?;
+                for id in ids {
+                    if let Err(e) = config.teardown_tx.send(id).await {
+                        error!(
+                            "Failed to send teardown request for deployment {}: {}",
+                            id, e
+                        );
+                    }
+                }
                 return Ok(StatusCode::ACCEPTED);
             }
 
@@ -166,11 +174,19 @@ pub async fn handle_webhook(
                         "PR closed: {}/PR#{}, marking deployments for teardown",
                         project_name, pr_number
                     );
-                    config
+                    let ids = config
                         .store
                         .deployments()
                         .mark_for_teardown(&project.name, &git_ref)
                         .await?;
+                    for id in ids {
+                        if let Err(e) = config.teardown_tx.send(id).await {
+                            error!(
+                                "Failed to send teardown request for deployment {}: {}",
+                                id, e
+                            );
+                        }
+                    }
                     Ok(StatusCode::ACCEPTED)
                 }
                 _ => {

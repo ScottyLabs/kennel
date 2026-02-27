@@ -6,8 +6,8 @@ pub struct Channels {
     pub build_rx: mpsc::Receiver<i32>,
     pub deploy_tx: mpsc::Sender<kennel_deployer::DeploymentRequest>,
     pub deploy_rx: mpsc::Receiver<kennel_deployer::DeploymentRequest>,
-    pub teardown_tx: mpsc::Sender<kennel_deployer::TeardownRequest>,
-    pub teardown_rx: mpsc::Receiver<kennel_deployer::TeardownRequest>,
+    pub teardown_tx: mpsc::Sender<i32>,
+    pub teardown_rx: mpsc::Receiver<i32>,
     pub router_update_tx: tokio::sync::broadcast::Sender<kennel_router::RouterUpdate>,
     pub router_update_rx: tokio::sync::broadcast::Receiver<kennel_router::RouterUpdate>,
 }

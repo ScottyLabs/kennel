@@ -20,12 +20,12 @@ impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
             Box::new(m20260224_193925_create_enums::Migration),
-            Box::new(m20260224_193940_create_builds::Migration),
-            Box::new(m20260224_193940_create_deployments::Migration),
-            Box::new(m20260224_193940_create_port_allocations::Migration),
-            Box::new(m20260224_193940_create_preview_databases::Migration),
             Box::new(m20260224_193940_create_projects::Migration),
             Box::new(m20260224_193940_create_services::Migration),
+            Box::new(m20260224_193940_create_builds::Migration),
+            Box::new(m20260224_193940_create_preview_databases::Migration),
+            Box::new(m20260224_193940_create_deployments::Migration),
+            Box::new(m20260224_193940_create_port_allocations::Migration),
             Box::new(m20260224_194026_create_triggers::Migration),
             Box::new(m20260224_195047_create_build_results::Migration),
             Box::new(m20260225_055843_add_error_message_to_build_results::Migration),
