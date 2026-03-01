@@ -7,6 +7,8 @@ on:
 jobs:
   check:
     runs-on: docker
+    env:
+      NIX_CONFIG: sandbox = true
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
 
@@ -14,12 +16,11 @@ jobs:
         uses: https://github.com/cachix/install-nix-action@v31
         with:
           extra_nix_config: |
-            sandbox = true
             extra-substituters = https://scottylabs.cachix.org
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
 
       - name: Install devenv
-        run: nix profile install nixpkgs#devenv
+        run: nix profile add nixpkgs#devenv
 
       - name: Check formatting
         run: devenv shell treefmt --fail-on-change
