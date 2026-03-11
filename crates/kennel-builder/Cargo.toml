@@ -10,6 +10,7 @@ chrono = "0.4.44"
 entity = { version = "0.1.0", path = "../entity" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
+kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
 sea-orm = "1.1.19"
 thiserror = "2.0.18"
 tokio = { version = "1", features = ["full"] }

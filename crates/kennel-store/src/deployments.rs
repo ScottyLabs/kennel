@@ -55,21 +55,21 @@ impl<'a> DeploymentRepository<'a> {
             .await
     }
 
-    pub async fn list_active(&self) -> Result<Vec<deployments::Model>, DbErr> {
-        self.list_by_status(DeploymentStatus::Active).await
+    pub async fn list_deployed(&self) -> Result<Vec<deployments::Model>, DbErr> {
+        self.list_by_status(DeploymentStatus::Deployed).await
     }
 
-    pub async fn list_active_with_services(
+    pub async fn list_deployed_with_services(
         &self,
     ) -> Result<Vec<(deployments::Model, Option<services::Model>)>, DbErr> {
         Deployments::find()
-            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
             .find_also_related(services::Entity)
             .all(self.db)
             .await
     }
 
-    pub async fn find_active_by_ref(
+    pub async fn find_deployed_by_ref(
         &self,
         project_name: &str,
         git_ref: &str,
@@ -79,7 +79,7 @@ impl<'a> DeploymentRepository<'a> {
             .filter(deployments::Column::ProjectName.eq(project_name))
             .filter(deployments::Column::GitRef.eq(git_ref))
             .filter(deployments::Column::ServiceName.eq(service_name))
-            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
             .one(self.db)
             .await
     }
@@ -113,7 +113,7 @@ impl<'a> DeploymentRepository<'a> {
 
         let mut query = Deployments::find()
             .filter(deployments::Column::LastActivity.lt(cutoff))
-            .filter(deployments::Column::Status.eq(DeploymentStatus::Active));
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed));
 
         for env in exclude_environments {
             query = query.filter(deployments::Column::Environment.ne(*env));
@@ -122,7 +122,7 @@ impl<'a> DeploymentRepository<'a> {
         Ok(query.all(self.db).await?)
     }
 
-    pub async fn mark_ids_tearing_down(&self, ids: &[i32]) -> crate::Result<()> {
+    pub async fn mark_ids_torn_down(&self, ids: &[i32]) -> crate::Result<()> {
         use chrono::Utc;
 
         if !ids.is_empty() {
@@ -130,7 +130,7 @@ impl<'a> DeploymentRepository<'a> {
                 .filter(deployments::Column::Id.is_in(ids.iter().copied()))
                 .col_expr(
                     deployments::Column::Status,
-                    Expr::value(DeploymentStatus::TearingDown),
+                    Expr::value(DeploymentStatus::TornDown),
                 )
                 .col_expr(
                     deployments::Column::UpdatedAt,
@@ -151,14 +151,14 @@ impl<'a> DeploymentRepository<'a> {
         let ids: Vec<i32> = Deployments::find()
             .filter(deployments::Column::ProjectName.eq(project_name))
             .filter(deployments::Column::Branch.eq(git_ref))
-            .filter(deployments::Column::Status.eq(DeploymentStatus::Active))
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
             .all(self.db)
             .await?
             .iter()
             .map(|d| d.id)
             .collect();
 
-        self.mark_ids_tearing_down(&ids).await?;
+        self.mark_ids_torn_down(&ids).await?;
 
         Ok(ids)
     }

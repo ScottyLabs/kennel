@@ -25,7 +25,8 @@ pub struct Model {
     pub git_ref: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub store_path: Option<String>,
-    pub port: Option<i32>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub process_config: Option<Json>,
     pub status: DeploymentStatus,
     #[sea_orm(column_type = "Text")]
     pub domain: String,
@@ -40,8 +41,6 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::dns_records::Entity")]
     DnsRecords,
-    #[sea_orm(has_many = "super::port_allocations::Entity")]
-    PortAllocations,
     #[sea_orm(
         belongs_to = "super::services::Entity",
         from = "(Column::ProjectName, Column::ProjectName, Column::ServiceName, Column::ServiceName)",
@@ -55,12 +54,6 @@ pub enum Relation {
 impl Related<super::dns_records::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::DnsRecords.def()
-    }
-}
-
-impl Related<super::port_allocations::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::PortAllocations.def()
     }
 }
 

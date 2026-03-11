@@ -16,6 +16,7 @@ kennel-deployer = { version = "0.1.0", path = "../kennel-deployer" }
 kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-router = { version = "0.1.0", path = "../kennel-router" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
+kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
 kennel-webhook = { version = "0.1.0", path = "../kennel-webhook" }
 migration = { version = "0.1.0", path = "../migration" }
 sea-orm = "1.1.19"

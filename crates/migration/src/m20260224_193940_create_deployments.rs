@@ -25,12 +25,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Deployments::Environment).text().not_null())
                     .col(ColumnDef::new(Deployments::GitRef).text().not_null())
                     .col(ColumnDef::new(Deployments::StorePath).text())
-                    .col(ColumnDef::new(Deployments::Port).integer())
+                    .col(ColumnDef::new(Deployments::ProcessConfig).json_binary())
                     .col(
                         ColumnDef::new(Deployments::Status)
                             .custom(Alias::new("deployment_status"))
                             .not_null()
-                            .default("pending"),
+                            .default("deployed"),
                     )
                     .col(ColumnDef::new(Deployments::Domain).text().not_null())
                     .col(
@@ -119,16 +119,6 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        manager
-            .create_index(
-                Index::create()
-                    .name("idx_deployments_port")
-                    .table(Deployments::Table)
-                    .col(Deployments::Port)
-                    .to_owned(),
-            )
-            .await?;
-
         Ok(())
     }
 
@@ -150,7 +140,7 @@ enum Deployments {
     Environment,
     GitRef,
     StorePath,
-    Port,
+    ProcessConfig,
     Status,
     Domain,
     CreatedAt,

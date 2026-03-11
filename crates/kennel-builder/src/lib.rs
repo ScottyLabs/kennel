@@ -7,6 +7,7 @@ mod worker;
 pub use error::{BuilderError, Result};
 
 use kennel_store::Store;
+use kennel_supervisor::ProcessConfig;
 use std::sync::Arc;
 use tokio::sync::{Semaphore, mpsc};
 use tracing::{error, info};
@@ -24,6 +25,8 @@ pub struct DeploymentRequest {
     pub build_id: i32,
     pub project_name: String,
     pub git_ref: String,
+    pub process_configs: Vec<ProcessConfig>,
+    pub required_resources: Vec<String>,
 }
 
 pub async fn run_worker_pool(mut build_rx: mpsc::Receiver<i32>, config: BuilderConfig) {

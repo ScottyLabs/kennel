@@ -4,7 +4,6 @@ pub mod cleanup;
 pub mod deployments;
 pub mod dns_records;
 pub mod error;
-pub mod port_allocations;
 pub mod preview_databases;
 pub mod projects;
 pub mod reconciliation;
@@ -47,10 +46,6 @@ impl Store {
 
     pub fn build_results(&self) -> build_results::BuildResultRepository<'_> {
         build_results::BuildResultRepository::new(&self.db)
-    }
-
-    pub fn port_allocations(&self) -> port_allocations::PortAllocationRepository<'_> {
-        port_allocations::PortAllocationRepository::new(&self.db)
     }
 
     pub fn preview_databases(&self) -> preview_databases::PreviewDatabaseRepository<'_> {

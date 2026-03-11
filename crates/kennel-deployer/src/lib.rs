@@ -1,10 +1,8 @@
 mod error;
-mod health;
 mod log_cleanup;
 mod secrets;
 mod service;
 mod static_site;
-mod systemd;
 mod teardown;
 mod user;
 mod utils;
@@ -15,16 +13,16 @@ pub use log_cleanup::run_log_cleanup_job;
 pub use teardown::run_teardown_worker;
 
 use kennel_dns::DnsManager;
-use kennel_router::RouterUpdate;
 use kennel_store::Store;
+use kennel_supervisor::Supervisor;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct DeployerConfig {
     pub store: Arc<Store>,
-    pub router_tx: Option<tokio::sync::broadcast::Sender<RouterUpdate>>,
+    pub supervisor: Arc<Mutex<Supervisor>>,
     pub dns_manager: Option<Arc<DnsManager>>,
     pub base_domain: String,
 }
@@ -73,7 +71,7 @@ pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i
                     );
                 }
 
-                if let Err(e) = config.store.deployments().mark_ids_tearing_down(&ids).await {
+                if let Err(e) = config.store.deployments().mark_ids_torn_down(&ids).await {
                     error!("Failed to mark deployments for teardown: {}", e);
                     continue;
                 }

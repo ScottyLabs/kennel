@@ -1,9 +1,11 @@
-use crate::error::Result;
-use entity::{deployments, services};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 use tokio::sync::RwLock;
+
+use crate::error::Result;
+use entity::{deployments, services};
 
 #[derive(Debug, Clone)]
 pub enum RouteTarget {
@@ -53,45 +55,42 @@ impl RoutingTable {
         routes.is_empty()
     }
 
-    pub async fn load_from_deployments_with_services(
+    /// Load static site routes from deployment records. Service routes are
+    /// populated dynamically via supervisor events (since the port is only
+    /// known at runtime).
+    pub async fn load_static_sites_from_deployments(
         &self,
         deployments_with_services: Vec<(deployments::Model, Option<services::Model>)>,
     ) -> Result<()> {
         let mut routes = self.routes.write().await;
-        routes.clear();
 
         for (deployment, service) in deployments_with_services {
-            let service = service.ok_or_else(|| {
-                crate::RouterError::Other(anyhow::anyhow!(
-                    "Service not found for deployment {}",
-                    deployment.id
-                ))
-            })?;
+            let service = match service {
+                Some(s) => s,
+                None => continue,
+            };
 
-            let target = if let Some(port) = deployment.port {
-                RouteTarget::Service { port: port as u16 }
-            } else {
-                let path = deployment
-                    .store_path
-                    .as_ref()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| crate::RouterError::Other(anyhow::anyhow!("No store path")))?;
+            // Only load static sites from DB. Service routes depend on
+            // supervisor-reported ports and are added via events.
+            if service.r#type != entity::sea_orm_active_enums::ServiceType::Static {
+                continue;
+            }
 
-                RouteTarget::StaticSite {
-                    path,
-                    spa: service.spa,
-                }
+            let path = match deployment.store_path.as_ref() {
+                Some(p) => PathBuf::from(p),
+                None => continue,
             };
 
             let route = Route {
-                target,
+                target: RouteTarget::StaticSite {
+                    path,
+                    spa: service.spa,
+                },
                 deployment_id: deployment.id,
             };
 
-            // Insert auto-generated domain
             routes.insert(deployment.domain.clone(), route.clone());
 
-            // Also insert custom domain if configured
             if let Some(custom_domain) = service.custom_domain {
                 routes.insert(custom_domain, route);
             }

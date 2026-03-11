@@ -29,6 +29,9 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         return Ok(());
     }
 
+    // Evaluate devenv task configuration to get process definitions.
+    let (process_configs, required_resources) = evaluate_devenv_tasks(&work_dir, build_id).await?;
+
     let mut store_paths = Vec::new();
     let all_services_succeeded = build_all_packages(
         &config,
@@ -54,6 +57,8 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         all_services_succeeded,
         project_name,
         git_ref,
+        process_configs,
+        required_resources,
     )
     .await
 }
@@ -345,6 +350,34 @@ async fn build_package(
     }
 }
 
+async fn evaluate_devenv_tasks(
+    work_dir: &Path,
+    build_id: i32,
+) -> Result<(Vec<kennel_supervisor::ProcessConfig>, Vec<String>)> {
+    info!(
+        "Evaluating devenv task configuration for build {}",
+        build_id
+    );
+
+    let task_config_path = nix::eval_task_config(work_dir).await?;
+    let tasks_json = tokio::fs::read_to_string(&task_config_path)
+        .await
+        .map_err(|e| {
+            crate::BuilderError::Other(anyhow::anyhow!("Failed to read tasks.json: {e}"))
+        })?;
+
+    let (process_configs, required_resources) = kennel_supervisor::devenv::parse_tasks(&tasks_json)
+        .map_err(|e| crate::BuilderError::Other(anyhow::anyhow!(e)))?;
+
+    info!(
+        "Found {} application processes and {} infrastructure requirements",
+        process_configs.len(),
+        required_resources.len()
+    );
+
+    Ok((process_configs, required_resources))
+}
+
 async fn finalize_build(
     config: &Arc<BuilderConfig>,
     build: entity::builds::Model,
@@ -352,6 +385,8 @@ async fn finalize_build(
     all_succeeded: bool,
     project_name: String,
     git_ref: String,
+    process_configs: Vec<kennel_supervisor::ProcessConfig>,
+    required_resources: Vec<String>,
 ) -> Result<()> {
     let mut build_active = build.into_active_model();
 
@@ -371,6 +406,8 @@ async fn finalize_build(
                 build_id,
                 project_name,
                 git_ref,
+                process_configs,
+                required_resources,
             })
             .await
         {

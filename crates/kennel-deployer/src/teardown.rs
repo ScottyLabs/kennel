@@ -1,22 +1,22 @@
-use crate::error::Result;
-use crate::{DeployerConfig, secrets, systemd, user, utils};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
 use entity::sea_orm_active_enums::DeploymentStatus;
 use sea_orm::{ActiveValue::Set, IntoActiveModel};
-use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
+
+use crate::error::Result;
+use crate::{DeployerConfig, secrets, user, utils};
 
 pub async fn run_teardown_worker(mut teardown_rx: mpsc::Receiver<i32>, config: DeployerConfig) {
     info!("Starting teardown worker");
 
     while let Some(deployment_id) = teardown_rx.recv().await {
-        info!(
-            "Processing teardown request for deployment {}",
-            deployment_id
-        );
+        info!("Processing teardown request for deployment {deployment_id}");
 
         if let Err(e) = process_teardown(deployment_id, &config).await {
-            error!("Teardown failed for deployment {}: {}", deployment_id, e);
+            error!("Teardown failed for deployment {deployment_id}: {e}");
         }
     }
 
@@ -30,71 +30,46 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         .find_by_id(deployment_id)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-        .ok_or_else(|| crate::DeployerError::NotFound(format!("Deployment {}", deployment_id)))?;
+        .ok_or_else(|| crate::DeployerError::NotFound(format!("Deployment {deployment_id}")))?;
 
-    if deployment.status != DeploymentStatus::TearingDown {
-        warn!(
-            "Deployment {} is not in TearingDown status, skipping",
-            deployment_id
-        );
-        return Ok(());
-    }
-
-    info!("Tearing down deployment {}", deployment_id);
+    info!("Tearing down deployment {deployment_id}");
 
     let branch_sanitized = deployment.branch_slug.clone();
+    let process_name = format!(
+        "kennel-{}-{}-{}",
+        deployment.project_name, branch_sanitized, deployment.service_name
+    );
 
-    // Stop systemd service if it's a service deployment
-    if deployment.port.is_some() {
-        let unit_name = format!(
-            "kennel-{}-{}-{}",
-            deployment.project_name, branch_sanitized, deployment.service_name
-        );
-
-        info!("Stopping systemd unit: {}", unit_name);
-
-        if let Err(e) = systemd::stop_unit(&unit_name).await {
-            warn!("Failed to stop unit {}: {}", unit_name, e);
-        }
-
-        if let Err(e) = systemd::disable_unit(&unit_name).await {
-            warn!("Failed to disable unit {}: {}", unit_name, e);
-        }
-
-        if let Err(e) = systemd::remove_unit(&unit_name).await {
-            warn!("Failed to remove unit {}: {}", unit_name, e);
-        }
-
-        if let Err(e) = systemd::daemon_reload().await {
-            warn!("Failed to reload systemd daemon: {}", e);
-        }
-
-        // Release port
-        if let Some(port) = deployment.port {
-            if let Err(e) = config.store.port_allocations().release_port(port).await {
-                warn!("Failed to release port {}: {}", port, e);
-            } else {
-                info!("Released port {}", port);
+    // Stop the supervised process
+    {
+        let mut supervisor = config.supervisor.lock().await;
+        if supervisor.is_running(&process_name) {
+            if let Err(e) = supervisor
+                .stop(&process_name, Duration::from_secs(30))
+                .await
+            {
+                warn!("Failed to stop process {process_name}: {e}");
             }
+            supervisor.remove(&process_name);
         }
     }
 
-    // Remove static symlink if it's a static deployment (port is None for static sites)
-    if deployment.port.is_none() {
-        let static_link_path = format!(
-            "{}/{}/{}/{}",
-            kennel_config::constants::SITES_BASE_DIR,
-            deployment.project_name,
-            deployment.branch_slug,
-            deployment.service_name
-        );
-        let static_link = Path::new(&static_link_path);
+    // Remove static symlink if it's a static site deployment
+    let static_link_path = format!(
+        "{}/{}/{}/{}",
+        kennel_config::constants::SITES_BASE_DIR,
+        deployment.project_name,
+        deployment.branch_slug,
+        deployment.service_name
+    );
+    let static_link = Path::new(&static_link_path);
+    if static_link.exists() {
         if let Err(e) = tokio::fs::remove_file(static_link).await {
             if e.kind() != std::io::ErrorKind::NotFound {
-                warn!("Failed to remove static symlink {:?}: {}", static_link, e);
+                warn!("Failed to remove static symlink {static_link_path}: {e}");
             }
         } else {
-            info!("Removed static symlink: {:?}", static_link);
+            info!("Removed static symlink: {static_link_path}");
         }
     }
 
@@ -106,12 +81,11 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         branch_sanitized,
         deployment.service_name
     ));
-
     if let Err(e) = secrets::remove_secrets_file(&secrets_path).await {
-        warn!("Failed to remove secrets file: {}", e);
+        warn!("Failed to remove secrets file: {e}");
     }
 
-    // Release preview database if this was the last deployment for this branch
+    // Release preview database if no remaining deployments for this branch
     let remaining_deployments = config
         .store
         .deployments()
@@ -124,14 +98,13 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
     if remaining_deployments.is_none() {
-        // No more deployments for this branch, release preview database
         if let Err(e) = config
             .store
             .preview_databases()
             .delete_by_project_and_branch(&deployment.project_name, &deployment.branch)
             .await
         {
-            warn!("Failed to release preview database: {}", e);
+            warn!("Failed to release preview database: {e}");
         } else {
             info!(
                 "Released preview database for {}/{}",
@@ -139,34 +112,28 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
             );
         }
 
-        // No more deployments for this project+branch+service, remove system user
         let username = utils::sanitize_username(
             &deployment.project_name,
             &deployment.branch,
             &deployment.service_name,
         );
-
         if let Err(e) = user::remove_user(&username).await {
-            warn!("Failed to remove system user {}: {}", username, e);
+            warn!("Failed to remove system user {username}: {e}");
         } else {
-            info!("Removed system user: {}", username);
+            info!("Removed system user: {username}");
         }
     }
 
-    // Delete DNS records for custom domains
-    if let Some(dns_manager) = &config.dns_manager {
-        info!("Deleting DNS records for deployment {}", deployment_id);
-        if let Err(e) = dns_manager
+    // Delete DNS records
+    if let Some(dns_manager) = &config.dns_manager
+        && let Err(e) = dns_manager
             .delete_record_for_deployment(deployment_id)
             .await
-        {
-            warn!("Failed to delete DNS records: {}", e);
-        } else {
-            info!("DNS records deleted successfully");
-        }
+    {
+        warn!("Failed to delete DNS records: {e}");
     }
 
-    // Mark as torn down
+    // Mark as torn down and delete
     let mut deployment_active = deployment.into_active_model();
     deployment_active.status = Set(DeploymentStatus::TornDown);
     config
@@ -176,7 +143,6 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
-    // Delete deployment record
     config
         .store
         .deployments()
@@ -184,7 +150,7 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
-    info!("Successfully tore down deployment {}", deployment_id);
+    info!("Successfully tore down deployment {deployment_id}");
 
     Ok(())
 }

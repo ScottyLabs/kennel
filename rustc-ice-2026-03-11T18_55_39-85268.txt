@@ -1,0 +1,37 @@
+thread 'rustc' panicked at /rustc-dev/3a70d0349fa378a10c3748f1a48742e61505020f/compiler/rustc_mir_transform/src/lib.rs:550:25:
+stealing value which is locked: ()
+stack backtrace:
+   0:        0x113b6d9a4 - <std[c0040615f6385a8e]::backtrace::Backtrace>::create
+   1:        0x111a0f67c - std[c0040615f6385a8e]::panicking::update_hook::<alloc[89a17cc06a408ab7]::boxed::Box<rustc_driver_impl[3fed37df6ce86d89]::install_ice_hook::{closure#1}>>::{closure#0}
+   2:        0x113b7efe0 - std[c0040615f6385a8e]::panicking::panic_with_hook
+   3:        0x113b62f08 - std[c0040615f6385a8e]::panicking::panic_handler::{closure#0}
+   4:        0x113b598ac - std[c0040615f6385a8e]::sys::backtrace::__rust_end_short_backtrace::<std[c0040615f6385a8e]::panicking::panic_handler::{closure#0}, !>
+   5:        0x113b644d8 - __rustc[8af5c0f5c54b39df]::rust_begin_unwind
+   6:        0x116b9f718 - core[dae54ca1a06fca76]::panicking::panic_fmt
+   7:        0x116b9f480 - core[dae54ca1a06fca76]::result::unwrap_failed
+   8:        0x112a77a00 - rustc_mir_transform[f0a77b71e9a7079b]::mir_drops_elaborated_and_const_checked
+   9:        0x112fad300 - rustc_query_impl[b026f8e43fafed2f]::execution::try_execute_query::<rustc_data_structures[72cfba6f3b26e8e3]::vec_cache::VecCache<rustc_span[52519e4b463ad43e]::def_id::LocalDefId, rustc_middle[fbe9e236e1823ad4]::query::erase::ErasedData<[u8; 8usize]>, rustc_middle[fbe9e236e1823ad4]::dep_graph::graph::DepNodeIndex>, true>
+  10:        0x112f929f8 - rustc_query_impl[b026f8e43fafed2f]::plumbing::force_from_dep_node_inner::<rustc_data_structures[72cfba6f3b26e8e3]::vec_cache::VecCache<rustc_span[52519e4b463ad43e]::def_id::LocalDefId, rustc_middle[fbe9e236e1823ad4]::query::erase::ErasedData<[u8; 8usize]>, rustc_middle[fbe9e236e1823ad4]::dep_graph::graph::DepNodeIndex>>
+  11:        0x1132c4eb0 - <rustc_query_impl[b026f8e43fafed2f]::dep_kind_vtables::make_dep_kind_vtable_for_query<rustc_query_impl[b026f8e43fafed2f]::query_impl::mir_drops_elaborated_and_const_checked::VTableGetter>::{closure#0} as core[dae54ca1a06fca76]::ops::function::FnOnce<(rustc_middle[fbe9e236e1823ad4]::ty::context::TyCtxt, rustc_middle[fbe9e236e1823ad4]::dep_graph::dep_node::DepNode, rustc_middle[fbe9e236e1823ad4]::dep_graph::serialized::SerializedDepNodeIndex)>>::call_once
+  12:        0x112762804 - <rustc_middle[fbe9e236e1823ad4]::dep_graph::graph::DepGraphData>::try_mark_previous_green
+  13:        0x1127627ac - <rustc_middle[fbe9e236e1823ad4]::dep_graph::graph::DepGraphData>::try_mark_previous_green
+  14:        0x112762670 - <rustc_middle[fbe9e236e1823ad4]::dep_graph::graph::DepGraphData>::try_mark_green
+  15:        0x11307d610 - rustc_query_impl[b026f8e43fafed2f]::execution::check_if_ensure_can_skip_execution::<rustc_middle[fbe9e236e1823ad4]::query::caches::DefaultCache<rustc_middle[fbe9e236e1823ad4]::ty::PseudoCanonicalInput<rustc_middle[fbe9e236e1823ad4]::ty::Ty>, rustc_middle[fbe9e236e1823ad4]::query::erase::ErasedData<[u8; 16usize]>>>
+  16:        0x1131b9678 - rustc_query_impl[b026f8e43fafed2f]::query_impl::layout_of::execute_query_incr::__rust_end_short_backtrace
+  17:        0x1122fa910 - <rustc_middle[fbe9e236e1823ad4]::ty::context::TyCtxt>::par_hir_body_owners::<rustc_interface[48b3fae77f8629d8]::passes::run_required_analyses::{closure#1}::{closure#0}>::{closure#0}
+  18:        0x1123956a8 - <rustc_thread_pool[3833c5cf44fee6f7]::job::HeapJob<<rustc_thread_pool[3833c5cf44fee6f7]::scope::Scope>::spawn<rustc_data_structures[72cfba6f3b26e8e3]::sync::parallel::par_slice<&rustc_span[52519e4b463ad43e]::def_id::LocalDefId, rustc_data_structures[72cfba6f3b26e8e3]::sync::parallel::par_for_each_in<&rustc_span[52519e4b463ad43e]::def_id::LocalDefId, &[rustc_span[52519e4b463ad43e]::def_id::LocalDefId], <rustc_middle[fbe9e236e1823ad4]::ty::context::TyCtxt>::par_hir_body_owners<rustc_interface[48b3fae77f8629d8]::passes::run_required_analyses::{closure#1}::{closure#0}>::{closure#0}>::{closure#0}::{closure#0}>::{closure#0}::{closure#0}>::{closure#0}> as rustc_thread_pool[3833c5cf44fee6f7]::job::Job>::execute
+  19:        0x116d236dc - <rustc_thread_pool[3833c5cf44fee6f7]::registry::WorkerThread>::wait_or_steal_until_cold
+  20:        0x1136a26d0 - <rustc_thread_pool[3833c5cf44fee6f7]::registry::ThreadBuilder>::run
+  21:        0x111a05b2c - std[c0040615f6385a8e]::sys::backtrace::__rust_begin_short_backtrace::<<rustc_thread_pool[3833c5cf44fee6f7]::ThreadPoolBuilder>::build_scoped<rustc_interface[48b3fae77f8629d8]::util::run_in_thread_pool_with_globals<rustc_interface[48b3fae77f8629d8]::interface::run_compiler<(), rustc_driver_impl[3fed37df6ce86d89]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#0}, rustc_interface[48b3fae77f8629d8]::util::run_in_thread_pool_with_globals<rustc_interface[48b3fae77f8629d8]::interface::run_compiler<(), rustc_driver_impl[3fed37df6ce86d89]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#1}, ()>::{closure#0}::{closure#0}::{closure#0}, ()>
+  22:        0x111a16e9c - <std[c0040615f6385a8e]::thread::lifecycle::spawn_unchecked<<rustc_thread_pool[3833c5cf44fee6f7]::ThreadPoolBuilder>::build_scoped<rustc_interface[48b3fae77f8629d8]::util::run_in_thread_pool_with_globals<rustc_interface[48b3fae77f8629d8]::interface::run_compiler<(), rustc_driver_impl[3fed37df6ce86d89]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#0}, rustc_interface[48b3fae77f8629d8]::util::run_in_thread_pool_with_globals<rustc_interface[48b3fae77f8629d8]::interface::run_compiler<(), rustc_driver_impl[3fed37df6ce86d89]::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#5}::{closure#0}::{closure#1}, ()>::{closure#0}::{closure#0}::{closure#0}, ()>::{closure#1} as core[dae54ca1a06fca76]::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  23:        0x113b89d10 - <std[c0040615f6385a8e]::sys::thread::unix::Thread>::new::thread_start
+  24:        0x19fd21c08 - __pthread_cond_wait
+
+
+rustc version: 1.95.0-nightly (3a70d0349 2026-02-27)
+platform: aarch64-apple-darwin
+
+query stack during panic:
+#0 [mir_drops_elaborated_and_const_checked] elaborating drops for `builds::<impl at crates/kennel-store/src/builds.rs:8:1: 8:29>::list_by_project_and_branch::{closure#0}`
+#1 [analysis] running analysis passes on crate `kennel_store`
+end of query stack

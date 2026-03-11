@@ -1,11 +1,13 @@
 use entity::sea_orm_active_enums::RepoType;
 use kennel_config::constants;
 use kennel_store::Store;
+use kennel_supervisor::{ProcessConfig, Supervisor};
 use sea_orm::ActiveValue;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tokio::sync::Mutex;
+use tracing::{error, info, warn};
 
 #[derive(Debug, Deserialize)]
 struct ProjectConfig {
@@ -39,11 +41,13 @@ pub async fn reconcile_projects(store: Arc<Store>) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn reconcile_deployments(store: Arc<Store>) -> anyhow::Result<()> {
+pub async fn reconcile_deployments(
+    store: Arc<Store>,
+    supervisor: Arc<Mutex<Supervisor>>,
+) -> anyhow::Result<()> {
     info!("Running startup resource reconciliation");
 
-    reconcile_systemd_units(&store).await?;
-    reconcile_port_allocations(&store).await?;
+    reconcile_supervisor_processes(&store, &supervisor).await?;
     reconcile_static_site_symlinks(&store).await?;
 
     info!("Startup reconciliation complete");
@@ -117,102 +121,38 @@ async fn cleanup_removed_projects(
     Ok(())
 }
 
-async fn reconcile_systemd_units(store: &Store) -> anyhow::Result<()> {
-    info!("Reconciling systemd units");
+/// Re-start all deployed service processes through the supervisor.
+/// After a restart, the supervisor has no running processes, so we
+/// reconstruct ProcessConfigs from stored deployment records.
+async fn reconcile_supervisor_processes(
+    store: &Store,
+    supervisor: &Arc<Mutex<Supervisor>>,
+) -> anyhow::Result<()> {
+    info!("Reconciling supervisor processes");
 
-    let output = tokio::process::Command::new("systemctl")
-        .args(["list-units", "--all", "--plain", "--no-legend", "kennel-*"])
-        .output()
-        .await?;
+    let deployed = store.find_deployed_service_deployments().await?;
 
-    if !output.status.success() {
-        warn!("Failed to list systemd units");
-        return Ok(());
-    }
+    for deployment in deployed {
+        let process_config: Option<ProcessConfig> = deployment
+            .process_config
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-    let units_output = String::from_utf8_lossy(&output.stdout);
-    let running_units: HashSet<String> = units_output
-        .lines()
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            parts.first().map(|s| s.to_string())
-        })
-        .filter(|unit| unit.starts_with("kennel-") && unit.ends_with(".service"))
-        .collect();
-
-    let active_deployments = store.deployments().list_active().await?;
-    let expected_units: HashSet<String> = active_deployments
-        .iter()
-        .map(|d| {
-            format!(
-                "kennel-{}-{}-{}.service",
-                d.project_name, d.branch_slug, d.service_name
-            )
-        })
-        .collect();
-
-    for orphaned_unit in running_units.difference(&expected_units) {
-        info!("Stopping orphaned systemd unit: {}", orphaned_unit);
-        if let Err(e) = tokio::process::Command::new("systemctl")
-            .args(["stop", orphaned_unit])
-            .output()
-            .await
-        {
-            warn!("Failed to stop orphaned unit {}: {}", orphaned_unit, e);
-        }
-
-        if let Err(e) = tokio::process::Command::new("systemctl")
-            .args(["disable", orphaned_unit])
-            .output()
-            .await
-        {
-            warn!("Failed to disable orphaned unit {}: {}", orphaned_unit, e);
-        }
-
-        let unit_file = format!("/etc/systemd/system/{}", orphaned_unit);
-        if let Err(e) = tokio::fs::remove_file(&unit_file).await {
-            warn!("Failed to remove orphaned unit file {}: {}", unit_file, e);
-        }
-    }
-
-    if !running_units
-        .difference(&expected_units)
-        .collect::<Vec<_>>()
-        .is_empty()
-        && let Err(e) = tokio::process::Command::new("systemctl")
-            .arg("daemon-reload")
-            .output()
-            .await
-    {
-        warn!("Failed to reload systemd daemon: {}", e);
-    }
-
-    Ok(())
-}
-
-async fn reconcile_port_allocations(store: &Store) -> anyhow::Result<()> {
-    info!("Reconciling port allocations");
-
-    let all_ports = store.port_allocations().list_allocated().await?;
-    let active_deployments = store.deployments().list_active().await?;
-    let active_deployment_ids: HashSet<i32> = active_deployments.iter().map(|d| d.id).collect();
-
-    for port_allocation in all_ports {
-        if let Some(deployment_id) = port_allocation.deployment_id
-            && !active_deployment_ids.contains(&deployment_id)
-        {
-            info!(
-                "Releasing stale port {} allocated to non-existent deployment {}",
-                port_allocation.port, deployment_id
-            );
-            if let Err(e) = store
-                .port_allocations()
-                .release_port(port_allocation.port)
-                .await
-            {
+        match process_config {
+            Some(config) => {
+                info!("Re-starting process {} from stored config", config.name);
+                let mut sup = supervisor.lock().await;
+                if let Err(e) = sup.start(config).await {
+                    error!(
+                        "Failed to restart process for deployment {}: {e}",
+                        deployment.id
+                    );
+                }
+            }
+            None => {
                 warn!(
-                    "Failed to release stale port {}: {}",
-                    port_allocation.port, e
+                    "Deployment {} has no stored process_config, skipping",
+                    deployment.id
                 );
             }
         }
@@ -229,12 +169,10 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let active_static_deployments: HashSet<String> = store
-        .deployments()
-        .list_active()
+    let deployed_static: HashSet<String> = store
+        .find_deployed_static_deployments()
         .await?
         .into_iter()
-        .filter(|d| d.port.is_none())
         .map(|d| format!("{}/{}/{}", d.project_name, d.branch_slug, d.service_name))
         .collect();
 
@@ -259,12 +197,12 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
             let mut site_entries = tokio::fs::read_dir(&branch_path).await?;
             while let Some(site_entry) = site_entries.next_entry().await? {
                 let site_name = site_entry.file_name().to_string_lossy().to_string();
-                let symlink_path = format!("{}/{}/{}", project_name, branch_name, site_name);
+                let symlink_path = format!("{project_name}/{branch_name}/{site_name}");
 
-                if !active_static_deployments.contains(&symlink_path) {
-                    info!("Removing orphaned static site symlink: {}", symlink_path);
+                if !deployed_static.contains(&symlink_path) {
+                    info!("Removing orphaned static site symlink: {symlink_path}");
                     if let Err(e) = tokio::fs::remove_file(site_entry.path()).await {
-                        warn!("Failed to remove orphaned symlink {}: {}", symlink_path, e);
+                        warn!("Failed to remove orphaned symlink {symlink_path}: {e}");
                     }
                 }
             }
@@ -276,10 +214,7 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
                 .is_none()
                 && let Err(e) = tokio::fs::remove_dir(&branch_path).await
             {
-                warn!(
-                    "Failed to remove empty branch directory {}: {}",
-                    branch_name, e
-                );
+                warn!("Failed to remove empty branch directory {branch_name}: {e}");
             }
         }
 
@@ -290,10 +225,7 @@ async fn reconcile_static_site_symlinks(store: &Store) -> anyhow::Result<()> {
             .is_none()
             && let Err(e) = tokio::fs::remove_dir(&project_path).await
         {
-            warn!(
-                "Failed to remove empty project directory {}: {}",
-                project_name, e
-            );
+            warn!("Failed to remove empty project directory {project_name}: {e}");
         }
     }
 

@@ -1,7 +1,6 @@
 mod acme;
 mod error;
 mod handler;
-mod health;
 mod proxy;
 mod static_serve;
 mod table;
@@ -9,27 +8,12 @@ mod tls;
 
 pub use acme::{create_acme_state, run_acme_event_loop};
 pub use error::{Result, RouterError};
-pub use health::run_health_monitor;
 pub use table::{Route, RouteTarget, RoutingTable};
 pub use tls::serve_with_tls;
 
-#[derive(Debug, Clone)]
-pub enum RouterUpdate {
-    DeploymentActive {
-        deployment_id: i32,
-        domain: String,
-        port: Option<u16>,
-        store_path: Option<String>,
-        spa: bool,
-    },
-    DeploymentRemoved {
-        domain: String,
-    },
-    FullReload,
-}
-
 use axum::Router;
 use kennel_store::Store;
+use kennel_supervisor::SupervisorEvent;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{error, info};
@@ -45,29 +29,31 @@ pub struct RouterConfig {
 
 pub async fn run_router(
     config: RouterConfig,
-    update_rx: tokio::sync::broadcast::Receiver<RouterUpdate>,
+    event_rx: tokio::sync::broadcast::Receiver<SupervisorEvent>,
 ) -> Result<()> {
     info!("Starting router on {}", config.bind_addr);
 
     let routing_table = Arc::new(RoutingTable::new());
 
-    let active_deployments = config
+    // Load static site routes from the database on startup.
+    // Service routes are populated via supervisor events.
+    let deployed = config
         .store
         .deployments()
-        .list_active_with_services()
+        .list_deployed_with_services()
         .await
         .map_err(|e| RouterError::Other(anyhow::anyhow!(e)))?;
 
     routing_table
-        .load_from_deployments_with_services(active_deployments)
+        .load_static_sites_from_deployments(deployed)
         .await?;
 
-    info!("Loaded {} routes", routing_table.len().await);
+    info!("Loaded {} initial routes", routing_table.len().await);
 
     let table_clone = routing_table.clone();
     let store_clone = config.store.clone();
     tokio::spawn(async move {
-        run_update_handler(table_clone, store_clone, update_rx).await;
+        run_update_handler(table_clone, store_clone, event_rx).await;
     });
 
     let app = Router::new()
@@ -90,13 +76,13 @@ pub async fn run_router(
         let addr: std::net::SocketAddr = config
             .bind_addr
             .parse()
-            .map_err(|e| RouterError::Other(anyhow::anyhow!("Invalid bind address: {}", e)))?;
+            .map_err(|e| RouterError::Other(anyhow::anyhow!("Invalid bind address: {e}")))?;
 
         info!("Router starting with TLS on {}", addr);
 
         serve_with_tls(app, addr, acme_state)
             .await
-            .map_err(|e| RouterError::Other(anyhow::anyhow!("TLS server error: {}", e)))?;
+            .map_err(|e| RouterError::Other(anyhow::anyhow!("TLS server error: {e}")))?;
     } else {
         let listener = TcpListener::bind(&config.bind_addr).await?;
         info!("Router listening on {} (HTTP only)", config.bind_addr);
@@ -114,7 +100,7 @@ pub async fn run_router(
 async fn get_all_domains(store: &Store) -> Result<Vec<String>> {
     let deployments = store
         .deployments()
-        .list_active_with_services()
+        .list_deployed_with_services()
         .await
         .map_err(|e| RouterError::Other(anyhow::anyhow!(e)))?;
 
@@ -137,7 +123,7 @@ async fn get_all_domains(store: &Store) -> Result<Vec<String>> {
 async fn run_update_handler(
     table: Arc<RoutingTable>,
     store: Arc<Store>,
-    mut update_rx: tokio::sync::broadcast::Receiver<RouterUpdate>,
+    mut event_rx: tokio::sync::broadcast::Receiver<SupervisorEvent>,
 ) {
     use std::path::PathBuf;
     use tokio::time::interval;
@@ -148,62 +134,104 @@ async fn run_update_handler(
 
     loop {
         tokio::select! {
-            Ok(update) = update_rx.recv() => {
-                match update {
-                    RouterUpdate::DeploymentActive { deployment_id, domain, port, store_path, spa } => {
-                        info!("Updating route for domain: {} (deployment {})", domain, deployment_id);
+            Ok(event) = event_rx.recv() => {
+                match event {
+                    SupervisorEvent::ProcessReady { name, port, store_path } => {
+                        info!("Process ready: {name}");
 
-                        let target = if let Some(port) = port {
-                            RouteTarget::Service { port }
-                        } else if let Some(path_str) = store_path {
-                            RouteTarget::StaticSite {
-                                path: PathBuf::from(path_str),
-                                spa,
+                        // Look up the deployment by process name to get
+                        // the domain and deployment ID.
+                        if let Some(port) = port {
+                            // Service deployment -- use the port the supervisor
+                            // reported.
+                            if let Ok(Some((deployment, _service))) = find_deployment_by_process_name(&store, &name).await {
+                                table.insert(
+                                    deployment.domain.clone(),
+                                    Route {
+                                        target: RouteTarget::Service { port },
+                                        deployment_id: deployment.id,
+                                    },
+                                ).await;
                             }
-                        } else {
-                            error!("Invalid deployment update: no port or store_path");
-                            continue;
-                        };
-
-                        table.insert(domain, Route {
-                            target,
-                            deployment_id,
-                        }).await;
-                    }
-                    RouterUpdate::DeploymentRemoved { domain } => {
-                        info!("Removing route for domain: {}", domain);
-                        table.remove(&domain).await;
-                    }
-                    RouterUpdate::FullReload => {
-                        info!("Full routing table reload requested");
-                        if let Err(e) = reload_routing_table(&table, &store).await {
-                            error!("Failed to reload routing table: {}", e);
+                        } else if let Some(path_str) = store_path {
+                            // Static site -- use the store path.
+                            if let Ok(Some((deployment, service))) = find_deployment_by_process_name(&store, &name).await {
+                                let spa = service.map(|s| s.spa).unwrap_or(false);
+                                table.insert(
+                                    deployment.domain.clone(),
+                                    Route {
+                                        target: RouteTarget::StaticSite {
+                                            path: PathBuf::from(path_str),
+                                            spa,
+                                        },
+                                        deployment_id: deployment.id,
+                                    },
+                                ).await;
+                            }
                         }
                     }
+                    SupervisorEvent::ProcessUnhealthy { name }
+                    | SupervisorEvent::ProcessStopped { name } => {
+                        if let Ok(Some((deployment, _service))) = find_deployment_by_process_name(&store, &name).await {
+                            table.remove(&deployment.domain).await;
+                        }
+                    }
+                    SupervisorEvent::ProcessHealthy { name, port } => {
+                        if let Some(port) = port
+                            && let Ok(Some((deployment, _service))) = find_deployment_by_process_name(&store, &name).await {
+                                table.insert(
+                                    deployment.domain.clone(),
+                                    Route {
+                                        target: RouteTarget::Service { port },
+                                        deployment_id: deployment.id,
+                                    },
+                                ).await;
+                            }
+                    }
+                    _ => {}
                 }
             }
             _ = reload_interval.tick() => {
-                info!("Periodic routing table reload");
-                if let Err(e) = reload_routing_table(&table, &store).await {
-                    error!("Failed to reload routing table: {}", e);
+                if let Err(e) = reload_static_routes(&table, &store).await {
+                    error!("Failed to reload routing table: {e}");
                 }
             }
         }
     }
 }
 
-async fn reload_routing_table(table: &RoutingTable, store: &Store) -> Result<()> {
-    let active_deployments = store
+/// Map a supervisor process name (e.g., "kennel-myproject-main-api") back
+/// to its deployment record.
+async fn find_deployment_by_process_name(
+    store: &Store,
+    process_name: &str,
+) -> std::result::Result<
+    Option<(entity::deployments::Model, Option<entity::services::Model>)>,
+    anyhow::Error,
+> {
+    let deployments = store.deployments().list_deployed_with_services().await?;
+
+    for (deployment, service) in deployments {
+        let expected_name = format!(
+            "kennel-{}-{}-{}",
+            deployment.project_name, deployment.branch_slug, deployment.service_name
+        );
+        if expected_name == process_name {
+            return Ok(Some((deployment, service)));
+        }
+    }
+
+    Ok(None)
+}
+
+async fn reload_static_routes(table: &RoutingTable, store: &Store) -> Result<()> {
+    let deployed = store
         .deployments()
-        .list_active_with_services()
+        .list_deployed_with_services()
         .await
         .map_err(|e| RouterError::Other(anyhow::anyhow!(e)))?;
 
-    table
-        .load_from_deployments_with_services(active_deployments)
-        .await?;
-
-    info!("Reloaded routing table with {} routes", table.len().await);
+    table.load_static_sites_from_deployments(deployed).await?;
 
     Ok(())
 }

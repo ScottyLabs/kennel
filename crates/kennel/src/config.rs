@@ -1,8 +1,8 @@
 use kennel_config::constants;
-
 use kennel_store::Store;
+use kennel_supervisor::Supervisor;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 pub fn create_builder_config(
     store: Arc<Store>,
@@ -21,14 +21,13 @@ pub fn create_builder_config(
 
 pub fn create_deployer_config(
     store: Arc<Store>,
-    router_tx: tokio::sync::broadcast::Sender<kennel_router::RouterUpdate>,
+    supervisor: Arc<Mutex<Supervisor>>,
     dns_manager: Option<Arc<kennel_dns::DnsManager>>,
     base_domain: String,
 ) -> kennel_deployer::DeployerConfig {
     kennel_deployer::DeployerConfig {
         store,
-
-        router_tx: Some(router_tx),
+        supervisor,
         dns_manager,
         base_domain,
     }

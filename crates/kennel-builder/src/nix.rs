@@ -62,6 +62,34 @@ pub async fn build(work_dir: &Path, service_name: &str, build_id: i32) -> Result
     Ok(store_path_str)
 }
 
+/// Evaluate the devenv task configuration for a project. Returns the Nix
+/// store path containing the tasks.json file.
+pub async fn eval_task_config(work_dir: &Path) -> Result<std::path::PathBuf> {
+    let repo_path = work_dir.join("repo");
+
+    info!("Evaluating devenv task configuration");
+
+    let output = Command::new("nix")
+        .arg("build")
+        .arg(".#devenv.shells.default.config.task.config")
+        .arg("--no-link")
+        .arg("--print-out-paths")
+        .current_dir(&repo_path)
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(BuilderError::NixBuild(format!(
+            "Failed to evaluate devenv task config: {stderr}"
+        )));
+    }
+
+    let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    Ok(std::path::PathBuf::from(path_str))
+}
+
 pub fn validate_service_name(name: &str) -> Result<()> {
     if name.is_empty() {
         return Err(BuilderError::NixBuild(

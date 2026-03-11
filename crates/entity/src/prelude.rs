@@ -4,7 +4,6 @@ pub use super::build_results::Entity as BuildResults;
 pub use super::builds::Entity as Builds;
 pub use super::deployments::Entity as Deployments;
 pub use super::dns_records::Entity as DnsRecords;
-pub use super::port_allocations::Entity as PortAllocations;
 pub use super::preview_databases::Entity as PreviewDatabases;
 pub use super::projects::Entity as Projects;
 pub use super::services::Entity as Services;

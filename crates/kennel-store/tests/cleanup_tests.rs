@@ -67,7 +67,7 @@ async fn test_find_expired_deployments() {
         environment: Set("dev".to_string()),
         git_ref: Set("abc123".to_string()),
         domain: Set("old.test.com".to_string()),
-        status: Set(DeploymentStatus::Active),
+        status: Set(DeploymentStatus::Deployed),
         last_activity: Set(old_activity),
         ..Default::default()
     };
@@ -112,7 +112,7 @@ async fn test_find_expired_excludes_prod() {
         environment: Set("prod".to_string()),
         git_ref: Set("def456".to_string()),
         domain: Set("prod.test.com".to_string()),
-        status: Set(DeploymentStatus::Active),
+        status: Set(DeploymentStatus::Deployed),
         last_activity: Set(old_activity),
         ..Default::default()
     };

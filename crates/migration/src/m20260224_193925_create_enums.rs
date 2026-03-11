@@ -33,14 +33,7 @@ impl MigrationTrait for Migration {
             .create_type(
                 Type::create()
                     .as_enum(Alias::new("deployment_status"))
-                    .values(vec![
-                        Alias::new("pending"),
-                        Alias::new("building"),
-                        Alias::new("active"),
-                        Alias::new("failed"),
-                        Alias::new("tearing_down"),
-                        Alias::new("torn_down"),
-                    ])
+                    .values(vec![Alias::new("deployed"), Alias::new("torn_down")])
                     .to_owned(),
             )
             .await?;

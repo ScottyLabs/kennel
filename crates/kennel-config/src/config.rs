@@ -1,6 +1,7 @@
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
+
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct KennelConfig {
@@ -14,24 +15,12 @@ pub struct KennelConfig {
     pub cachix: Option<CachixConfig>,
 }
 
+/// Kennel-specific metadata per service. Process configuration (exec, probes,
+/// restart, ports, dependencies) comes from devenv's process definitions.
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServiceConfig {
-    pub flake_output: Option<String>,
-
-    #[serde(default = "default_health_check_path")]
-    pub health_check_path: String,
-
-    #[serde(default = "default_health_check_timeout")]
-    pub health_check_timeout_secs: u64,
-
-    #[serde(default)]
-    pub preview_database: bool,
-
     #[serde(default)]
     pub custom_domain: Option<String>,
-
-    #[serde(default)]
-    pub env: HashMap<String, String>,
 
     #[serde(default)]
     pub secrets: Vec<String>,
@@ -52,14 +41,6 @@ pub struct StaticSiteConfig {
 pub struct CachixConfig {
     pub cache_name: String,
     pub auth_token_file: Option<String>,
-}
-
-fn default_health_check_path() -> String {
-    "/health".to_string()
-}
-
-fn default_health_check_timeout() -> u64 {
-    30
 }
 
 pub async fn parse_kennel_toml(repo_path: &Path) -> std::io::Result<KennelConfig> {
@@ -97,23 +78,14 @@ mod tests {
     fn test_parse_service_config() {
         let toml_str = r#"
 [services.api]
-flake_output = "api"
-health_check_path = "/health"
-health_check_timeout_secs = 60
+custom_domain = "api.myapp.com"
 secrets = ["DATABASE_PASSWORD", "JWT_SECRET"]
-
-[services.api.env]
-PORT = "8080"
-DATABASE_URL = "postgres://localhost/db"
 "#;
         let config: KennelConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.services.len(), 1);
 
         let api = config.services.get("api").unwrap();
-        assert_eq!(api.flake_output, Some("api".to_string()));
-        assert_eq!(api.health_check_path, "/health");
-        assert_eq!(api.health_check_timeout_secs, 60);
-        assert_eq!(api.env.get("PORT"), Some(&"8080".to_string()));
+        assert_eq!(api.custom_domain, Some("api.myapp.com".to_string()));
         assert_eq!(api.secrets.len(), 2);
     }
 

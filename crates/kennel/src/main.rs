@@ -6,10 +6,12 @@ mod signal;
 
 use kennel_config::constants;
 use kennel_store::Store;
+use kennel_supervisor::{Supervisor, SupervisorEvent};
 use migration::MigratorTrait;
 use sea_orm::Database;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -27,21 +29,24 @@ async fn main() -> anyhow::Result<()> {
 
     let db = Database::connect(&database_url).await?;
 
-    // Run migrations
     migration::Migrator::up(&db, None).await?;
 
     let store = Arc::new(Store::new(db));
 
     tracing::info!("Database migrations complete");
 
-    // Reconcile projects from NixOS configuration
     if let Err(e) = reconcile::reconcile_projects(store.clone()).await {
         tracing::error!("Project reconciliation failed: {}", e);
         return Err(e);
     }
 
-    // Reconcile deployments and resources on startup
-    if let Err(e) = reconcile::reconcile_deployments(store.clone()).await {
+    // Initialize supervisor with event channel.
+    let (event_tx, _) =
+        tokio::sync::broadcast::channel::<SupervisorEvent>(constants::SUPERVISOR_EVENT_CAPACITY);
+    let supervisor = Arc::new(Mutex::new(Supervisor::new(event_tx.clone())));
+
+    // Reconcile deployments by re-starting processes through the supervisor.
+    if let Err(e) = reconcile::reconcile_deployments(store.clone(), supervisor.clone()).await {
         tracing::error!("Startup reconciliation failed: {}", e);
     }
 
@@ -51,12 +56,8 @@ async fn main() -> anyhow::Result<()> {
 
     let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
     let builder_config = config::create_builder_config(store.clone(), channels.deploy_tx.clone());
-    let deployer_config = config::create_deployer_config(
-        store.clone(),
-        channels.router_update_tx.clone(),
-        dns_manager,
-        base_domain,
-    );
+    let deployer_config =
+        config::create_deployer_config(store.clone(), supervisor.clone(), dns_manager, base_domain);
     let router_config = config::create_router_config(store.clone());
 
     let webhook_config = kennel_webhook::WebhookConfig {
@@ -72,50 +73,37 @@ async fn main() -> anyhow::Result<()> {
     let webhook_router = kennel_webhook::router(webhook_config);
     let api_router = kennel_api::router(store.clone()).merge(webhook_router);
 
-    // Spawn builder worker pool
     let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(
         channels.build_rx,
         builder_config,
     ));
 
-    // Spawn deployer
     let deployer_handle = tokio::spawn(kennel_deployer::run_deployer(
         channels.deploy_rx,
         deployer_config.clone(),
     ));
 
-    // Spawn teardown worker
     let teardown_handle = tokio::spawn(kennel_deployer::run_teardown_worker(
         channels.teardown_rx,
         deployer_config.clone(),
     ));
 
-    // Spawn cleanup job
     let cleanup_handle = tokio::spawn(kennel_deployer::run_cleanup_job(
         deployer_config.clone(),
         channels.teardown_tx.clone(),
     ));
 
-    // Spawn build log cleanup job
     let log_cleanup_handle = tokio::spawn(kennel_deployer::run_log_cleanup_job(
         deployer_config.clone(),
     ));
 
-    // Spawn router
-    let router_store = store.clone();
-    let routing_table = Arc::new(kennel_router::RoutingTable::new());
-    let routing_table_clone = routing_table.clone();
+    // Router subscribes to supervisor events for routing table updates.
+    let event_rx = event_tx.subscribe();
     let router_handle = tokio::spawn(async move {
-        if let Err(e) = kennel_router::run_router(router_config, channels.router_update_rx).await {
+        if let Err(e) = kennel_router::run_router(router_config, event_rx).await {
             tracing::error!("Router failed: {}", e);
         }
     });
-
-    // Spawn health monitor
-    let health_handle = tokio::spawn(kennel_router::run_health_monitor(
-        routing_table_clone,
-        router_store,
-    ));
 
     tracing::info!("Starting API server on {api_addr}");
     let listener = TcpListener::bind(&api_addr).await?;
@@ -144,7 +132,6 @@ async fn main() -> anyhow::Result<()> {
                 cleanup_handle,
                 log_cleanup_handle,
                 router_handle,
-                health_handle,
             );
         } => {
             tracing::info!("All components shut down gracefully");

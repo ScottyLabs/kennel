@@ -1,16 +1,19 @@
-use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest, utils};
-use entity::sea_orm_active_enums::DeploymentStatus;
-use entity::{build_results, deployments};
-use kennel_config::KennelConfig;
-use kennel_store::Store;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use entity::deployments;
+use entity::sea_orm_active_enums::DeploymentStatus;
+use kennel_config::KennelConfig;
+use kennel_store::Store;
+use kennel_supervisor::SupervisorEvent;
 use tracing::{info, warn};
+
+use crate::error::Result;
+use crate::{DeployerConfig, DeploymentRequest, utils};
 
 pub async fn deploy_site(
     request: &DeploymentRequest,
-    build_result: &build_results::Model,
+    build_result: &entity::build_results::Model,
     store: &Arc<Store>,
     config: &DeployerConfig,
     kennel_config: &KennelConfig,
@@ -55,6 +58,13 @@ pub async fn deploy_site(
 
     tokio::fs::rename(&temp_link, &site_link).await?;
 
+    let domain = utils::generate_deployment_domain(
+        &build_result.service_name,
+        &branch_sanitized,
+        &request.project_name,
+        &config.base_domain,
+    );
+
     let deployment = deployments::ActiveModel {
         project_name: sea_orm::ActiveValue::Set(request.project_name.clone()),
         git_ref: sea_orm::ActiveValue::Set(request.git_ref.clone()),
@@ -65,14 +75,9 @@ pub async fn deploy_site(
             &request.git_ref,
         )),
         store_path: sea_orm::ActiveValue::Set(Some(store_path.clone())),
-        port: sea_orm::ActiveValue::Set(None),
-        status: sea_orm::ActiveValue::Set(DeploymentStatus::Active),
-        domain: sea_orm::ActiveValue::Set(utils::generate_deployment_domain(
-            &build_result.service_name,
-            &branch_sanitized,
-            &request.project_name,
-            &config.base_domain,
-        )),
+        status: sea_orm::ActiveValue::Set(DeploymentStatus::Deployed),
+        domain: sea_orm::ActiveValue::Set(domain.clone()),
+        process_config: sea_orm::ActiveValue::Set(None),
         ..Default::default()
     };
 
@@ -93,40 +98,29 @@ pub async fn deploy_site(
     if let Some(dns_manager) = &config.dns_manager
         && let Some(custom_domain) = site_config.and_then(|s| s.custom_domain.as_ref())
     {
-        info!("Creating DNS records for custom domain: {}", custom_domain);
+        info!("Creating DNS records for custom domain: {custom_domain}");
         match dns_manager
             .create_record_for_deployment(new_deployment.id, custom_domain)
             .await
         {
-            Ok(_) => {
-                info!(
-                    "DNS records created successfully for custom domain {}",
-                    custom_domain
-                );
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to create DNS records for custom domain {}: {}",
-                    custom_domain, e
-                );
-            }
+            Ok(_) => info!("DNS records created for {custom_domain}"),
+            Err(e) => warn!("Failed to create DNS records for {custom_domain}: {e}"),
         }
     }
 
-    // Notify router of new deployment
-    if let Some(ref router_tx) = config.router_tx {
-        let update = kennel_router::RouterUpdate::DeploymentActive {
-            deployment_id: new_deployment.id,
-            domain: new_deployment.domain.clone(),
+    // Notify the router via supervisor event channel. Static sites have no
+    // supervised process, but the router still needs to learn about them.
+    let supervisor = config.supervisor.lock().await;
+    let _ = supervisor
+        .event_sender()
+        .send(SupervisorEvent::ProcessReady {
+            name: format!(
+                "kennel-{}-{}-{}",
+                request.project_name, branch_sanitized, build_result.service_name
+            ),
             port: None,
             store_path: Some(store_path.clone()),
-            spa: site_config.map(|s| s.spa).unwrap_or(false),
-        };
-
-        if let Err(e) = router_tx.send(update) {
-            warn!("Failed to send router update: {}", e);
-        }
-    }
+        });
 
     Ok(())
 }
