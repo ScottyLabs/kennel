@@ -158,19 +158,19 @@ services.kennel.secrets = {
 };
 ```
 
-### kennel-secrets Crate
+### Deployer Secrets Module
 
-The existing stub crate is replaced with a thin wrapper around the secretspec library:
+Secret resolution lives in the deployer as a `secrets` module:
 
 ```rust
-pub async fn resolve_secrets(
+pub fn resolve_secrets(
     repo_path: &Path,
     environment: &str,
     vault_endpoint: &str,
 ) -> anyhow::Result<HashMap<String, String>>;
 ```
 
-Dependencies: `secretspec` with `vault` feature flag.
+The deployer depends on `secretspec` with the `vault` feature flag.
 
 ## Alternatives Considered
 
@@ -186,13 +186,9 @@ Dependencies: `secretspec` with `vault` feature flag.
 
 ## Implementation Phases
 
-### Replace kennel-secrets Stub
+### Secrets Module
 
-Add `secretspec` with `vault` feature as a dependency. Implement `resolve_secrets()` function that loads `secretspec.toml`, sets provider and profile, and returns resolved secrets as a HashMap.
-
-### Integrate into Deployer
-
-Call `resolve_secrets()` in `deploy_service()` after infrastructure provisioning. Merge resolved secrets into `ProcessConfig.env`. Remove `secrets::generate_env_file()` and the `secrets.rs` module.
+Add `secretspec` with `vault` feature as a dependency of the deployer. Implement `resolve_secrets()` in a `secrets` module that loads `secretspec.toml`, sets provider and profile, and returns resolved secrets as a HashMap. Call it in `deploy_service()` after infrastructure provisioning and merge into `ProcessConfig.env`.
 
 ### Update kennel.toml
 
