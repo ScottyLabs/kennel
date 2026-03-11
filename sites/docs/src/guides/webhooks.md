@@ -1,7 +1,4 @@
----
-title: Webhook Setup
-description: Configure Forgejo or GitHub to send webhooks to Kennel
----
+# Webhook Setup
 
 Kennel receives push and pull request events via webhooks. You need to configure your Git server to send webhooks to Kennel.
 
@@ -24,30 +21,30 @@ Without a valid signature, webhooks are rejected with 401 Unauthorized.
 ## Forgejo Setup
 
 1. Go to your repository settings
-2. Navigate to Webhooks
-3. Click "Add Webhook" and select "Forgejo"
-4. Configure:
+1. Navigate to Webhooks
+1. Click "Add Webhook" and select "Forgejo"
+1. Configure:
    - **Payload URL**: `https://kennel.example.com/webhook/<project-name>`
    - **HTTP Method**: POST
    - **POST Content Type**: application/json
    - **Secret**: Use the webhook secret from Kennel's projects table
    - **Trigger On**: Select "Push events" and "Pull request events"
    - **Branch filter**: Leave empty (Kennel handles all branches)
-5. Click "Add Webhook"
+1. Click "Add Webhook"
 
 Test the webhook by pushing a commit or opening a PR.
 
 ## GitHub Setup
 
 1. Go to repository Settings -> Webhooks
-2. Click "Add webhook"
-3. Configure:
+1. Click "Add webhook"
+1. Configure:
    - **Payload URL**: `https://kennel.example.com/webhook/<project-name>`
    - **Content type**: application/json
    - **Secret**: Use the webhook secret from Kennel's projects table
    - **SSL verification**: Enable
    - **Events**: Select "Just the push event" and "Pull requests"
-4. Click "Add webhook"
+1. Click "Add webhook"
 
 Test the webhook by pushing a commit or opening a PR.
 
@@ -58,6 +55,7 @@ Test the webhook by pushing a commit or opening a PR.
 Triggered when commits are pushed to any branch.
 
 Kennel processes these to:
+
 - Create a new build for the commit
 - Deploy the new version
 - Update the existing deployment for that branch
@@ -65,6 +63,7 @@ Kennel processes these to:
 ### Branch Deletion
 
 When a branch is deleted (push event with all-zero commit SHA), Kennel:
+
 - Marks all deployments for that branch as tearing down
 - Stops services, removes symlinks
 - Releases ports and preview databases
@@ -73,6 +72,7 @@ When a branch is deleted (push event with all-zero commit SHA), Kennel:
 ### Pull Request Events
 
 Supported actions:
+
 - **opened**: Creates a deployment on `pr-<number>` branch
 - **synchronize** / **synchronized**: Updates the PR deployment with new commits
 - **reopened**: Creates deployment if torn down
@@ -85,11 +85,13 @@ Other PR actions (labeled, assigned, etc.) are ignored.
 Kennel parses these fields from the JSON payload:
 
 For push events:
+
 - `ref` - Git ref like `refs/heads/main`
 - `after` - Commit SHA
 - `pusher.name` or `sender.login` - Author
 
 For PR events:
+
 - `action` - PR action (opened, synchronize, closed, etc.)
 - `number` - PR number
 - `pull_request.head.sha` - Commit SHA

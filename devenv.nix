@@ -15,6 +15,7 @@ in
     openssl
     postgresql_18
     sea-orm-cli
+    mdbook
     bun
     just
   ]);

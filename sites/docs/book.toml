@@ -1,0 +1,11 @@
+[book]
+title = "Kennel"
+description = "Branch-based deployment platform for NixOS"
+authors = ["ScottyLabs"]
+language = "en"
+
+[build]
+build-dir = "book"
+
+[output.html]
+git-repository-url = "https://git.scottylabs.org/scottylabs/kennel"

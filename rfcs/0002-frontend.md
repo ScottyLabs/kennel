@@ -7,7 +7,7 @@
 
 ## Overview
 
-This RFC defines the two frontend targets for Kennel: a documentation site built with Astro Starlight (`sites/docs/`) and a dashboard web application built with Svelte (`sites/web/`). Both live in the monorepo, use Bun as the JavaScript runtime, and are packaged as Nix derivations via `bun2nix`.
+This RFC defines the two frontend targets for Kennel: a documentation site built with [mdBook](https://rust-lang.github.io/mdBook/) (`sites/docs/`) and a dashboard web application built with Svelte (`sites/web/`). Both live in the monorepo.
 
 ## Motivation
 
@@ -62,24 +62,20 @@ site = b2n.mkDerivation {
 
 ### Documentation Site (`sites/docs/`)
 
-We're using [Starlight](https://starlight.astro.build/) (Astro). It provides search, Markdown/MDX support, sidebar navigation, and syntax highlighting out of the box. Astro's static site generation produces a lightweight, fast site.
+We're using [mdBook](https://rust-lang.github.io/mdBook/), a Rust-native documentation tool. It produces static HTML with built-in search, sidebar navigation, and syntax highlighting. No JavaScript build tooling required -- `mdbook build` produces the output directly.
 
 Hosted at `docs.kennel.scottylabs.org`.
 
 #### Topics
 
-The documentation site should cover:
+The documentation site covers:
 
-- **Getting Started** -- what Kennel is, how it fits into the ScottyLabs infrastructure, quickstart for adding a project
-- **Project Configuration** -- `kennel.toml` reference, service types (service, static, image), branch configuration, environment mapping
-- **Domain Scheme** -- how domains are assigned for single-service and multi-service projects, custom domains, wildcard certs
-- **Secrets** -- OpenBao integration, per-environment secret paths, how secrets are injected
-- **Build Pipeline** -- how Kennel builds Nix flakes, skip-if-unchanged logic, Cachix caching
-- **Deployment Lifecycle** -- systemd units, static sites, port allocation, health checks, teardown, auto-expiry
-- **PR Previews** -- how preview deployments work, ephemeral databases, auto-cleanup
-- **Dashboard** -- how to use the web UI for monitoring deployments and builds
-- **API Reference** -- REST API endpoints for programmatic access
-- **Operations Guide** -- running Kennel, NixOS module configuration, startup reconciliation, troubleshooting
+- **Architecture** -- system overview, component responsibilities, communication patterns
+- **Usage** -- push-to-deploy flow, build process, blue-green deployment, routing, teardown
+- **Configuration** -- `kennel.toml` reference, devenv process definitions, environment mapping
+- **Webhooks** -- Forgejo and GitHub webhook setup, signature verification
+- **NixOS Deployment** -- NixOS module configuration, TLS, DNS, resource providers, security
+- **Troubleshooting** -- common errors and debugging
 
 ### Dashboard (`sites/web/`)
 
@@ -143,7 +139,7 @@ Both sites are deployed by Kennel itself as static site services within the Kenn
 
 - **Docusaurus** -- React-based, doesn't align with the Svelte ecosystem. No ability to share components.
 - **VitePress** -- Vue-based, same ecosystem mismatch.
-- **mdBook** -- Rust-native and simple, but lacks search, sidebar customization, and component embedding that Starlight provides.
+- **Astro Starlight** -- rich features (MDX, component embedding, OpenAPI plugin) but requires Bun, Node.js tooling, and bun2nix for Nix builds. mdBook is simpler and has no JavaScript dependencies.
 - **Plain Markdown in the repo** -- No search, no navigation, poor reading experience.
 
 ### Dashboard
@@ -160,7 +156,7 @@ None.
 ## Implementation Phases
 
 1. Add `bun2nix` flake input and `bun` to devenv packages
-1. Initialize Astro Starlight project in `sites/docs/`
+1. Initialize mdBook project in `sites/docs/`
 1. Initialize Svelte + Vite project in `sites/web/`
 1. Add Nix derivations for both sites
 1. Write initial documentation pages covering `kennel.toml` and getting started

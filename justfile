@@ -26,10 +26,9 @@ migrate:
 generate-entities:
     sea-orm-cli generate entity -o crates/entity/src --with-serde both --lib --model-extra-derives 'utoipa::ToSchema' --enum-extra-derives 'utoipa::ToSchema'
 
-# Generate OpenAPI specs for web and docs
+# Generate OpenAPI specs for web dashboard
 generate-api:
     cd sites/web && bun run generate-api
-    cd sites/docs && bun run generate-api
 
 # Start web dashboard dev server
 web:
@@ -37,7 +36,7 @@ web:
 
 # Start docs dev server
 docs:
-    cd sites/docs && bun dev
+    cd sites/docs && mdbook serve
 
 # Attach to process-compose interface
 attach:
