@@ -181,6 +181,7 @@ impl Supervisor {
             job.clone(),
             state.clone(),
             self.event_tx.clone(),
+            notify_socket_path,
         );
 
         self.processes.insert(
@@ -384,13 +385,27 @@ fn spawn_supervision_task(
     job: Job,
     state: Arc<StdMutex<ProcessState>>,
     event_tx: broadcast::Sender<SupervisorEvent>,
+    notify_socket_path: Option<PathBuf>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         let name = config.name.clone();
 
-        // Initial readiness probe.
+        // Initial readiness probe. For notify probes, wait for READY=1
+        // on the notify socket instead of polling.
         if let Some(ready_config) = &config.ready {
-            match probe::run_readiness_probe(&name, ready_config).await {
+            let probe_result = if ready_config.notify {
+                let socket_path = notify_socket_path
+                    .as_deref()
+                    .unwrap_or_else(|| std::path::Path::new("/dev/null"));
+                let timeout = ready_config
+                    .timeout
+                    .unwrap_or(std::time::Duration::from_secs(30));
+                crate::notify::wait_for_ready(socket_path, timeout).await
+            } else {
+                probe::run_readiness_probe(&name, ready_config).await
+            };
+
+            match probe_result {
                 Ok(()) => {
                     *state.lock().unwrap() = ProcessState::Ready;
                     let port = config.ports.values().next().copied();

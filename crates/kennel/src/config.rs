@@ -23,12 +23,14 @@ pub fn create_deployer_config(
     store: Arc<Store>,
     supervisor: Arc<Mutex<Supervisor>>,
     dns_manager: Option<Arc<kennel_dns::DnsManager>>,
+    resource_providers: Vec<Arc<dyn kennel_provision::ResourceProvider>>,
     base_domain: String,
 ) -> kennel_deployer::DeployerConfig {
     kennel_deployer::DeployerConfig {
         store,
         supervisor,
         dns_manager,
+        resource_providers,
         base_domain,
     }
 }

@@ -85,7 +85,27 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         warn!("Failed to remove secrets file: {e}");
     }
 
-    // Release preview database if no remaining deployments for this branch
+    // Teardown provisioned resources.
+    let resource_request = kennel_provision::ResourceRequest {
+        deployment_id: deployment.id,
+        project_name: deployment.project_name.clone(),
+        service_name: deployment.service_name.clone(),
+        branch: deployment.branch.clone(),
+        branch_slug: branch_sanitized.clone(),
+        environment: deployment.environment.clone(),
+        system_user: process_name.clone(),
+    };
+
+    for provider in &config.resource_providers {
+        if let Err(e) = provider.teardown(&resource_request).await {
+            warn!(
+                "Resource provider '{}' teardown failed: {e}",
+                provider.name()
+            );
+        }
+    }
+
+    // Remove system user if no remaining deployments for this branch.
     let remaining_deployments = config
         .store
         .deployments()
@@ -98,20 +118,6 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
     if remaining_deployments.is_none() {
-        if let Err(e) = config
-            .store
-            .preview_databases()
-            .delete_by_project_and_branch(&deployment.project_name, &deployment.branch)
-            .await
-        {
-            warn!("Failed to release preview database: {e}");
-        } else {
-            info!(
-                "Released preview database for {}/{}",
-                deployment.project_name, deployment.branch
-            );
-        }
-
         let username = utils::sanitize_username(
             &deployment.project_name,
             &deployment.branch,

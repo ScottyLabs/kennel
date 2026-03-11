@@ -6279,6 +6279,10 @@ rec {
             packageId = "kennel-dns";
           }
           {
+            name = "kennel-provision";
+            packageId = "kennel-provision";
+          }
+          {
             name = "kennel-router";
             packageId = "kennel-router";
           }
@@ -6496,6 +6500,10 @@ rec {
           {
             name = "kennel-dns";
             packageId = "kennel-dns";
+          }
+          {
+            name = "kennel-provision";
+            packageId = "kennel-provision";
           }
           {
             name = "kennel-router";

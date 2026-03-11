@@ -13,6 +13,7 @@ pub use log_cleanup::run_log_cleanup_job;
 pub use teardown::run_teardown_worker;
 
 use kennel_dns::DnsManager;
+use kennel_provision::ResourceProvider;
 use kennel_store::Store;
 use kennel_supervisor::Supervisor;
 use std::sync::Arc;
@@ -24,6 +25,7 @@ pub struct DeployerConfig {
     pub store: Arc<Store>,
     pub supervisor: Arc<Mutex<Supervisor>>,
     pub dns_manager: Option<Arc<DnsManager>>,
+    pub resource_providers: Vec<Arc<dyn ResourceProvider>>,
     pub base_domain: String,
 }
 

@@ -56,8 +56,16 @@ async fn main() -> anyhow::Result<()> {
 
     let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
     let builder_config = config::create_builder_config(store.clone(), channels.deploy_tx.clone());
-    let deployer_config =
-        config::create_deployer_config(store.clone(), supervisor.clone(), dns_manager, base_domain);
+    // Resource providers are initialized based on environment configuration.
+    let resource_providers = vec![];
+
+    let deployer_config = config::create_deployer_config(
+        store.clone(),
+        supervisor.clone(),
+        dns_manager,
+        resource_providers,
+        base_domain,
+    );
     let router_config = config::create_router_config(store.clone());
 
     let webhook_config = kennel_webhook::WebhookConfig {

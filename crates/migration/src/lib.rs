@@ -13,6 +13,7 @@ mod m20260225_055843_add_error_message_to_build_results;
 mod m20260226_063306_create_dns_records;
 mod m20260226_215312_add_builds_unique_constraint;
 mod m20260311_094722_supervisor_migration;
+mod m20260311_193541_drop_preview_databases;
 
 pub struct Migrator;
 
@@ -33,6 +34,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260226_063306_create_dns_records::Migration),
             Box::new(m20260226_215312_add_builds_unique_constraint::Migration),
             Box::new(m20260311_094722_supervisor_migration::Migration),
+            Box::new(m20260311_193541_drop_preview_databases::Migration),
         ]
     }
 }

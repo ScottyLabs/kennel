@@ -3,6 +3,7 @@ pub mod config;
 pub mod devenv;
 pub mod error;
 pub mod event;
+pub mod notify;
 pub mod order;
 pub mod probe;
 pub mod socket;

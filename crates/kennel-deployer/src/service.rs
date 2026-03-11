@@ -114,19 +114,42 @@ async fn deploy_service(
         .join(&devenv_config.name);
     tokio::fs::create_dir_all(&service_work_dir).await?;
 
-    // Merge devenv process config with Kennel deployment metadata.
-    let mut process_config = devenv_config.clone();
-    process_config.name = process_name.clone();
-    process_config.user = Some(username);
-    process_config.cwd = Some(service_work_dir);
-    process_config.env.insert(
-        "ENVIRONMENT".into(),
-        determine_environment(&request.git_ref),
+    let mut process_config = merge_config(
+        devenv_config,
+        &process_name,
+        &username,
+        service_work_dir,
+        &request.git_ref,
     );
+
+    // Provision required infrastructure resources.
+    let resource_request = kennel_provision::ResourceRequest {
+        deployment_id: 0,
+        project_name: request.project_name.clone(),
+        service_name: devenv_config.name.clone(),
+        branch: request.git_ref.clone(),
+        branch_slug: branch_sanitized.clone(),
+        environment: determine_environment(&request.git_ref),
+        system_user: username.clone(),
+    };
+
+    for provider in &config.resource_providers {
+        if request
+            .required_resources
+            .contains(&provider.name().to_string())
+        {
+            let env_vars = provider.provision(&resource_request).await.map_err(|e| {
+                crate::DeployerError::Other(anyhow::anyhow!(
+                    "resource provider '{}' failed: {e}",
+                    provider.name()
+                ))
+            })?;
+            process_config.env.extend(env_vars);
+        }
+    }
 
     let service_config = config_file.services.get(&devenv_config.name);
 
-    // Generate secrets env file
     let env_pairs: Vec<(String, String)> = process_config
         .env
         .iter()
@@ -222,4 +245,24 @@ async fn deploy_service(
     }
 
     Ok(())
+}
+
+/// Merge a devenv-provided ProcessConfig with Kennel deployment metadata.
+/// Sets the process name, system user, working directory, and environment
+/// for the deployment context.
+fn merge_config(
+    devenv_config: &ProcessConfig,
+    process_name: &str,
+    username: &str,
+    cwd: PathBuf,
+    git_ref: &str,
+) -> ProcessConfig {
+    let mut config = devenv_config.clone();
+    config.name = process_name.to_string();
+    config.user = Some(username.to_string());
+    config.cwd = Some(cwd);
+    config
+        .env
+        .insert("ENVIRONMENT".into(), determine_environment(git_ref));
+    config
 }

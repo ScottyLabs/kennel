@@ -158,40 +158,32 @@ Static sites remain in `kennel.toml` because they are not processes and have no 
 
 ### Configuration Merging
 
-The deployer merges devenv process config with Kennel deployment metadata at deploy time:
+The deployer merges devenv process config with Kennel deployment metadata via a standalone `merge_config` function:
 
 - **Base**: `ProcessConfig` deserialized from devenv's `tasks.json`
-- **Overlay**: Kennel-specific environment variables (secrets, preview database URLs, deployment metadata)
-- **User switching**: `ProcessConfig.user` set to the per-project system user (e.g., `kennel-myapp`)
+- **Overlay**: process name (Kennel-namespaced), system user, working directory, environment classification
+- **Resource URLs**: injected separately by resource providers after the merge
 
 ```rust
 fn merge_config(
-    devenv_config: ProcessConfig,
-    kennel_service: &ServiceConfig,
-    deployment: &DeploymentMetadata,
+    devenv_config: &ProcessConfig,
+    process_name: &str,
+    username: &str,
+    cwd: PathBuf,
+    git_ref: &str,
 ) -> ProcessConfig {
-    let mut config = devenv_config;
-
-    // Kennel sets the system user for isolation.
-    config.user = Some(deployment.system_user.clone());
-
-    // Kennel injects deployment-specific environment variables.
-    config.env.insert("DEPLOYMENT_ID".into(), deployment.id.to_string());
-    config.env.insert("ENVIRONMENT".into(), deployment.environment.clone());
-
-    // Preview database URLs if configured.
-    if let Some(db_url) = &deployment.database_url {
-        config.env.insert("DATABASE_URL".into(), db_url.clone());
-    }
-    if let Some(valkey_url) = &deployment.valkey_url {
-        config.env.insert("VALKEY_URL".into(), valkey_url.clone());
-    }
-
-    // Secrets from OpenBao are injected via environment file, not merged here.
-
+    let mut config = devenv_config.clone();
+    config.name = process_name.to_string();
+    config.user = Some(username.to_string());
+    config.cwd = Some(cwd);
+    config
+        .env
+        .insert("ENVIRONMENT".into(), determine_environment(git_ref));
     config
 }
 ```
+
+Resource-specific environment variables (`DATABASE_URL`, `VALKEY_URL`, `S3_ENDPOINT`, etc.) are injected by the infrastructure provisioning system after the merge, not by `merge_config` itself.
 
 ### Builder Changes
 

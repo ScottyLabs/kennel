@@ -14,6 +14,7 @@ kennel-builder = { version = "0.1.0", path = "../kennel-builder" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-deployer = { version = "0.1.0", path = "../kennel-deployer" }
 kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
+kennel-provision = { version = "0.1.0", path = "../kennel-provision" }
 kennel-router = { version = "0.1.0", path = "../kennel-router" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
