@@ -133,16 +133,6 @@ rec {
       # File a bug if you depend on any for non-debug work!
       debug = internal.debugCrate { inherit packageId; };
     };
-    "kennel-secrets" = rec {
-      packageId = "kennel-secrets";
-      build = internal.buildRustCrateWithFeatures {
-        packageId = "kennel-secrets";
-      };
-
-      # Debug support which might change between releases.
-      # File a bug if you depend on any for non-debug work!
-      debug = internal.debugCrate { inherit packageId; };
-    };
     "kennel-store" = rec {
       packageId = "kennel-store";
       build = internal.buildRustCrateWithFeatures {
@@ -6970,14 +6960,6 @@ rec {
             packageId = "kennel-provision";
           }
           {
-            name = "kennel-router";
-            packageId = "kennel-router";
-          }
-          {
-            name = "kennel-secrets";
-            packageId = "kennel-secrets";
-          }
-          {
             name = "kennel-store";
             packageId = "kennel-store";
           }
@@ -6992,6 +6974,15 @@ rec {
           {
             name = "sea-orm";
             packageId = "sea-orm";
+          }
+          {
+            name = "secrecy";
+            packageId = "secrecy";
+          }
+          {
+            name = "secretspec";
+            packageId = "secretspec";
+            features = [ "vault" ];
           }
           {
             name = "serde_json";
@@ -7178,33 +7169,6 @@ rec {
           {
             name = "webpki-roots";
             packageId = "webpki-roots 1.0.6";
-          }
-        ];
-
-      };
-      "kennel-secrets" = rec {
-        crateName = "kennel-secrets";
-        version = "0.1.0";
-        edition = "2024";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ./crates/kennel-secrets; };
-        libName = "kennel_secrets";
-        dependencies = [
-          {
-            name = "anyhow";
-            packageId = "anyhow";
-          }
-          {
-            name = "secrecy";
-            packageId = "secrecy";
-          }
-          {
-            name = "secretspec";
-            packageId = "secretspec";
-            features = [ "vault" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
           }
         ];
 

@@ -1,5 +1,6 @@
 mod error;
 mod log_cleanup;
+mod secrets;
 mod service;
 mod static_site;
 mod teardown;

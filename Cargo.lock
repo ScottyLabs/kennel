@@ -2169,12 +2169,12 @@ dependencies = [
  "kennel-config",
  "kennel-dns",
  "kennel-provision",
- "kennel-router",
- "kennel-secrets",
  "kennel-store",
  "kennel-supervisor",
  "reqwest 0.13.2",
  "sea-orm",
+ "secrecy",
+ "secretspec",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
@@ -2230,16 +2230,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "webpki-roots 1.0.6",
-]
-
-[[package]]
-name = "kennel-secrets"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "secrecy",
- "secretspec",
- "tracing",
 ]
 
 [[package]]

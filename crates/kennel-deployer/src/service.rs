@@ -156,7 +156,7 @@ async fn deploy_service(
             .join(request.build_id.to_string())
             .join("repo");
         let environment = determine_environment(&request.git_ref);
-        match kennel_secrets::resolve_secrets(&work_dir, &environment, vault_endpoint) {
+        match crate::secrets::resolve_secrets(&work_dir, &environment, vault_endpoint) {
             Ok(secrets) => {
                 process_config.env.extend(secrets);
             }

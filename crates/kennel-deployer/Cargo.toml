@@ -11,12 +11,12 @@ kennel-builder = { version = "0.1.0", path = "../kennel-builder" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-provision = { version = "0.1.0", path = "../kennel-provision" }
-kennel-router = { version = "0.1.0", path = "../kennel-router" }
-kennel-secrets = { version = "0.1.0", path = "../kennel-secrets" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
 reqwest = "0.13.2"
 sea-orm = "1.1.19"
+secrecy = "0.10.3"
+secretspec = { version = "0.8.0", features = ["vault"] }
 serde_json = "1.0.149"
 thiserror = "2.0.18"
 tokio = { version = "1.49.0", features = ["full"] }
