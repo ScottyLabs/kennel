@@ -31,6 +31,7 @@ pub fn create_deployer_config(
         supervisor,
         dns_manager,
         resource_providers,
+        vault_endpoint: std::env::var("VAULT_ENDPOINT").ok(),
         base_domain,
     }
 }

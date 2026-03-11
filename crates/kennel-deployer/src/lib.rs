@@ -1,6 +1,5 @@
 mod error;
 mod log_cleanup;
-mod secrets;
 mod service;
 mod static_site;
 mod teardown;
@@ -26,6 +25,7 @@ pub struct DeployerConfig {
     pub supervisor: Arc<Mutex<Supervisor>>,
     pub dns_manager: Option<Arc<DnsManager>>,
     pub resource_providers: Vec<Arc<dyn ResourceProvider>>,
+    pub vault_endpoint: Option<String>,
     pub base_domain: String,
 }
 

@@ -102,6 +102,7 @@ The filename should match the branch name, e.g. `0001-dev-environment-ci.md`.
 | 0009 | [Supervisor Migration](./0009-supervisor-migration.md) | Accepted |
 | 0010 | [devenv Integration](./0010-devenv-integration.md) | Accepted |
 | 0011 | [Infrastructure Provisioning](./0011-infrastructure-provisioning.md) | Accepted |
+| 0012 | [Secrets Management](./0012-secrets-management.md) | Accepted |
 
 *(This index will be updated as RFCs are added)*
 

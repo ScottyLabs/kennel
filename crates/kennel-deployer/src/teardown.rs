@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::error::Result;
-use crate::{DeployerConfig, secrets, user, utils};
+use crate::{DeployerConfig, user, utils};
 
 pub async fn run_teardown_worker(mut teardown_rx: mpsc::Receiver<i32>, config: DeployerConfig) {
     info!("Starting teardown worker");
@@ -71,18 +71,6 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         } else {
             info!("Removed static symlink: {static_link_path}");
         }
-    }
-
-    // Remove secrets file
-    let secrets_path = PathBuf::from(format!(
-        "{}/{}-{}-{}.env",
-        kennel_config::constants::SECRETS_DIR,
-        deployment.project_name,
-        branch_sanitized,
-        deployment.service_name
-    ));
-    if let Err(e) = secrets::remove_secrets_file(&secrets_path).await {
-        warn!("Failed to remove secrets file: {e}");
     }
 
     // Teardown provisioned resources.

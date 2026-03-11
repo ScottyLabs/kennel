@@ -38,9 +38,11 @@ Both the custom domain and auto-generated subdomain work simultaneously:
 - `https://example.com` (custom)
 - `https://<service>-<branch>.<project>.scottylabs.org` (auto-generated)
 
-`secrets` (list of strings, optional)
+### Secrets
 
-Secret names to inject from OpenBao. These are fetched at deploy time and written to the service's environment file.
+Application secrets are managed via [secretspec](https://github.com/cachix/secretspec). Place a `secretspec.toml` at the repository root to declare what secrets your application needs. Kennel resolves them from the platform's Vault/OpenBao instance at deploy time and injects them as environment variables.
+
+See the [secretspec documentation](https://secretspec.dev) for the full `secretspec.toml` format.
 
 ### Environment Variables
 
@@ -133,7 +135,6 @@ signing_key_file = "/var/lib/kennel/cachix-key"
 
 [services.api]
 custom_domain = "api.myapp.com"
-secrets = ["DATABASE_PASSWORD", "JWT_SECRET"]
 
 [services.worker]
 
@@ -148,7 +149,7 @@ custom_domain = "docs.myapp.com"
 
 This configuration defines:
 
-- 2 services (api with custom domain and secrets, worker with defaults)
+- 2 services (api with custom domain, worker with defaults)
 - 2 static sites (web as SPA, docs as plain HTML)
 - Cachix caching enabled
 

@@ -12,6 +12,7 @@ kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-provision = { version = "0.1.0", path = "../kennel-provision" }
 kennel-router = { version = "0.1.0", path = "../kennel-router" }
+kennel-secrets = { version = "0.1.0", path = "../kennel-secrets" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
 reqwest = "0.13.2"

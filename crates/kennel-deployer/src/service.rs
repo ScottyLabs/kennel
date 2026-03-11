@@ -7,7 +7,7 @@ use kennel_supervisor::ProcessConfig;
 use tracing::{error, info, warn};
 
 use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest, secrets, static_site, user, utils};
+use crate::{DeployerConfig, DeploymentRequest, static_site, user, utils};
 
 pub(crate) fn determine_environment(git_ref: &str) -> String {
     match git_ref {
@@ -150,18 +150,21 @@ async fn deploy_service(
 
     let service_config = config_file.services.get(&devenv_config.name);
 
-    let env_pairs: Vec<(String, String)> = process_config
-        .env
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-    let _secrets_path = secrets::generate_env_file(
-        &request.project_name,
-        &branch_sanitized,
-        &devenv_config.name,
-        &env_pairs,
-    )
-    .await?;
+    // Resolve secrets from secretspec.toml if present.
+    if let Some(vault_endpoint) = &config.vault_endpoint {
+        let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
+            .join(request.build_id.to_string())
+            .join("repo");
+        let environment = determine_environment(&request.git_ref);
+        match kennel_secrets::resolve_secrets(&work_dir, &environment, vault_endpoint) {
+            Ok(secrets) => {
+                process_config.env.extend(secrets);
+            }
+            Err(e) => {
+                warn!("Secret resolution failed: {e}");
+            }
+        }
+    }
 
     let process_config_json = serde_json::to_value(&process_config)
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;

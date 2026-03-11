@@ -21,9 +21,6 @@ pub struct KennelConfig {
 pub struct ServiceConfig {
     #[serde(default)]
     pub custom_domain: Option<String>,
-
-    #[serde(default)]
-    pub secrets: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -79,14 +76,12 @@ mod tests {
         let toml_str = r#"
 [services.api]
 custom_domain = "api.myapp.com"
-secrets = ["DATABASE_PASSWORD", "JWT_SECRET"]
 "#;
         let config: KennelConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.services.len(), 1);
 
         let api = config.services.get("api").unwrap();
         assert_eq!(api.custom_domain, Some("api.myapp.com".to_string()));
-        assert_eq!(api.secrets.len(), 2);
     }
 
     #[test]
