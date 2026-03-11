@@ -31,22 +31,19 @@
           cargoNix = pkgs.callPackage ./Cargo.nix { };
           kennel = cargoNix.workspaceMembers.kennel.build;
 
-          kennelDocs = b2n.mkDerivation {
+          kennelDocs = pkgs.stdenv.mkDerivation {
             pname = "kennel-docs";
-            version = (builtins.fromJSON (builtins.readFile ./sites/docs/package.json)).version;
+            version = "0.1.0";
             src = ./sites/docs;
-
-            bunDeps = b2n.fetchBunDeps {
-              bunNix = ./sites/docs/bun.nix;
-            };
+            nativeBuildInputs = [ pkgs.mdbook ];
 
             buildPhase = ''
-              bun run build
+              mdbook build
             '';
 
             installPhase = ''
               mkdir -p $out
-              cp -r dist/* $out/
+              cp -r book/* $out/
             '';
           };
 

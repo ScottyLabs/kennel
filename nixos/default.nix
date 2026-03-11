@@ -291,8 +291,10 @@ in
         ReadWritePaths = [
           "/var/lib/kennel"
           "/run/kennel"
-          "/etc/systemd/system"
         ];
+
+        # cgroup v2 delegation for per-process resource isolation
+        Delegate = "yes";
 
         Environment = [
           "RUST_LOG=info"
@@ -321,8 +323,9 @@ in
           (optionals (cfg.builder.cachix.authTokenFile != null) [ cfg.builder.cachix.authTokenFile ])
           ++ (optionals cfg.dns.enable [ cfg.dns.cloudflare.apiTokenFile ]);
 
-        AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-        CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+        # User switching (setuid/setgid) for per-deployment process isolation
+        AmbientCapabilities = [ "CAP_SETUID" "CAP_SETGID" ];
+        CapabilityBoundingSet = [ "CAP_SETUID" "CAP_SETGID" ];
       };
     };
 
