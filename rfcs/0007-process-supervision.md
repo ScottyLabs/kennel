@@ -138,8 +138,9 @@ pub struct ReadyConfig {
     /// Shell command to execute. Exit code 0 means ready.
     pub exec: Option<String>,
 
-    /// HTTP GET probe.
-    pub http: Option<HttpProbe>,
+    /// HTTP GET probe. Wrapped in `HttpReadyConfig` to match devenv's
+    /// `ready.http.get` JSON structure.
+    pub http: Option<HttpReadyConfig>,
 
     /// Systemd notify protocol. The process sends READY=1 to $NOTIFY_SOCKET.
     #[serde(default)]
@@ -168,6 +169,11 @@ pub struct ReadyConfig {
     /// Consecutive failures required to transition to unhealthy.
     #[serde(default = "default_failure_threshold")]
     pub failure_threshold: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct HttpReadyConfig {
+    pub get: Option<HttpProbe>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

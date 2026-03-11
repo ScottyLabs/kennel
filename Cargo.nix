@@ -2238,6 +2238,25 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "caps" = rec {
+        crateName = "caps";
+        version = "0.5.6";
+        edition = "2018";
+        sha256 = "1q35z137s1m7v9cv94y9iw7cp39vkh8d12i9i6lbcc5sgajdn7gx";
+        authors = [
+          "Luca Bruno <lucab@lucabruno.net>"
+        ];
+        dependencies = [
+          {
+            name = "libc";
+            packageId = "libc";
+          }
+        ];
+        features = {
+          "serde" = [ "dep:serde" ];
+          "serde_support" = [ "serde" ];
+        };
+      };
       "cc" = rec {
         crateName = "cc";
         version = "1.2.56";
@@ -6739,6 +6758,11 @@ rec {
           {
             name = "anyhow";
             packageId = "anyhow";
+          }
+          {
+            name = "caps";
+            packageId = "caps";
+            target = { target, features }: ("linux" == target."os" or null);
           }
           {
             name = "nix";

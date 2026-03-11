@@ -86,10 +86,26 @@ impl Supervisor {
         let command = build_command(&config);
         let (job, job_handle) = start_job(command);
 
+        // Create notify socket if the process uses notify readiness.
+        let notify_socket_path = if config.ready.as_ref().is_some_and(|r| r.notify) {
+            let path = std::env::temp_dir().join(format!("kennel-notify-{}", name));
+            Some(path)
+        } else {
+            None
+        };
+
         let spawn_env = config.env.clone();
         let spawn_cwd = config.cwd.clone();
         let socket_fds: Vec<_> = bound_sockets.iter().map(|s| s.fd).collect();
-        let _cgroup_procs_path = cgroup.as_ref().map(|cg| cg.path().join("cgroup.procs"));
+        let has_sockets = !socket_fds.is_empty();
+        let notify_path = notify_socket_path.clone();
+
+        #[cfg(target_os = "linux")]
+        let spawn_user = config.user.clone();
+        #[cfg(target_os = "linux")]
+        let spawn_caps = config.capabilities.clone();
+        #[cfg(target_os = "linux")]
+        let cgroup_procs_path = cgroup.as_ref().map(|cg| cg.path().join("cgroup.procs"));
 
         job.set_spawn_hook(move |cmd, _ctx| {
             let inner = cmd.command_mut();
@@ -102,22 +118,57 @@ impl Supervisor {
                 inner.current_dir(cwd);
             }
 
-            if !socket_fds.is_empty() {
+            if has_sockets {
                 inner.env("LISTEN_FDS", socket_fds.len().to_string());
             }
 
-            // Move the child into its cgroup before exec. This runs in
-            // the forked child process, so std::process::id() returns
-            // the child's PID.
+            if let Some(ref path) = notify_path {
+                inner.env("NOTIFY_SOCKET", path.to_string_lossy().as_ref());
+            }
+
+            let pre_exec_has_sockets = has_sockets;
             #[cfg(target_os = "linux")]
-            if let Some(ref procs_path) = _cgroup_procs_path {
-                let path = procs_path.clone();
-                unsafe {
-                    inner.pre_exec(move || {
-                        let pid = std::process::id();
-                        std::fs::write(&path, pid.to_string())
-                    });
-                }
+            let pre_exec_user = spawn_user.clone();
+            #[cfg(target_os = "linux")]
+            let pre_exec_caps = spawn_caps.clone();
+            #[cfg(target_os = "linux")]
+            let pre_exec_cgroup = cgroup_procs_path.clone();
+
+            // SAFETY: pre_exec runs between fork and exec in the child
+            // process. Only the calling thread exists in the child, so
+            // there are no data races. The operations (setenv, setuid,
+            // setgid, fs::write) are all async-signal-safe or only
+            // affect the child's own state before exec replaces it.
+            unsafe {
+                inner.pre_exec(move || {
+                    if pre_exec_has_sockets {
+                        std::env::set_var("LISTEN_PID", std::process::id().to_string());
+                    }
+
+                    #[cfg(target_os = "linux")]
+                    if let Some(ref username) = pre_exec_user {
+                        if let Ok(uid) = resolve_uid(username) {
+                            if let Ok(gid) = resolve_gid(username) {
+                                let _ = nix::unistd::setgid(gid);
+                                let _ = nix::unistd::setuid(uid);
+                            }
+                        }
+                    }
+
+                    #[cfg(target_os = "linux")]
+                    for cap_name in &pre_exec_caps {
+                        if let Ok(cap) = cap_name.parse::<caps::Capability>() {
+                            let _ = caps::raise(None, caps::CapSet::Ambient, cap);
+                        }
+                    }
+
+                    #[cfg(target_os = "linux")]
+                    if let Some(ref procs_path) = pre_exec_cgroup {
+                        std::fs::write(procs_path, std::process::id().to_string())?;
+                    }
+
+                    Ok(())
+                });
             }
         })
         .await;
@@ -298,6 +349,34 @@ fn build_command(config: &ProcessConfig) -> Arc<Command> {
             reset_sigmask: true,
         },
     })
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_uid(username: &str) -> std::io::Result<nix::unistd::Uid> {
+    use nix::unistd::User;
+    User::from_name(username)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map(|u| u.uid)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("user not found: {username}"),
+            )
+        })
+}
+
+#[cfg(target_os = "linux")]
+fn resolve_gid(username: &str) -> std::io::Result<nix::unistd::Gid> {
+    use nix::unistd::User;
+    User::from_name(username)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map(|u| u.gid)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("user not found: {username}"),
+            )
+        })
 }
 
 fn spawn_supervision_task(

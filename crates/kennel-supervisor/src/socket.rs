@@ -179,6 +179,8 @@ mod tests {
         }];
 
         let bound = bind_sockets(&specs).unwrap();
+        // SAFETY: The fd is valid because bind_sockets just created and
+        // returned it, and bound[0]._socket keeps the fd alive.
         let borrowed = unsafe { BorrowedFd::borrow_raw(bound[0].fd) };
         let flags = fcntl(borrowed, FcntlArg::F_GETFD).unwrap();
         let fd_flags = FdFlag::from_bits_truncate(flags);
