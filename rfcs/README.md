@@ -97,6 +97,11 @@ The filename should match the branch name, e.g. `0001-dev-environment-ci.md`.
 | 0004 | [Core Pipeline Architecture](./0004-core-pipeline.md) | Accepted |
 | 0005 | [NixOS Module](./0005-nixos-module.md) | Accepted |
 | 0006 | [DNS Management](./0006-dns-management.md) | Accepted |
+| 0007 | [Process Supervision](./0007-process-supervision.md) | Accepted |
+| 0008 | [Resource Isolation](./0008-resource-isolation.md) | Accepted |
+| 0009 | [Supervisor Migration](./0009-supervisor-migration.md) | Accepted |
+| 0010 | [devenv Integration](./0010-devenv-integration.md) | Accepted |
+| 0011 | [Infrastructure Provisioning](./0011-infrastructure-provisioning.md) | Accepted |
 
 *(This index will be updated as RFCs are added)*
 
