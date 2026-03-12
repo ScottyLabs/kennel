@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = "1.0.102"
+libc = "0.2.183"
 nix = { version = "0.31.2", features = ["process", "signal", "fs"] }
 reqwest = "0.13.2"
 serde = { version = "1.0.228", features = ["derive"] }

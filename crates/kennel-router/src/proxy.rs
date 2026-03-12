@@ -31,15 +31,18 @@ pub async fn proxy_to_service(
     } else {
         "http"
     };
-    headers.insert("x-forwarded-proto", proto.parse().unwrap());
+    if let Ok(val) = proto.parse() {
+        headers.insert("x-forwarded-proto", val);
+    }
 
-    // Add X-Forwarded-For header
     let forwarded_for = if let Some(existing) = headers.get("x-forwarded-for") {
         format!("{}, {}", existing.to_str().unwrap_or(""), client_ip)
     } else {
         client_ip.to_string()
     };
-    headers.insert("x-forwarded-for", forwarded_for.parse().unwrap());
+    if let Ok(val) = forwarded_for.parse() {
+        headers.insert("x-forwarded-for", val);
+    }
 
     match client
         .request(method.clone(), &backend_url)

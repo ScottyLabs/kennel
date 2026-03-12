@@ -16,11 +16,17 @@ impl PostgresProvider {
     }
 
     fn database_name(request: &ResourceRequest) -> String {
-        format!(
+        let name = format!(
             "kennel_{}_{}",
             request.project_name.replace('-', "_"),
             request.branch_slug.replace('-', "_")
-        )
+        );
+        // Only allow alphanumeric and underscores to prevent SQL injection.
+        assert!(
+            name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
+            "invalid database name: {name}"
+        );
+        name
     }
 }
 

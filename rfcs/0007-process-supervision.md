@@ -418,6 +418,10 @@ After a restart, the readiness probe runs again before the process is considered
 
 - **Log capture.** The current systemd integration relies on journald for log capture. With a userspace supervisor, Kennel must capture stdout/stderr itself. Should it pipe output to log files, or use a PTY for terminal-aware capture? Log files are simpler but lose terminal formatting.
 
+- **File watching.** The `WatchConfig` type is defined and deserialized from devenv task configs for forward compatibility, but the supervisor does not yet restart processes when watched files change.
+
+- **Watchdog.** The `WatchdogConfig` type is defined and deserialized, but the supervisor does not yet monitor heartbeats or enforce watchdog timeouts.
+
 ## Implementation Phases
 
 ### Crate Skeleton and Config Types

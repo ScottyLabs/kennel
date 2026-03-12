@@ -34,13 +34,6 @@ pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) 
         return Ok(());
     }
 
-    let _build = config
-        .store
-        .builds()
-        .find_by_id(request.build_id)
-        .await?
-        .ok_or_else(|| crate::DeployerError::NotFound(format!("Build {}", request.build_id)))?;
-
     let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
         .join(request.build_id.to_string());
     let config_file = parse_kennel_toml(&work_dir).await.map_err(|e| {
@@ -124,7 +117,6 @@ async fn deploy_service(
 
     // Provision required infrastructure resources.
     let resource_request = kennel_provision::ResourceRequest {
-        deployment_id: 0,
         project_name: request.project_name.clone(),
         service_name: devenv_config.name.clone(),
         branch: request.git_ref.clone(),

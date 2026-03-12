@@ -56,8 +56,32 @@ async fn main() -> anyhow::Result<()> {
 
     let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
     let builder_config = config::create_builder_config(store.clone(), channels.deploy_tx.clone());
-    // Resource providers are initialized based on environment configuration.
-    let resource_providers = vec![];
+    let mut resource_providers: Vec<Arc<dyn kennel_provision::ResourceProvider>> = vec![];
+
+    if let Ok(socket_dir) = std::env::var("POSTGRES_SOCKET_DIR") {
+        resource_providers.push(Arc::new(kennel_provision::postgres::PostgresProvider::new(
+            store.db().clone(),
+            socket_dir,
+        )));
+    }
+
+    if let Ok(socket_path) = std::env::var("VALKEY_SOCKET_PATH") {
+        resource_providers.push(Arc::new(kennel_provision::valkey::ValkeyProvider::new(
+            socket_path,
+        )));
+    }
+
+    if let Ok(admin_endpoint) = std::env::var("GARAGE_ADMIN_ENDPOINT") {
+        let s3_endpoint =
+            std::env::var("GARAGE_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:3900".into());
+        let admin_token = std::env::var("GARAGE_ADMIN_TOKEN")
+            .expect("GARAGE_ADMIN_TOKEN required when GARAGE_ADMIN_ENDPOINT is set");
+        resource_providers.push(Arc::new(kennel_provision::garage::GarageProvider::new(
+            admin_endpoint,
+            s3_endpoint,
+            admin_token,
+        )));
+    }
 
     let deployer_config = config::create_deployer_config(
         store.clone(),

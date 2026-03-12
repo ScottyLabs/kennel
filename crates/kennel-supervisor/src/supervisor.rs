@@ -73,6 +73,13 @@ impl Supervisor {
 
     pub async fn start(&mut self, config: ProcessConfig) -> Result<()> {
         let name = config.name.clone();
+
+        if self.processes.contains_key(&name) {
+            return Err(SupervisorError::Other(anyhow::anyhow!(
+                "process '{name}' is already running"
+            )));
+        }
+
         tracing::info!(process = %name, exec = %config.exec, "starting process");
 
         let bound_sockets = crate::socket::bind_sockets(&config.listen)?;
@@ -126,7 +133,7 @@ impl Supervisor {
                 inner.env("NOTIFY_SOCKET", path.to_string_lossy().as_ref());
             }
 
-            let pre_exec_has_sockets = has_sockets;
+            let pre_exec_socket_fds = socket_fds.clone();
             #[cfg(target_os = "linux")]
             let pre_exec_user = spawn_user.clone();
             #[cfg(target_os = "linux")]
@@ -136,22 +143,32 @@ impl Supervisor {
 
             // SAFETY: pre_exec runs between fork and exec in the child
             // process. Only the calling thread exists in the child, so
-            // there are no data races. The operations (setenv, setuid,
-            // setgid, fs::write) are all async-signal-safe or only
-            // affect the child's own state before exec replaces it.
+            // there are no data races. The operations (dup2, setenv,
+            // setuid, setgid, fs::write) are all async-signal-safe or
+            // only affect the child's own state before exec replaces it.
             unsafe {
                 inner.pre_exec(move || {
-                    if pre_exec_has_sockets {
+                    // Renumber socket FDs to be contiguous starting at
+                    // FD 3 per the systemd socket activation protocol.
+                    for (i, &fd) in pre_exec_socket_fds.iter().enumerate() {
+                        let target_fd = (crate::socket::LISTEN_FDS_START as usize + i) as i32;
+                        if fd != target_fd {
+                            if libc::dup2(fd, target_fd) < 0 {
+                                return Err(std::io::Error::last_os_error());
+                            }
+                            libc::close(fd);
+                        }
+                    }
+
+                    if !pre_exec_socket_fds.is_empty() {
                         std::env::set_var("LISTEN_PID", std::process::id().to_string());
                     }
 
                     #[cfg(target_os = "linux")]
                     if let Some(ref username) = pre_exec_user {
-                        if let Ok(uid) = resolve_uid(username) {
-                            if let Ok(gid) = resolve_gid(username) {
-                                let _ = nix::unistd::setgid(gid);
-                                let _ = nix::unistd::setuid(uid);
-                            }
+                        if let Ok((uid, gid)) = resolve_user(username) {
+                            let _ = nix::unistd::setgid(gid);
+                            let _ = nix::unistd::setuid(uid);
                         }
                     }
 
@@ -216,9 +233,12 @@ impl Supervisor {
         managed.job.stop_with_signal(Signal::Terminate, grace).await;
         *managed.state.lock().unwrap() = ProcessState::Stopped;
 
-        let _ = self.event_tx.send(SupervisorEvent::ProcessStopped {
-            name: name.to_string(),
-        });
+        send_event(
+            &self.event_tx,
+            SupervisorEvent::ProcessStopped {
+                name: name.to_string(),
+            },
+        );
 
         Ok(())
     }
@@ -274,7 +294,11 @@ impl Supervisor {
                     }
                 }
                 Ok(_) => {}
-                Err(_) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(skipped = n, "supervisor event receiver lagged");
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
 
@@ -292,14 +316,17 @@ impl Supervisor {
         let name = new_config.name.clone();
         let old_name = format!("{name}--old");
 
-        // Rename the current process to make room for the new one.
+        // Abort the old supervision task before renaming so it stops
+        // emitting events with the old name.
+        if let Some(old) = self.processes.get(&name) {
+            old.supervision_handle.abort();
+        }
         if let Some(old) = self.processes.remove(&name) {
             self.processes.insert(old_name.clone(), old);
         }
 
         self.start(new_config).await?;
 
-        // Wait for the new process to become ready.
         let mut event_rx = self.event_tx.subscribe();
         loop {
             match event_rx.recv().await {
@@ -308,7 +335,6 @@ impl Supervisor {
                     name: ref n,
                     ref error,
                 }) if *n == name => {
-                    // Restore the old process on failure.
                     if let Some(old) = self.processes.remove(&old_name) {
                         self.processes.insert(name.clone(), old);
                     }
@@ -318,7 +344,11 @@ impl Supervisor {
                     });
                 }
                 Ok(_) => {}
-                Err(_) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(skipped = n, "supervisor event receiver lagged");
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
 
@@ -338,6 +368,12 @@ impl Supervisor {
     }
 }
 
+fn send_event(tx: &broadcast::Sender<SupervisorEvent>, event: SupervisorEvent) {
+    if let Err(e) = tx.send(event) {
+        tracing::warn!("failed to send supervisor event: {e}");
+    }
+}
+
 fn build_command(config: &ProcessConfig) -> Arc<Command> {
     Arc::new(Command {
         program: Program::Exec {
@@ -353,31 +389,17 @@ fn build_command(config: &ProcessConfig) -> Arc<Command> {
 }
 
 #[cfg(target_os = "linux")]
-fn resolve_uid(username: &str) -> std::io::Result<nix::unistd::Uid> {
+fn resolve_user(username: &str) -> std::io::Result<(nix::unistd::Uid, nix::unistd::Gid)> {
     use nix::unistd::User;
-    User::from_name(username)
+    let user = User::from_name(username)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-        .map(|u| u.uid)
         .ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("user not found: {username}"),
             )
-        })
-}
-
-#[cfg(target_os = "linux")]
-fn resolve_gid(username: &str) -> std::io::Result<nix::unistd::Gid> {
-    use nix::unistd::User;
-    User::from_name(username)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-        .map(|u| u.gid)
-        .ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("user not found: {username}"),
-            )
-        })
+        })?;
+    Ok((user.uid, user.gid))
 }
 
 fn spawn_supervision_task(
@@ -409,21 +431,27 @@ fn spawn_supervision_task(
                 Ok(()) => {
                     *state.lock().unwrap() = ProcessState::Ready;
                     let port = config.ports.values().next().copied();
-                    let _ = event_tx.send(SupervisorEvent::ProcessReady {
-                        name: name.clone(),
-                        port,
-                        store_path: None,
-                    });
+                    send_event(
+                        &event_tx,
+                        SupervisorEvent::ProcessReady {
+                            name: name.clone(),
+                            port,
+                            store_path: None,
+                        },
+                    );
                 }
                 Err(e) => {
                     *state.lock().unwrap() = ProcessState::Failed {
                         error: e.to_string(),
                         restarts: 0,
                     };
-                    let _ = event_tx.send(SupervisorEvent::ProcessFailed {
-                        name: name.clone(),
-                        error: e.to_string(),
-                    });
+                    send_event(
+                        &event_tx,
+                        SupervisorEvent::ProcessFailed {
+                            name: name.clone(),
+                            error: e.to_string(),
+                        },
+                    );
                     let _ = job
                         .stop_with_signal(Signal::Terminate, Duration::from_secs(10))
                         .await;
@@ -433,11 +461,14 @@ fn spawn_supervision_task(
         } else {
             *state.lock().unwrap() = ProcessState::Running;
             let port = config.ports.values().next().copied();
-            let _ = event_tx.send(SupervisorEvent::ProcessReady {
-                name: name.clone(),
-                port,
-                store_path: None,
-            });
+            send_event(
+                &event_tx,
+                SupervisorEvent::ProcessReady {
+                    name: name.clone(),
+                    port,
+                    store_path: None,
+                },
+            );
         }
 
         // Liveness monitoring and restart loop.
@@ -457,7 +488,7 @@ fn spawn_supervision_task(
 
                         restarts += 1;
                         *state.lock().unwrap() = ProcessState::Restarting { attempt: restarts };
-                        let _ = event_tx.send(SupervisorEvent::ProcessRestarting {
+                        send_event(&event_tx,SupervisorEvent::ProcessRestarting {
                             name: name.clone(),
                             attempt: restarts,
                         });
@@ -470,7 +501,7 @@ fn spawn_supervision_task(
                                     healthy = true;
                                     *state.lock().unwrap() = ProcessState::Ready;
                                     let port = config.ports.values().next().copied();
-                                    let _ = event_tx.send(SupervisorEvent::ProcessReady {
+                                    send_event(&event_tx,SupervisorEvent::ProcessReady {
                                         name: name.clone(),
                                         port,
                                         store_path: None,
@@ -481,7 +512,7 @@ fn spawn_supervision_task(
                                         error: e.to_string(),
                                         restarts,
                                     };
-                                    let _ = event_tx.send(SupervisorEvent::ProcessFailed {
+                                    send_event(&event_tx,SupervisorEvent::ProcessFailed {
                                         name: name.clone(),
                                         error: e.to_string(),
                                     });
@@ -495,7 +526,7 @@ fn spawn_supervision_task(
                         } else {
                             *state.lock().unwrap() = ProcessState::Running;
                             let port = config.ports.values().next().copied();
-                            let _ = event_tx.send(SupervisorEvent::ProcessReady {
+                            send_event(&event_tx,SupervisorEvent::ProcessReady {
                                 name: name.clone(),
                                 port,
                                 store_path: None,
@@ -503,7 +534,7 @@ fn spawn_supervision_task(
                         }
                     } else {
                         *state.lock().unwrap() = ProcessState::Stopped;
-                        let _ = event_tx.send(SupervisorEvent::ProcessStopped {
+                        send_event(&event_tx,SupervisorEvent::ProcessStopped {
                             name: name.clone(),
                         });
                         return;
@@ -517,14 +548,14 @@ fn spawn_supervision_task(
                     if probe_result.is_err() && healthy {
                         healthy = false;
                         *state.lock().unwrap() = ProcessState::Unhealthy;
-                        let _ = event_tx.send(SupervisorEvent::ProcessUnhealthy {
+                        send_event(&event_tx,SupervisorEvent::ProcessUnhealthy {
                             name: name.clone(),
                         });
                     } else if probe_result.is_ok() && !healthy {
                         healthy = true;
                         *state.lock().unwrap() = ProcessState::Ready;
                         let port = config.ports.values().next().copied();
-                        let _ = event_tx.send(SupervisorEvent::ProcessHealthy {
+                        send_event(&event_tx,SupervisorEvent::ProcessHealthy {
                             name: name.clone(),
                             port,
                         });

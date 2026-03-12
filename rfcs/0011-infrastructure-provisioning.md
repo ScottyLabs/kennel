@@ -168,17 +168,13 @@ Kennel authenticates to Garage's admin API using a bearer token configured in th
 
 ### Resource Tracking
 
-The current `preview_databases` table is replaced with a general `provisioned_resources` table tracking all provider allocations. Columns:
+Each provider manages its own state rather than using a shared database table:
 
-- `id` -- primary key
-- `provider` -- provider name (`postgres`, `valkey`, `garage`)
-- `deployment_id` -- foreign key to deployments
-- `project_name`, `service_name`, `branch` -- for reconciliation queries
-- `resource_identifier` -- provider-specific identifier (database name, DB number, bucket name)
-- `metadata` -- JSONB for provider-specific data (Garage API key ID, bucket UUID, etc.)
-- `created_at` -- timestamp
+- **PostgreSQL**: queries `pg_database` for databases matching the `kennel_*` naming pattern
+- **Valkey**: tracks DB number allocations in memory (reconstructed via reconciliation on restart)
+- **Garage**: queries the Garage admin API for buckets and keys matching the `kennel-*` naming pattern
 
-The migration drops the `preview_databases` table and creates `provisioned_resources`.
+This avoids an additional database table and keeps each provider self-contained. The `preview_databases` table is dropped since providers handle resource tracking internally.
 
 ### Environment Variable Parity
 

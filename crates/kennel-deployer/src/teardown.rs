@@ -75,7 +75,6 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
 
     // Teardown provisioned resources.
     let resource_request = kennel_provision::ResourceRequest {
-        deployment_id: deployment.id,
         project_name: deployment.project_name.clone(),
         service_name: deployment.service_name.clone(),
         branch: deployment.branch.clone(),
@@ -108,7 +107,7 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
     if remaining_deployments.is_none() {
         let username = utils::sanitize_username(
             &deployment.project_name,
-            &deployment.branch,
+            &deployment.branch_slug,
             &deployment.service_name,
         );
         if let Err(e) = user::remove_user(&username).await {

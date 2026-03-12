@@ -8,7 +8,6 @@ use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ResourceRequest {
-    pub deployment_id: i32,
     pub project_name: String,
     pub service_name: String,
     pub branch: String,

@@ -126,7 +126,6 @@ impl GarageProvider {
         Ok(())
     }
 
-    #[allow(dead_code)]
     async fn delete_key(&self, access_key_id: &str) -> anyhow::Result<()> {
         let response = self
             .client
@@ -180,10 +179,11 @@ impl ResourceProvider for GarageProvider {
 
     async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()> {
         let bucket_name = Self::bucket_name(request);
+        let key_name = format!("kennel-{}-{}", request.project_name, request.branch_slug);
 
-        tracing::info!("Deleting Garage bucket: {bucket_name}");
+        tracing::info!("Deleting Garage bucket and key: {bucket_name}");
 
-        // List buckets to find the bucket ID for this alias.
+        // Delete bucket.
         let response = self
             .client
             .get(format!("{}/v2/ListBuckets", self.admin_endpoint))
@@ -191,19 +191,38 @@ impl ResourceProvider for GarageProvider {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            anyhow::bail!("Failed to list buckets");
+        if response.status().is_success() {
+            let buckets: Vec<serde_json::Value> = response.json().await?;
+            for bucket in &buckets {
+                let aliases = bucket["globalAliases"].as_array();
+                if aliases.is_some_and(|a| a.iter().any(|v| v.as_str() == Some(&bucket_name)))
+                    && let Some(bucket_id) = bucket["id"].as_str()
+                {
+                    if let Err(e) = self.delete_bucket(bucket_id).await {
+                        tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
+                    }
+                }
+            }
         }
 
-        let buckets: Vec<serde_json::Value> = response.json().await?;
+        // Delete associated API key.
+        let response = self
+            .client
+            .get(format!("{}/v2/ListKeys", self.admin_endpoint))
+            .bearer_auth(&self.admin_token)
+            .send()
+            .await?;
 
-        for bucket in &buckets {
-            let aliases = bucket["globalAliases"].as_array();
-            if aliases.is_some_and(|a| a.iter().any(|v| v.as_str() == Some(&bucket_name)))
-                && let Some(bucket_id) = bucket["id"].as_str()
-                && let Err(e) = self.delete_bucket(bucket_id).await
-            {
-                tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
+        if response.status().is_success() {
+            let keys: Vec<serde_json::Value> = response.json().await?;
+            for key in &keys {
+                if key["name"].as_str() == Some(&key_name) {
+                    if let Some(key_id) = key["accessKeyId"].as_str() {
+                        if let Err(e) = self.delete_key(key_id).await {
+                            tracing::warn!("Failed to delete key {key_name}: {e}");
+                        }
+                    }
+                }
             }
         }
 

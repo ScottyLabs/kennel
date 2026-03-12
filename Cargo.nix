@@ -7224,6 +7224,10 @@ rec {
             target = { target, features }: ("linux" == target."os" or null);
           }
           {
+            name = "libc";
+            packageId = "libc";
+          }
+          {
             name = "nix";
             packageId = "nix 0.31.2";
             features = [ "process" "signal" "fs" ];
@@ -7465,9 +7469,9 @@ rec {
       };
       "libc" = rec {
         crateName = "libc";
-        version = "0.2.182";
+        version = "0.2.183";
         edition = "2021";
-        sha256 = "04k1w1mq9f4cxv520dbr5xw1i7xkbc9fcrvaggyjy25jdkdvl038";
+        sha256 = "17c9gyia7rrzf9gsssvk3vq9ca2jp6rh32fsw6ciarpn5djlddmm";
         authors = [
           "The Rust Project Developers"
         ];

@@ -66,7 +66,10 @@ async fn probe_http(config: &crate::config::HttpProbe, timeout: Duration) -> any
         config.scheme, config.host, config.port, config.path
     );
 
-    let client = reqwest::Client::builder().timeout(timeout).build()?;
+    let client = reqwest::Client::builder()
+        .connect_timeout(timeout)
+        .timeout(timeout)
+        .build()?;
 
     let response = client.get(&url).send().await?;
 
