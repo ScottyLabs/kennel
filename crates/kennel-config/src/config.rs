@@ -37,7 +37,6 @@ pub struct StaticSiteConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CachixConfig {
     pub cache_name: String,
-    pub auth_token_file: Option<String>,
 }
 
 pub async fn parse_kennel_toml(repo_path: &Path) -> std::io::Result<KennelConfig> {
@@ -110,13 +109,11 @@ spa = true
         let toml_str = r#"
 [cachix]
 cache_name = "my-cache"
-auth_token_file = "/path/to/token"
 "#;
         let config: KennelConfig = toml::from_str(toml_str).unwrap();
         assert!(config.cachix.is_some());
 
         let cachix = config.cachix.unwrap();
         assert_eq!(cachix.cache_name, "my-cache");
-        assert_eq!(cachix.auth_token_file, Some("/path/to/token".to_string()));
     }
 }
