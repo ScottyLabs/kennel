@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use sea_orm::{ConnectionTrait, DatabaseConnection};
+use sea_orm::{ConnectionTrait, DatabaseConnection, Statement};
 
 use crate::{ReconciliationSummary, ResourceProvider, ResourceRequest};
 
@@ -10,23 +10,36 @@ pub struct PostgresProvider {
     socket_dir: String,
 }
 
+/// Validate that an identifier contains only safe characters for use in SQL DDL.
+/// Returns an error instead of panicking.
+fn validate_identifier(name: &str) -> anyhow::Result<()> {
+    if name.is_empty() {
+        anyhow::bail!("identifier cannot be empty");
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        anyhow::bail!(
+            "identifier contains invalid characters (only alphanumeric, underscore, hyphen allowed): {name}"
+        );
+    }
+    Ok(())
+}
+
 impl PostgresProvider {
     pub fn new(db: DatabaseConnection, socket_dir: String) -> Self {
         Self { db, socket_dir }
     }
 
-    fn database_name(request: &ResourceRequest) -> String {
+    fn database_name(request: &ResourceRequest) -> anyhow::Result<String> {
         let name = format!(
             "kennel_{}_{}",
             request.project_name.replace('-', "_"),
             request.branch_slug.replace('-', "_")
         );
-        // Only allow alphanumeric and underscores to prevent SQL injection.
-        assert!(
-            name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
-            "invalid database name: {name}"
-        );
-        name
+        validate_identifier(&name)?;
+        Ok(name)
     }
 }
 
@@ -40,14 +53,16 @@ impl ResourceProvider for PostgresProvider {
         &self,
         request: &ResourceRequest,
     ) -> anyhow::Result<HashMap<String, String>> {
-        let db_name = Self::database_name(request);
+        let db_name = Self::database_name(request)?;
+        validate_identifier(&request.system_user)?;
 
-        // Create database if it doesn't exist.
+        // Use a parameterized query for the existence check.
         let exists: Vec<sea_orm::QueryResult> = self
             .db
-            .query_all(sea_orm::Statement::from_string(
+            .query_all(Statement::from_sql_and_values(
                 sea_orm::DatabaseBackend::Postgres,
-                format!("SELECT 1 FROM pg_database WHERE datname = '{db_name}'"),
+                "SELECT 1 FROM pg_database WHERE datname = $1",
+                [db_name.clone().into()],
             ))
             .await?;
 
@@ -58,14 +73,20 @@ impl ResourceProvider for PostgresProvider {
 
             tracing::info!("Created database {db_name}");
 
-            // Grant access to the deployment's system user.
-            let _ = self
-                .db
+            // Create the role if it doesn't exist (peer auth requires it).
+            self.db
+                .execute_unprepared(&format!(
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{user}') THEN CREATE ROLE \"{user}\" WITH LOGIN; END IF; END $$;",
+                    user = request.system_user
+                ))
+                .await?;
+
+            self.db
                 .execute_unprepared(&format!(
                     "GRANT ALL PRIVILEGES ON DATABASE \"{db_name}\" TO \"{}\"",
                     request.system_user
                 ))
-                .await;
+                .await?;
         }
 
         let mut env = HashMap::new();
@@ -78,15 +99,14 @@ impl ResourceProvider for PostgresProvider {
     }
 
     async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()> {
-        let db_name = Self::database_name(request);
+        let db_name = Self::database_name(request)?;
 
-        // Terminate active connections.
-        let _ = self
-            .db
+        // Terminate active connections before dropping.
+        self.db
             .execute_unprepared(&format!(
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' AND pid <> pg_backend_pid()"
             ))
-            .await;
+            .await?;
 
         self.db
             .execute_unprepared(&format!("DROP DATABASE IF EXISTS \"{db_name}\""))
@@ -100,12 +120,14 @@ impl ResourceProvider for PostgresProvider {
         &self,
         active_deployments: &[ResourceRequest],
     ) -> anyhow::Result<ReconciliationSummary> {
-        let active_db_names: std::collections::HashSet<String> =
-            active_deployments.iter().map(Self::database_name).collect();
+        let active_db_names: std::collections::HashSet<String> = active_deployments
+            .iter()
+            .filter_map(|r| Self::database_name(r).ok())
+            .collect();
 
         let rows: Vec<sea_orm::QueryResult> = self
             .db
-            .query_all(sea_orm::Statement::from_string(
+            .query_all(Statement::from_string(
                 sea_orm::DatabaseBackend::Postgres,
                 "SELECT datname FROM pg_database WHERE datname LIKE 'kennel_%'".to_string(),
             ))
@@ -117,10 +139,9 @@ impl ResourceProvider for PostgresProvider {
             let db_name: String = row.try_get("", "datname")?;
             if !active_db_names.contains(&db_name) {
                 tracing::info!("Removing orphaned database: {db_name}");
-                let _ = self
-                    .db
+                self.db
                     .execute_unprepared(&format!("DROP DATABASE IF EXISTS \"{db_name}\""))
-                    .await;
+                    .await?;
                 summary.orphaned_resources_removed += 1;
             }
         }
