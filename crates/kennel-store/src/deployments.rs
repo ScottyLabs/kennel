@@ -1,4 +1,5 @@
 use ::entity::{deployments, prelude::*, sea_orm_active_enums::DeploymentStatus, services};
+use sea_orm::sea_query::{LockBehavior, LockType};
 use sea_orm::{entity::*, query::*, sea_query::Expr, *};
 
 pub struct DeploymentRepository<'a> {
@@ -187,5 +188,60 @@ impl<'a> DeploymentRepository<'a> {
             .await?;
 
         Ok(())
+    }
+
+    /// Atomically claim the oldest `TearingDown` deployment using
+    /// `FOR UPDATE SKIP LOCKED` to prevent double-claiming across concurrent
+    /// teardown workers. Returns the deployment without transitioning its
+    /// status, since the teardown worker will handle final cleanup.
+    pub async fn claim_tearing_down(&self) -> crate::Result<Option<deployments::Model>> {
+        let txn = self.db.begin().await?;
+
+        let deployment = Deployments::find()
+            .filter(deployments::Column::Status.eq(DeploymentStatus::TearingDown))
+            .order_by_asc(deployments::Column::UpdatedAt)
+            .lock_with_behavior(LockType::Update, LockBehavior::SkipLocked)
+            .one(&txn)
+            .await?;
+
+        txn.commit().await?;
+
+        Ok(deployment)
+    }
+
+    /// Mark the given deployment IDs as `TearingDown` so they are picked up
+    /// by the teardown worker.
+    pub async fn mark_tearing_down(&self, ids: &[i32]) -> crate::Result<()> {
+        use chrono::Utc;
+
+        if !ids.is_empty() {
+            Deployments::update_many()
+                .filter(deployments::Column::Id.is_in(ids.iter().copied()))
+                .col_expr(
+                    deployments::Column::Status,
+                    Expr::value(DeploymentStatus::TearingDown),
+                )
+                .col_expr(
+                    deployments::Column::UpdatedAt,
+                    Expr::value(Utc::now().naive_utc()),
+                )
+                .exec(self.db)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Find all `Deployed` deployments that have a non-null `process_config`,
+    /// indicating they are running services. Used for reconciliation on startup
+    /// to verify running processes match the expected state.
+    pub async fn find_deployed_service_deployments(
+        &self,
+    ) -> crate::Result<Vec<deployments::Model>> {
+        Ok(Deployments::find()
+            .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
+            .filter(deployments::Column::ProcessConfig.is_not_null())
+            .all(self.db)
+            .await?)
     }
 }

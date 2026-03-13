@@ -18,13 +18,19 @@ async fn clean_build(config: &DeployerConfig, build_id: i32) {
 }
 
 /// Periodically deletes build logs and records older than the retention period.
-pub async fn run_log_cleanup_job(config: DeployerConfig) {
+pub async fn run_log_cleanup_job(
+    config: DeployerConfig,
+    cancel: tokio_util::sync::CancellationToken,
+) {
     info!("Starting build log cleanup job");
 
     let mut interval = tokio::time::interval(constants::LOG_CLEANUP_INTERVAL);
 
     loop {
-        interval.tick().await;
+        tokio::select! {
+            _ = interval.tick() => {},
+            _ = cancel.cancelled() => break,
+        }
 
         info!("Running build log cleanup");
 

@@ -8,16 +8,15 @@ mod user;
 mod utils;
 
 pub use error::{DeployerError, Result};
-pub use kennel_builder::DeploymentRequest;
 pub use log_cleanup::run_log_cleanup_job;
-pub use teardown::run_teardown_worker;
 
 use kennel_dns::DnsManager;
 use kennel_provision::ResourceProvider;
 use kennel_store::Store;
 use kennel_supervisor::Supervisor;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{Mutex, Notify};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
 #[derive(Clone)]
@@ -31,34 +30,107 @@ pub struct DeployerConfig {
 }
 
 pub async fn run_deployer(
-    mut deploy_rx: mpsc::Receiver<DeploymentRequest>,
     config: DeployerConfig,
+    deploy_signal: Arc<Notify>,
+    cancel: CancellationToken,
 ) {
     info!("Starting deployer");
 
-    while let Some(request) = deploy_rx.recv().await {
+    loop {
+        if cancel.is_cancelled() {
+            break;
+        }
+
+        let build = match config.store.builds().claim_built_build().await {
+            Ok(Some(build)) => build,
+            Ok(None) => {
+                tokio::select! {
+                    _ = deploy_signal.notified() => continue,
+                    _ = cancel.cancelled() => break,
+                }
+            }
+            Err(e) => {
+                error!("Failed to claim built build: {e}");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        };
+
+        let build_id = build.id;
         info!(
-            "Received deployment request for build {} (project: {}, ref: {})",
-            request.build_id, request.project_name, request.git_ref
+            "Deploying build {build_id} (project: {}, ref: {})",
+            build.project_name, build.git_ref
         );
 
-        if let Err(e) = service::deploy_build(&request, &config).await {
-            error!("Deployment failed for build {}: {}", request.build_id, e);
+        if let Err(e) = service::deploy_build(&build, &config).await {
+            error!("Deployment failed for build {build_id}: {e}");
+            // Mark the build as Failed since deployment failed.
+            if let Err(e2) = config.store.builds().mark_failed(build_id).await {
+                error!("Failed to mark build {build_id} as failed: {e2}");
+            }
+        } else {
+            // Mark the build as Success since deployment completed.
+            if let Err(e) = config.store.builds().mark_success(build_id).await {
+                error!("Failed to mark build {build_id} as success: {e}");
+            }
         }
     }
 
     info!("Deployer shutting down");
 }
 
-pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i32>) {
+pub async fn run_teardown_worker(
+    config: DeployerConfig,
+    teardown_signal: Arc<Notify>,
+    cancel: CancellationToken,
+) {
+    info!("Starting teardown worker");
+
+    loop {
+        if cancel.is_cancelled() {
+            break;
+        }
+
+        let deployment = match config.store.deployments().claim_tearing_down().await {
+            Ok(Some(d)) => d,
+            Ok(None) => {
+                tokio::select! {
+                    _ = teardown_signal.notified() => continue,
+                    _ = cancel.cancelled() => break,
+                }
+            }
+            Err(e) => {
+                error!("Failed to claim teardown deployment: {e}");
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        };
+
+        let deployment_id = deployment.id;
+        info!("Processing teardown for deployment {deployment_id}");
+
+        if let Err(e) = teardown::process_teardown(deployment, &config).await {
+            error!("Teardown failed for deployment {deployment_id}: {e}");
+        }
+    }
+
+    info!("Teardown worker shutting down");
+}
+
+pub async fn run_cleanup_job(
+    config: DeployerConfig,
+    teardown_signal: Arc<Notify>,
+    cancel: CancellationToken,
+) {
     info!("Starting auto-expiry cleanup job");
 
     let mut interval = tokio::time::interval(kennel_config::constants::CLEANUP_JOB_INTERVAL);
 
     loop {
-        interval.tick().await;
-
-        info!("Running auto-expiry cleanup");
+        tokio::select! {
+            _ = interval.tick() => {},
+            _ = cancel.cancelled() => break,
+        }
 
         match config.store.find_expired_deployments(7).await {
             Ok(expired) if !expired.is_empty() => {
@@ -74,19 +146,12 @@ pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i
                     );
                 }
 
-                if let Err(e) = config.store.deployments().mark_ids_torn_down(&ids).await {
-                    error!("Failed to mark deployments for teardown: {}", e);
+                if let Err(e) = config.store.deployments().mark_tearing_down(&ids).await {
+                    error!("Failed to mark deployments for teardown: {e}");
                     continue;
                 }
 
-                for id in &ids {
-                    if let Err(e) = teardown_tx.send(*id).await {
-                        error!(
-                            "Failed to send teardown request for deployment {}: {}",
-                            id, e
-                        );
-                    }
-                }
+                teardown_signal.notify_one();
 
                 info!(
                     "Marked {} deployment(s) for auto-expiry teardown",
@@ -94,9 +159,11 @@ pub async fn run_cleanup_job(config: DeployerConfig, teardown_tx: mpsc::Sender<i
                 );
             }
             Err(e) => {
-                error!("Cleanup job failed to find expired deployments: {}", e);
+                error!("Cleanup job failed to find expired deployments: {e}");
             }
             _ => {}
         }
     }
+
+    info!("Cleanup job shutting down");
 }

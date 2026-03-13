@@ -19,7 +19,7 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         return Ok(());
     }
 
-    let (project_name, git_ref, work_dir) =
+    let (_project_name, _git_ref, work_dir) =
         setup_build_environment(&config, &build, build_id).await?;
 
     let kennel_config = clone_and_parse_config(&config, &build, build_id, &work_dir).await?;
@@ -55,10 +55,9 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         build,
         build_id,
         all_services_succeeded,
-        project_name,
-        git_ref,
         process_configs,
         required_resources,
+        &kennel_config,
     )
     .await
 }
@@ -381,18 +380,29 @@ async fn evaluate_devenv_tasks(
 async fn finalize_build(
     config: &Arc<BuilderConfig>,
     build: entity::builds::Model,
-    build_id: i32,
+    _build_id: i32,
     all_succeeded: bool,
-    project_name: String,
-    git_ref: String,
     process_configs: Vec<kennel_supervisor::ProcessConfig>,
     required_resources: Vec<String>,
+    kennel_config: &kennel_config::KennelConfig,
 ) -> Result<()> {
     let mut build_active = build.into_active_model();
+    let now = chrono::Utc::now().naive_utc();
 
     if all_succeeded {
-        build_active.status = Set(BuildStatus::Success);
-        build_active.finished_at = Set(Some(chrono::Utc::now().naive_utc()));
+        // Store build outputs on the record so the deployer can read them.
+        build_active.process_configs = Set(Some(
+            serde_json::to_value(&process_configs).map_err(|e| anyhow::anyhow!(e))?,
+        ));
+        build_active.required_resources = Set(Some(
+            serde_json::to_value(&required_resources).map_err(|e| anyhow::anyhow!(e))?,
+        ));
+        build_active.kennel_config = Set(Some(
+            serde_json::to_value(kennel_config).map_err(|e| anyhow::anyhow!(e))?,
+        ));
+        build_active.status = Set(BuildStatus::Built);
+        build_active.finished_at = Set(Some(now));
+        build_active.updated_at = Set(now);
         config
             .store
             .builds()
@@ -400,24 +410,11 @@ async fn finalize_build(
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
 
-        if let Err(e) = config
-            .deploy_tx
-            .send(crate::DeploymentRequest {
-                build_id,
-                project_name,
-                git_ref,
-                process_configs,
-                required_resources,
-            })
-            .await
-        {
-            error!("Failed to send deployment request: {}", e);
-        }
-
         Ok(())
     } else {
         build_active.status = Set(BuildStatus::Failed);
-        build_active.finished_at = Set(Some(chrono::Utc::now().naive_utc()));
+        build_active.finished_at = Set(Some(now));
+        build_active.updated_at = Set(now);
         config
             .store
             .builds()

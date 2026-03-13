@@ -1,37 +1,16 @@
 use std::path::Path;
 use std::time::Duration;
 
-use entity::sea_orm_active_enums::DeploymentStatus;
-use sea_orm::{ActiveValue::Set, IntoActiveModel};
-use tokio::sync::mpsc;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::error::Result;
 use crate::{DeployerConfig, user, utils};
 
-pub async fn run_teardown_worker(mut teardown_rx: mpsc::Receiver<i32>, config: DeployerConfig) {
-    info!("Starting teardown worker");
-
-    while let Some(deployment_id) = teardown_rx.recv().await {
-        info!("Processing teardown request for deployment {deployment_id}");
-
-        if let Err(e) = process_teardown(deployment_id, &config).await {
-            error!("Teardown failed for deployment {deployment_id}: {e}");
-        }
-    }
-
-    info!("Teardown worker shutting down");
-}
-
-async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result<()> {
-    let deployment = config
-        .store
-        .deployments()
-        .find_by_id(deployment_id)
-        .await
-        .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-        .ok_or_else(|| crate::DeployerError::NotFound(format!("Deployment {deployment_id}")))?;
-
+pub async fn process_teardown(
+    deployment: entity::deployments::Model,
+    config: &DeployerConfig,
+) -> Result<()> {
+    let deployment_id = deployment.id;
     info!("Tearing down deployment {deployment_id}");
 
     let branch_sanitized = deployment.branch_slug.clone();
@@ -126,16 +105,7 @@ async fn process_teardown(deployment_id: i32, config: &DeployerConfig) -> Result
         warn!("Failed to delete DNS records: {e}");
     }
 
-    // Mark as torn down and delete
-    let mut deployment_active = deployment.into_active_model();
-    deployment_active.status = Set(DeploymentStatus::TornDown);
-    config
-        .store
-        .deployments()
-        .update(deployment_active)
-        .await
-        .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
-
+    // Delete the deployment record (already in TearingDown state).
     config
         .store
         .deployments()

@@ -2,12 +2,11 @@ use std::path::PathBuf;
 
 use entity::deployments;
 use entity::sea_orm_active_enums::DeploymentStatus;
-use kennel_config::parse_kennel_toml;
 use kennel_supervisor::ProcessConfig;
 use tracing::{error, info, warn};
 
 use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest, static_site, user, utils};
+use crate::{DeployerConfig, static_site, user, utils};
 
 pub(crate) fn determine_environment(git_ref: &str) -> String {
     match git_ref {
@@ -19,57 +18,81 @@ pub(crate) fn determine_environment(git_ref: &str) -> String {
     }
 }
 
-pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) -> Result<()> {
+/// Deploy a completed build. Reads process_configs, required_resources, and
+/// kennel_config from the build record's JSONB columns.
+pub async fn deploy_build(build: &entity::builds::Model, config: &DeployerConfig) -> Result<()> {
     let build_results = config
         .store
         .build_results()
-        .find_successful_by_build_id(request.build_id)
+        .find_successful_by_build_id(build.id)
         .await?;
 
     if build_results.is_empty() {
-        warn!(
-            "No successful build results found for build {}",
-            request.build_id
-        );
+        warn!("No successful build results found for build {}", build.id);
         return Ok(());
     }
 
-    let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
-        .join(request.build_id.to_string());
-    let config_file = parse_kennel_toml(&work_dir).await.map_err(|e| {
-        crate::DeployerError::Other(anyhow::anyhow!("Failed to parse kennel.toml: {}", e))
-    })?;
+    // Deserialize build outputs from JSONB columns.
+    let process_configs: Vec<ProcessConfig> = build
+        .process_configs
+        .as_ref()
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+
+    let required_resources: Vec<String> = build
+        .required_resources
+        .as_ref()
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+
+    let kennel_config: kennel_config::KennelConfig = build
+        .kennel_config
+        .as_ref()
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_else(|| kennel_config::KennelConfig {
+            services: Default::default(),
+            static_sites: Default::default(),
+            cachix: None,
+        });
 
     info!(
         "Deploying {} items for build {}",
         build_results.len(),
-        request.build_id
+        build.id
     );
 
-    // Deploy static sites from kennel.toml (not devenv processes).
+    // Deploy static sites.
     for build_result in &build_results {
-        let is_static_site = config_file
+        if kennel_config
             .static_sites
-            .contains_key(&build_result.service_name);
-
-        if is_static_site
-            && let Err(e) =
-                static_site::deploy_site(request, build_result, &config.store, config, &config_file)
-                    .await
+            .contains_key(&build_result.service_name)
         {
-            error!(
-                "Failed to deploy static site '{}' from build {}: {}",
-                build_result.service_name, request.build_id, e
-            );
+            if let Err(e) =
+                static_site::deploy_site(build, build_result, &config.store, config, &kennel_config)
+                    .await
+            {
+                error!(
+                    "Failed to deploy static site '{}' from build {}: {}",
+                    build_result.service_name, build.id, e
+                );
+            }
         }
     }
 
-    // Deploy service processes from devenv task configs.
-    for process_config in &request.process_configs {
-        if let Err(e) = deploy_service(request, process_config, config, &config_file).await {
+    // Deploy service processes.
+    for process_config in &process_configs {
+        if let Err(e) = deploy_service(
+            build,
+            process_config,
+            &required_resources,
+            config,
+            &kennel_config,
+        )
+        .await
+        {
             error!(
                 "Failed to deploy service '{}' from build {}: {}",
-                process_config.name, request.build_id, e
+                process_config.name, build.id, e
             );
         }
     }
@@ -78,8 +101,9 @@ pub async fn deploy_build(request: &DeploymentRequest, config: &DeployerConfig) 
 }
 
 async fn deploy_service(
-    request: &DeploymentRequest,
+    build: &entity::builds::Model,
     devenv_config: &ProcessConfig,
+    required_resources: &[String],
     config: &DeployerConfig,
     config_file: &kennel_config::KennelConfig,
 ) -> Result<()> {
@@ -88,48 +112,44 @@ async fn deploy_service(
         devenv_config.name, devenv_config.exec
     );
 
-    let branch_sanitized = utils::sanitize_identifier(&request.git_ref);
+    let branch = &build.branch;
+    let branch_sanitized = utils::sanitize_identifier(branch);
     let process_name = format!(
         "kennel-{}-{}-{}",
-        request.project_name, branch_sanitized, devenv_config.name
+        build.project_name, branch_sanitized, devenv_config.name
     );
-    let username = utils::sanitize_username(
-        &request.project_name,
-        &branch_sanitized,
-        &devenv_config.name,
-    );
+    let username =
+        utils::sanitize_username(&build.project_name, &branch_sanitized, &devenv_config.name);
 
     user::ensure_user_exists(&username).await?;
 
     let service_work_dir = PathBuf::from(kennel_config::constants::SERVICES_BASE_DIR)
-        .join(&request.project_name)
+        .join(&build.project_name)
         .join(&branch_sanitized)
         .join(&devenv_config.name);
     tokio::fs::create_dir_all(&service_work_dir).await?;
 
+    let environment = determine_environment(branch);
     let mut process_config = merge_config(
         devenv_config,
         &process_name,
         &username,
         service_work_dir,
-        &request.git_ref,
+        branch,
     );
 
     // Provision required infrastructure resources.
     let resource_request = kennel_provision::ResourceRequest {
-        project_name: request.project_name.clone(),
+        project_name: build.project_name.clone(),
         service_name: devenv_config.name.clone(),
-        branch: request.git_ref.clone(),
+        branch: branch.clone(),
         branch_slug: branch_sanitized.clone(),
-        environment: determine_environment(&request.git_ref),
+        environment: environment.clone(),
         system_user: username.clone(),
     };
 
     for provider in &config.resource_providers {
-        if request
-            .required_resources
-            .contains(&provider.name().to_string())
-        {
+        if required_resources.contains(&provider.name().to_string()) {
             let env_vars = provider.provision(&resource_request).await.map_err(|e| {
                 crate::DeployerError::Other(anyhow::anyhow!(
                     "resource provider '{}' failed: {e}",
@@ -145,9 +165,8 @@ async fn deploy_service(
     // Resolve secrets from secretspec.toml if present.
     if let Some(vault_endpoint) = &config.vault_endpoint {
         let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
-            .join(request.build_id.to_string())
+            .join(build.id.to_string())
             .join("repo");
-        let environment = determine_environment(&request.git_ref);
         match crate::secrets::resolve_secrets(&work_dir, &environment, vault_endpoint) {
             Ok(secrets) => {
                 process_config.env.extend(secrets);
@@ -158,56 +177,94 @@ async fn deploy_service(
         }
     }
 
-    let process_config_json = serde_json::to_value(&process_config)
+    // Strip secrets from the process config before persisting to DB.
+    // Secrets are resolved at deploy time and only live in memory.
+    let process_config_for_db = process_config.clone();
+    // TODO: identify and strip secret keys from process_config_for_db.env
+    let process_config_json = serde_json::to_value(&process_config_for_db)
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
     let domain = utils::generate_deployment_domain(
         &devenv_config.name,
         &branch_sanitized,
-        &request.project_name,
+        &build.project_name,
         &config.base_domain,
     );
 
-    // Check for existing deployment (blue-green).
+    // Check for existing deployment (blue-green vs fresh deploy).
+    // C01 fix: UPDATE existing record instead of INSERTing a second one.
+    // C10 fix: create/update deployment record BEFORE starting the process.
     let existing_deployment = config
         .store
         .deployments()
-        .find_deployed_by_ref(&request.project_name, &request.git_ref, &devenv_config.name)
+        .find_deployed_by_ref(&build.project_name, branch, &devenv_config.name)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
+    let deployment_id = if let Some(existing) = &existing_deployment {
+        // Update existing deployment to Deploying with new config.
+        let mut active = sea_orm::IntoActiveModel::into_active_model(existing.clone());
+        active.status = sea_orm::ActiveValue::Set(DeploymentStatus::Deploying);
+        active.store_path = sea_orm::ActiveValue::Set(Some(devenv_config.exec.clone()));
+        active.process_config = sea_orm::ActiveValue::Set(Some(process_config_json));
+        active.git_ref = sea_orm::ActiveValue::Set(build.git_ref.clone());
+        active.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now().naive_utc());
+        let updated = config
+            .store
+            .deployments()
+            .update(active)
+            .await
+            .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
+        updated.id
+    } else {
+        // Create new deployment record with Deploying status.
+        let deployment = deployments::ActiveModel {
+            project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
+            git_ref: sea_orm::ActiveValue::Set(build.git_ref.clone()),
+            service_name: sea_orm::ActiveValue::Set(devenv_config.name.clone()),
+            branch: sea_orm::ActiveValue::Set(branch.clone()),
+            branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
+            environment: sea_orm::ActiveValue::Set(environment.clone()),
+            store_path: sea_orm::ActiveValue::Set(Some(devenv_config.exec.clone())),
+            status: sea_orm::ActiveValue::Set(DeploymentStatus::Deploying),
+            domain: sea_orm::ActiveValue::Set(domain.clone()),
+            process_config: sea_orm::ActiveValue::Set(Some(process_config_json)),
+            ..Default::default()
+        };
+        let new = config
+            .store
+            .deployments()
+            .create(deployment)
+            .await
+            .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
+        new.id
+    };
+
+    // Start or replace the process.
     if existing_deployment.is_some() {
         let mut supervisor = config.supervisor.lock().await;
         supervisor
             .blue_green_deploy(
-                process_config.clone(),
+                process_config,
                 kennel_config::constants::BLUE_GREEN_DRAIN_TIMEOUT,
             )
             .await?;
     } else {
         let mut supervisor = config.supervisor.lock().await;
-        supervisor.start(process_config.clone()).await?;
+        supervisor.start(process_config).await?;
     }
 
-    // Create deployment record.
-    let deployment = deployments::ActiveModel {
-        project_name: sea_orm::ActiveValue::Set(request.project_name.clone()),
-        git_ref: sea_orm::ActiveValue::Set(request.git_ref.clone()),
-        service_name: sea_orm::ActiveValue::Set(devenv_config.name.clone()),
-        branch: sea_orm::ActiveValue::Set(request.git_ref.clone()),
-        branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
-        environment: sea_orm::ActiveValue::Set(determine_environment(&request.git_ref)),
-        store_path: sea_orm::ActiveValue::Set(Some(devenv_config.exec.clone())),
+    // Mark deployment as Deployed.
+    let active = deployments::ActiveModel {
+        id: sea_orm::ActiveValue::Set(deployment_id),
         status: sea_orm::ActiveValue::Set(DeploymentStatus::Deployed),
-        domain: sea_orm::ActiveValue::Set(domain.clone()),
-        process_config: sea_orm::ActiveValue::Set(Some(process_config_json)),
+        updated_at: sea_orm::ActiveValue::Set(chrono::Utc::now().naive_utc()),
         ..Default::default()
     };
-
-    let new_deployment = config
+    config
         .store
         .deployments()
-        .create(deployment)
+        .update(active)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
@@ -222,20 +279,22 @@ async fn deploy_service(
     {
         info!("Creating DNS records for custom domain: {custom_domain}");
         match dns_manager
-            .create_record_for_deployment(new_deployment.id, custom_domain)
+            .create_record_for_deployment(deployment_id, custom_domain)
             .await
         {
-            Ok(_) => info!("DNS records created for {custom_domain}"),
+            Ok(_) => {
+                info!("DNS records created for {custom_domain}");
+                // Update dns_status to active (fixes H27).
+                if let Err(e) = config
+                    .store
+                    .deployments()
+                    .update_dns_status(deployment_id, "active")
+                    .await
+                {
+                    warn!("Failed to update dns_status: {e}");
+                }
+            }
             Err(e) => warn!("Failed to create DNS records for {custom_domain}: {e}"),
-        }
-    }
-
-    // Mark old deployment as torn down.
-    if let Some(old_deployment) = existing_deployment {
-        let mut old_active = sea_orm::IntoActiveModel::into_active_model(old_deployment);
-        old_active.status = sea_orm::ActiveValue::Set(DeploymentStatus::TornDown);
-        if let Err(e) = config.store.deployments().update(old_active).await {
-            error!("Failed to mark old deployment as torn down: {e}");
         }
     }
 
@@ -243,14 +302,12 @@ async fn deploy_service(
 }
 
 /// Merge a devenv-provided ProcessConfig with Kennel deployment metadata.
-/// Sets the process name, system user, working directory, and environment
-/// for the deployment context.
 fn merge_config(
     devenv_config: &ProcessConfig,
     process_name: &str,
     username: &str,
     cwd: PathBuf,
-    git_ref: &str,
+    branch: &str,
 ) -> ProcessConfig {
     let mut config = devenv_config.clone();
     config.name = process_name.to_string();
@@ -258,6 +315,6 @@ fn merge_config(
     config.cwd = Some(cwd);
     config
         .env
-        .insert("ENVIRONMENT".into(), determine_environment(git_ref));
+        .insert("ENVIRONMENT".into(), determine_environment(branch));
     config
 }

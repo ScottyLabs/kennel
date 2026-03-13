@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct KennelConfig {
     #[serde(default)]
     pub services: HashMap<String, ServiceConfig>,
@@ -17,13 +17,13 @@ pub struct KennelConfig {
 
 /// Kennel-specific metadata per service. Process configuration (exec, probes,
 /// restart, ports, dependencies) comes from devenv's process definitions.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServiceConfig {
     #[serde(default)]
     pub custom_domain: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StaticSiteConfig {
     pub flake_output: Option<String>,
 
@@ -34,7 +34,7 @@ pub struct StaticSiteConfig {
     pub custom_domain: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CachixConfig {
     pub cache_name: String,
 }

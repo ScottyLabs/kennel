@@ -9,10 +9,10 @@ use kennel_supervisor::SupervisorEvent;
 use tracing::{info, warn};
 
 use crate::error::Result;
-use crate::{DeployerConfig, DeploymentRequest, utils};
+use crate::{DeployerConfig, utils};
 
 pub async fn deploy_site(
-    request: &DeploymentRequest,
+    build: &entity::builds::Model,
     build_result: &entity::build_results::Model,
     store: &Arc<Store>,
     config: &DeployerConfig,
@@ -28,9 +28,9 @@ pub async fn deploy_site(
         build_result.service_name, store_path
     );
 
-    let branch_sanitized = utils::sanitize_identifier(&request.git_ref);
+    let branch_sanitized = utils::sanitize_identifier(&build.branch);
     let site_base_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
-        .join(&request.project_name)
+        .join(&build.project_name)
         .join(&branch_sanitized);
 
     tokio::fs::create_dir_all(&site_base_dir).await?;
@@ -61,18 +61,18 @@ pub async fn deploy_site(
     let domain = utils::generate_deployment_domain(
         &build_result.service_name,
         &branch_sanitized,
-        &request.project_name,
+        &build.project_name,
         &config.base_domain,
     );
 
     let deployment = deployments::ActiveModel {
-        project_name: sea_orm::ActiveValue::Set(request.project_name.clone()),
-        git_ref: sea_orm::ActiveValue::Set(request.git_ref.clone()),
+        project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
+        git_ref: sea_orm::ActiveValue::Set(build.git_ref.clone()),
         service_name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
-        branch: sea_orm::ActiveValue::Set(request.git_ref.clone()),
+        branch: sea_orm::ActiveValue::Set(build.branch.clone()),
         branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
         environment: sea_orm::ActiveValue::Set(crate::service::determine_environment(
-            &request.git_ref,
+            &build.branch,
         )),
         store_path: sea_orm::ActiveValue::Set(Some(store_path.clone())),
         status: sea_orm::ActiveValue::Set(DeploymentStatus::Deployed),
@@ -93,7 +93,7 @@ pub async fn deploy_site(
         site_link.display()
     );
 
-    // Create DNS records for custom domain if configured
+    // Create DNS records for custom domain if configured.
     let site_config = kennel_config.static_sites.get(&build_result.service_name);
     if let Some(dns_manager) = &config.dns_manager
         && let Some(custom_domain) = site_config.and_then(|s| s.custom_domain.as_ref())
@@ -103,20 +103,28 @@ pub async fn deploy_site(
             .create_record_for_deployment(new_deployment.id, custom_domain)
             .await
         {
-            Ok(_) => info!("DNS records created for {custom_domain}"),
+            Ok(_) => {
+                info!("DNS records created for {custom_domain}");
+                if let Err(e) = store
+                    .deployments()
+                    .update_dns_status(new_deployment.id, "active")
+                    .await
+                {
+                    warn!("Failed to update dns_status: {e}");
+                }
+            }
             Err(e) => warn!("Failed to create DNS records for {custom_domain}: {e}"),
         }
     }
 
-    // Notify the router via supervisor event channel. Static sites have no
-    // supervised process, but the router still needs to learn about them.
+    // Notify the router via supervisor event channel.
     let supervisor = config.supervisor.lock().await;
     let _ = supervisor
         .event_sender()
         .send(SupervisorEvent::ProcessReady {
             name: format!(
                 "kennel-{}-{}-{}",
-                request.project_name, branch_sanitized, build_result.service_name
+                build.project_name, branch_sanitized, build_result.service_name
             ),
             port: None,
             store_path: Some(store_path.clone()),

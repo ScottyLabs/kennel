@@ -4684,7 +4684,7 @@ rec {
           "unstable" = [ "futures-core/unstable" "futures-task/unstable" ];
           "write-all-vectored" = [ "io" ];
         };
-        resolvedDefaultFeatures = [ "alloc" "async-await" "async-await-macro" "channel" "futures-channel" "futures-io" "futures-macro" "futures-sink" "io" "memchr" "sink" "slab" "std" ];
+        resolvedDefaultFeatures = [ "alloc" "async-await" "async-await-macro" "channel" "default" "futures-channel" "futures-io" "futures-macro" "futures-sink" "io" "memchr" "sink" "slab" "std" ];
       };
       "fuzzy-matcher" = rec {
         crateName = "fuzzy-matcher";
@@ -6779,6 +6779,11 @@ rec {
             features = [ "full" ];
           }
           {
+            name = "tokio-util";
+            packageId = "tokio-util";
+            features = [ "rt" ];
+          }
+          {
             name = "tracing";
             packageId = "tracing";
           }
@@ -6883,6 +6888,10 @@ rec {
             packageId = "sea-orm";
           }
           {
+            name = "serde_json";
+            packageId = "serde_json";
+          }
+          {
             name = "thiserror";
             packageId = "thiserror 2.0.18";
           }
@@ -6890,6 +6899,11 @@ rec {
             name = "tokio";
             packageId = "tokio";
             features = [ "full" ];
+          }
+          {
+            name = "tokio-util";
+            packageId = "tokio-util";
+            features = [ "rt" ];
           }
           {
             name = "tracing";
@@ -6944,12 +6958,12 @@ rec {
             packageId = "anyhow";
           }
           {
-            name = "entity";
-            packageId = "entity";
+            name = "chrono";
+            packageId = "chrono";
           }
           {
-            name = "kennel-builder";
-            packageId = "kennel-builder";
+            name = "entity";
+            packageId = "entity";
           }
           {
             name = "kennel-config";
@@ -7000,6 +7014,11 @@ rec {
             name = "tokio";
             packageId = "tokio";
             features = [ "full" ];
+          }
+          {
+            name = "tokio-util";
+            packageId = "tokio-util";
+            features = [ "rt" ];
           }
           {
             name = "tracing";
@@ -16302,6 +16321,11 @@ rec {
             packageId = "futures-sink";
           }
           {
+            name = "futures-util";
+            packageId = "futures-util";
+            optional = true;
+          }
+          {
             name = "pin-project-lite";
             packageId = "pin-project-lite";
           }
@@ -16333,7 +16357,7 @@ rec {
           "time" = [ "tokio/time" "slab" ];
           "tracing" = [ "dep:tracing" ];
         };
-        resolvedDefaultFeatures = [ "codec" "compat" "default" "futures-io" "io" ];
+        resolvedDefaultFeatures = [ "codec" "compat" "default" "futures-io" "futures-util" "io" "rt" ];
       };
       "toml 0.9.12+spec-1.1.0" = rec {
         crateName = "toml";

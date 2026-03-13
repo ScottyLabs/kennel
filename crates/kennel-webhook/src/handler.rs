@@ -12,6 +12,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+/// Normalize a git ref to a short branch name by stripping the refs/heads/ prefix.
+fn normalize_branch(git_ref: &str) -> &str {
+    git_ref.strip_prefix("refs/heads/").unwrap_or(git_ref)
+}
+
 pub async fn handle_webhook(
     State(config): State<Arc<WebhookConfig>>,
     Path(project_name): Path<String>,
@@ -21,7 +26,6 @@ pub async fn handle_webhook(
 ) -> Result<StatusCode> {
     info!("Received webhook for project: {}", project_name);
 
-    // Look up project
     let project = config
         .store
         .projects()
@@ -29,14 +33,12 @@ pub async fn handle_webhook(
         .await?
         .ok_or_else(|| WebhookError::ProjectNotFound(project_name.clone()))?;
 
-    // Determine event type from headers for logging
     let event_type = headers
         .get("X-Forgejo-Event")
         .or_else(|| headers.get("X-GitHub-Event"))
         .and_then(|h| h.to_str().ok())
         .unwrap_or("unknown");
 
-    // Verify signature
     if let Err(e) = verify_signature(&headers, &body, &project.webhook_secret) {
         error!(
             "Signature verification failed for project '{}', IP: {}, event type: {}",
@@ -47,7 +49,6 @@ pub async fn handle_webhook(
         return Err(e);
     }
 
-    // Parse event
     let event = parse_webhook_event(&headers, &body)?;
 
     match event {
@@ -57,28 +58,22 @@ pub async fn handle_webhook(
             author,
             deleted,
         } => {
+            let branch = normalize_branch(&git_ref);
+
             if deleted {
                 info!(
                     "Branch deleted: {}/{}, marking deployments for teardown",
-                    project_name, git_ref
+                    project_name, branch
                 );
-                let ids = config
+                config
                     .store
                     .deployments()
-                    .mark_for_teardown(&project.name, &git_ref)
+                    .mark_for_teardown(&project.name, branch)
                     .await?;
-                for id in ids {
-                    if let Err(e) = config.teardown_tx.send(id).await {
-                        error!(
-                            "Failed to send teardown request for deployment {}: {}",
-                            id, e
-                        );
-                    }
-                }
+                config.teardown_signal.notify_one();
                 return Ok(StatusCode::ACCEPTED);
             }
 
-            // Create build record
             let build = match config
                 .store
                 .builds()
@@ -103,18 +98,22 @@ pub async fn handle_webhook(
                 }
             };
 
+            // Cancel stale builds for the same branch.
+            if let Err(e) = config
+                .store
+                .builds()
+                .cancel_stale_builds(&project.name, branch, build.id)
+                .await
+            {
+                warn!("Failed to cancel stale builds: {e}");
+            }
+
             info!(
                 "Created build {} for {}/{}/{}",
                 build.id, project_name, git_ref, commit_sha
             );
 
-            // Send to builder
-            config
-                .build_tx
-                .send(build.id)
-                .await
-                .map_err(|_| WebhookError::BuilderUnavailable)?;
-
+            config.build_signal.notify_one();
             Ok(StatusCode::OK)
         }
         WebhookEvent::PullRequest {
@@ -127,7 +126,6 @@ pub async fn handle_webhook(
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
                     let git_ref = format!("pr-{}", pr_number);
 
-                    // Create build record
                     let build = match config
                         .store
                         .builds()
@@ -154,39 +152,36 @@ pub async fn handle_webhook(
                         }
                     };
 
+                    // Cancel stale builds for this PR branch.
+                    if let Err(e) = config
+                        .store
+                        .builds()
+                        .cancel_stale_builds(&project.name, &git_ref, build.id)
+                        .await
+                    {
+                        warn!("Failed to cancel stale builds: {e}");
+                    }
+
                     info!(
                         "Created PR build {} for {}/PR#{}/{}",
                         build.id, project_name, pr_number, commit_sha
                     );
 
-                    // Send to builder
-                    config
-                        .build_tx
-                        .send(build.id)
-                        .await
-                        .map_err(|_| WebhookError::BuilderUnavailable)?;
-
+                    config.build_signal.notify_one();
                     Ok(StatusCode::OK)
                 }
                 "closed" => {
-                    let git_ref = format!("pr-{}", pr_number);
+                    let branch = format!("pr-{}", pr_number);
                     info!(
                         "PR closed: {}/PR#{}, marking deployments for teardown",
                         project_name, pr_number
                     );
-                    let ids = config
+                    config
                         .store
                         .deployments()
-                        .mark_for_teardown(&project.name, &git_ref)
+                        .mark_for_teardown(&project.name, &branch)
                         .await?;
-                    for id in ids {
-                        if let Err(e) = config.teardown_tx.send(id).await {
-                            error!(
-                                "Failed to send teardown request for deployment {}: {}",
-                                id, e
-                            );
-                        }
-                    }
+                    config.teardown_signal.notify_one();
                     Ok(StatusCode::ACCEPTED)
                 }
                 _ => {

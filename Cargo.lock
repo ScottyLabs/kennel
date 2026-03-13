@@ -2112,6 +2112,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2144,9 +2145,11 @@ dependencies = [
  "kennel-store",
  "kennel-supervisor",
  "sea-orm",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -2165,8 +2168,8 @@ name = "kennel-deployer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "entity",
- "kennel-builder",
  "kennel-config",
  "kennel-dns",
  "kennel-provision",
@@ -2179,6 +2182,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -4737,6 +4741,7 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]

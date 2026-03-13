@@ -1,8 +1,8 @@
-mod channels;
 mod config;
 mod dns;
 mod reconcile;
 mod signal;
+mod signals;
 
 use kennel_config::constants;
 use kennel_store::Store;
@@ -12,6 +12,7 @@ use sea_orm::Database;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -35,27 +36,40 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Database migrations complete");
 
+    // Startup recovery: reset stuck states so workers re-process them.
+    let building_reset = store.builds().reset_building_to_queued().await?;
+    if building_reset > 0 {
+        tracing::info!("Reset {building_reset} stuck Building builds to Queued");
+    }
+    let deploying_reset = store.builds().reset_deploying_to_built().await?;
+    if deploying_reset > 0 {
+        tracing::info!("Reset {deploying_reset} stuck Deploying builds to Built");
+    }
+
     if let Err(e) = reconcile::reconcile_projects(store.clone()).await {
         tracing::error!("Project reconciliation failed: {}", e);
         return Err(e);
     }
 
     // Initialize supervisor with event channel.
+    // Subscribe to events BEFORE reconciliation starts processes (fixes H02).
     let (event_tx, _) =
         tokio::sync::broadcast::channel::<SupervisorEvent>(constants::SUPERVISOR_EVENT_CAPACITY);
     let supervisor = Arc::new(Mutex::new(Supervisor::new(event_tx.clone())));
+    let event_rx = event_tx.subscribe();
 
-    // Reconcile deployments by re-starting processes through the supervisor.
     if let Err(e) = reconcile::reconcile_deployments(store.clone(), supervisor.clone()).await {
         tracing::error!("Startup reconciliation failed: {}", e);
     }
 
-    let channels = channels::create_channels();
+    let signals = signals::Signals::new();
+    let cancel = CancellationToken::new();
+
     let base_domain =
         std::env::var("BASE_DOMAIN").unwrap_or_else(|_| constants::DEFAULT_BASE_DOMAIN.into());
 
     let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
-    let builder_config = config::create_builder_config(store.clone(), channels.deploy_tx.clone());
+
     let mut resource_providers: Vec<Arc<dyn kennel_provision::ResourceProvider>> = vec![];
 
     if let Ok(socket_dir) = std::env::var("POSTGRES_SOCKET_DIR") {
@@ -83,19 +97,33 @@ async fn main() -> anyhow::Result<()> {
         )));
     }
 
-    let deployer_config = config::create_deployer_config(
-        store.clone(),
-        supervisor.clone(),
+    let deployer_config = kennel_deployer::DeployerConfig {
+        store: store.clone(),
+        supervisor: supervisor.clone(),
         dns_manager,
         resource_providers,
+        vault_endpoint: std::env::var("VAULT_ENDPOINT").ok(),
         base_domain,
-    );
+    };
+
+    let builder_config = kennel_builder::BuilderConfig {
+        store: store.clone(),
+        build_signal: signals.build.clone(),
+        deploy_signal: signals.deploy.clone(),
+        cancel: cancel.clone(),
+        max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(constants::DEFAULT_MAX_CONCURRENT_BUILDS),
+        work_dir: std::env::var("WORK_DIR").unwrap_or_else(|_| constants::DEFAULT_WORK_DIR.into()),
+    };
+
     let router_config = config::create_router_config(store.clone());
 
     let webhook_config = kennel_webhook::WebhookConfig {
         store: store.clone(),
-        build_tx: channels.build_tx,
-        teardown_tx: channels.teardown_tx.clone(),
+        build_signal: signals.build.clone(),
+        teardown_signal: signals.teardown.clone(),
     };
 
     let api_host = std::env::var("API_HOST").unwrap_or_else(|_| constants::DEFAULT_API_HOST.into());
@@ -105,41 +133,45 @@ async fn main() -> anyhow::Result<()> {
     let webhook_router = kennel_webhook::router(webhook_config);
     let api_router = kennel_api::router(store.clone()).merge(webhook_router);
 
-    let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(
-        channels.build_rx,
-        builder_config,
-    ));
+    let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(builder_config));
 
     let deployer_handle = tokio::spawn(kennel_deployer::run_deployer(
-        channels.deploy_rx,
         deployer_config.clone(),
+        signals.deploy.clone(),
+        cancel.clone(),
     ));
 
     let teardown_handle = tokio::spawn(kennel_deployer::run_teardown_worker(
-        channels.teardown_rx,
         deployer_config.clone(),
+        signals.teardown.clone(),
+        cancel.clone(),
     ));
 
     let cleanup_handle = tokio::spawn(kennel_deployer::run_cleanup_job(
         deployer_config.clone(),
-        channels.teardown_tx.clone(),
+        signals.teardown.clone(),
+        cancel.clone(),
     ));
 
+    let log_cleanup_cancel = cancel.clone();
     let log_cleanup_handle = tokio::spawn(kennel_deployer::run_log_cleanup_job(
         deployer_config.clone(),
+        log_cleanup_cancel,
     ));
 
-    // Router subscribes to supervisor events for routing table updates.
-    let event_rx = event_tx.subscribe();
     let router_handle = tokio::spawn(async move {
         if let Err(e) = kennel_router::run_router(router_config, event_rx).await {
             tracing::error!("Router failed: {}", e);
         }
     });
 
-    // Signal systemd that startup is complete (migrations, reconciliation,
-    // and all worker tasks are running).
+    // Signal systemd that startup is complete.
     let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
+
+    // Fire signals in case there are work items from before the crash.
+    signals.build.notify_one();
+    signals.deploy.notify_one();
+    signals.teardown.notify_one();
 
     tracing::info!("Starting API server on {api_addr}");
     let listener = TcpListener::bind(&api_addr).await?;
@@ -155,13 +187,18 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Wait for the API server to shut down (triggered by signal), then
+    // cancel all workers and wait for them to finish.
+    let _ = server_handle.await;
+    tracing::info!("API server shut down, cancelling workers");
+    cancel.cancel();
+
     tokio::select! {
         _ = tokio::time::sleep(constants::SHUTDOWN_TIMEOUT) => {
             tracing::warn!("Shutdown timeout reached, forcing exit");
         }
         _ = async {
             let _ = tokio::join!(
-                server_handle,
                 builder_handle,
                 deployer_handle,
                 teardown_handle,
