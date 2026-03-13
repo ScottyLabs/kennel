@@ -20,14 +20,8 @@ use serde::{Deserialize, Serialize};
     enum_name = "build_result_status"
 )]
 pub enum BuildResultStatus {
-    #[sea_orm(string_value = "pending")]
-    Pending,
-    #[sea_orm(string_value = "building")]
-    Building,
     #[sea_orm(string_value = "success")]
     Success,
-    #[sea_orm(string_value = "skipped")]
-    Skipped,
     #[sea_orm(string_value = "failed")]
     Failed,
 }
@@ -48,6 +42,10 @@ pub enum BuildStatus {
     Queued,
     #[sea_orm(string_value = "building")]
     Building,
+    #[sea_orm(string_value = "built")]
+    Built,
+    #[sea_orm(string_value = "deploying")]
+    Deploying,
     #[sea_orm(string_value = "success")]
     Success,
     #[sea_orm(string_value = "failed")]
@@ -68,8 +66,12 @@ pub enum BuildStatus {
 )]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "deployment_status")]
 pub enum DeploymentStatus {
+    #[sea_orm(string_value = "deploying")]
+    Deploying,
     #[sea_orm(string_value = "deployed")]
     Deployed,
+    #[sea_orm(string_value = "tearing_down")]
+    TearingDown,
     #[sea_orm(string_value = "torn_down")]
     TornDown,
 }

@@ -28,6 +28,9 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("queued"),
                     )
+                    .col(ColumnDef::new(Builds::ProcessConfigs).json_binary())
+                    .col(ColumnDef::new(Builds::RequiredResources).json_binary())
+                    .col(ColumnDef::new(Builds::KennelConfig).json_binary())
                     .col(ColumnDef::new(Builds::StartedAt).timestamp())
                     .col(ColumnDef::new(Builds::FinishedAt).timestamp())
                     .col(
@@ -103,6 +106,9 @@ enum Builds {
     GitRef,
     CommitSha,
     Status,
+    ProcessConfigs,
+    RequiredResources,
+    KennelConfig,
     StartedAt,
     FinishedAt,
     CreatedAt,

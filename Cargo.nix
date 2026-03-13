@@ -6757,6 +6757,10 @@ rec {
             packageId = "migration";
           }
           {
+            name = "sd-notify";
+            packageId = "sd-notify";
+          }
+          {
             name = "sea-orm";
             packageId = "sea-orm";
           }
@@ -7114,6 +7118,10 @@ rec {
           {
             name = "entity";
             packageId = "entity";
+          }
+          {
+            name = "http-body-util";
+            packageId = "http-body-util";
           }
           {
             name = "kennel-config";
@@ -12317,6 +12325,22 @@ rec {
         ];
         features = {
           "default" = [ "use_std" ];
+        };
+      };
+      "sd-notify" = rec {
+        crateName = "sd-notify";
+        version = "0.5.0";
+        edition = "2021";
+        sha256 = "0xpy528vqfasq389pwg9z86w0m0bfsfhz8r7vpqzljv9kqszfkiy";
+        libName = "sd_notify";
+        dependencies = [
+          {
+            name = "libc";
+            packageId = "libc";
+          }
+        ];
+        features = {
+          "fdstore" = [ "dep:sendfd" ];
         };
       };
       "sea-bae" = rec {

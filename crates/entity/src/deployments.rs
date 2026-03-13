@@ -43,8 +43,8 @@ pub enum Relation {
     DnsRecords,
     #[sea_orm(
         belongs_to = "super::services::Entity",
-        from = "(Column::ProjectName, Column::ProjectName, Column::ServiceName, Column::ServiceName)",
-        to = "(super::services::Column::Name, super::services::Column::ProjectName, super::services::Column::Name, super::services::Column::ProjectName)",
+        from = "(Column::ProjectName, Column::ServiceName)",
+        to = "(super::services::Column::ProjectName, super::services::Column::Name)",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

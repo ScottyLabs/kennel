@@ -1,5 +1,6 @@
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
+use http_body_util::BodyExt;
 use std::net::IpAddr;
 use tracing::{error, warn};
 
@@ -7,6 +8,7 @@ pub async fn proxy_to_service(
     request: Request<Body>,
     port: u16,
     client_ip: IpAddr,
+    client: &reqwest::Client,
 ) -> Response<Body> {
     let uri = request.uri();
     let backend_url = format!(
@@ -14,8 +16,6 @@ pub async fn proxy_to_service(
         port,
         uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/")
     );
-
-    let client = reqwest::Client::new();
 
     let method = request.method().clone();
     let mut headers = request.headers().clone();
@@ -25,7 +25,6 @@ pub async fn proxy_to_service(
         headers.insert("x-forwarded-host", host.clone());
     }
 
-    // Determine protocol from request
     let proto = if request.uri().scheme().map(|s| s.as_str()) == Some("https") {
         "https"
     } else {
@@ -44,9 +43,21 @@ pub async fn proxy_to_service(
         headers.insert("x-forwarded-for", val);
     }
 
+    let body_bytes = match request.into_body().collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            error!("Failed to read request body: {}", e);
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("Failed to read request body"))
+                .unwrap();
+        }
+    };
+
     match client
-        .request(method.clone(), &backend_url)
+        .request(method, &backend_url)
         .headers(headers)
+        .body(body_bytes)
         .send()
         .await
     {

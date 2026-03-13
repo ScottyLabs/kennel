@@ -8,6 +8,7 @@ mod tls;
 
 pub use acme::{create_acme_state, run_acme_event_loop};
 pub use error::{Result, RouterError};
+pub use handler::RouterState;
 pub use table::{Route, RouteTarget, RoutingTable};
 pub use tls::serve_with_tls;
 
@@ -50,15 +51,20 @@ pub async fn run_router(
 
     info!("Loaded {} initial routes", routing_table.len().await);
 
-    let table_clone = routing_table.clone();
+    let table_for_handler = routing_table.clone();
     let store_clone = config.store.clone();
     tokio::spawn(async move {
-        run_update_handler(table_clone, store_clone, event_rx).await;
+        run_update_handler(table_for_handler, store_clone, event_rx).await;
     });
+
+    let state = RouterState {
+        table: routing_table,
+        http_client: reqwest::Client::new(),
+    };
 
     let app = Router::new()
         .fallback(handler::route_request)
-        .with_state(routing_table);
+        .with_state(state);
 
     if config.tls_enabled {
         let email = config.acme_email.ok_or_else(|| {

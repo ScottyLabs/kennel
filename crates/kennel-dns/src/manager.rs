@@ -29,12 +29,16 @@ impl DnsManager {
     }
 
     fn get_provider_for_domain(&self, domain: &str) -> Result<&Arc<dyn DnsProvider>> {
+        // Find the longest-matching zone for this domain, checking boundary.
+        let mut best: Option<(&str, &Arc<dyn DnsProvider>)> = None;
         for (zone, provider) in &self.providers {
-            if domain.ends_with(zone) {
-                return Ok(provider);
+            let matches = domain == zone.as_str() || domain.ends_with(&format!(".{zone}"));
+            if matches && best.as_ref().map_or(true, |(z, _)| zone.len() > z.len()) {
+                best = Some((zone.as_str(), provider));
             }
         }
-        Err(Error::NoProviderForDomain(domain.to_string()))
+        best.map(|(_, p)| p)
+            .ok_or_else(|| Error::NoProviderForDomain(domain.to_string()))
     }
 
     pub async fn create_record_for_deployment(
@@ -42,6 +46,17 @@ impl DnsManager {
         deployment_id: i32,
         domain: &str,
     ) -> Result<()> {
+        // Check for domain conflicts: another deployment already owns this domain.
+        let existing = self.store.dns_records().find_by_domain(domain).await?;
+        let conflict = existing
+            .iter()
+            .any(|r| r.deployment_id.is_some_and(|id| id != deployment_id));
+        if conflict {
+            return Err(Error::Other(anyhow::anyhow!(
+                "domain '{domain}' is already claimed by another deployment"
+            )));
+        }
+
         let provider = self.get_provider_for_domain(domain)?;
 
         info!(

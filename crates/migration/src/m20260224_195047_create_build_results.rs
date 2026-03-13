@@ -24,8 +24,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(BuildResults::Status)
                             .custom(Alias::new("build_result_status"))
-                            .not_null()
-                            .default("pending"),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(BuildResults::Changed)

@@ -197,10 +197,9 @@ impl ResourceProvider for GarageProvider {
                 let aliases = bucket["globalAliases"].as_array();
                 if aliases.is_some_and(|a| a.iter().any(|v| v.as_str() == Some(&bucket_name)))
                     && let Some(bucket_id) = bucket["id"].as_str()
+                    && let Err(e) = self.delete_bucket(bucket_id).await
                 {
-                    if let Err(e) = self.delete_bucket(bucket_id).await {
-                        tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
-                    }
+                    tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
                 }
             }
         }
@@ -216,12 +215,11 @@ impl ResourceProvider for GarageProvider {
         if response.status().is_success() {
             let keys: Vec<serde_json::Value> = response.json().await?;
             for key in &keys {
-                if key["name"].as_str() == Some(&key_name) {
-                    if let Some(key_id) = key["accessKeyId"].as_str() {
-                        if let Err(e) = self.delete_key(key_id).await {
-                            tracing::warn!("Failed to delete key {key_name}: {e}");
-                        }
-                    }
+                if key["name"].as_str() == Some(&key_name)
+                    && let Some(key_id) = key["accessKeyId"].as_str()
+                    && let Err(e) = self.delete_key(key_id).await
+                {
+                    tracing::warn!("Failed to delete key {key_name}: {e}");
                 }
             }
         }

@@ -20,6 +20,12 @@ pub struct Model {
     #[sea_orm(column_type = "Text")]
     pub commit_sha: String,
     pub status: BuildStatus,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub process_configs: Option<Json>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub required_resources: Option<Json>,
+    #[sea_orm(column_type = "JsonBinary", nullable)]
+    pub kennel_config: Option<Json>,
     pub started_at: Option<DateTime>,
     pub finished_at: Option<DateTime>,
     pub created_at: DateTime,

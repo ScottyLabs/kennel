@@ -18,7 +18,7 @@ pub async fn serve_with_tls(
 
     axum_server::bind(addr)
         .acceptor(acceptor)
-        .serve(router.into_make_service())
+        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
         .await?;
 
     Ok(())

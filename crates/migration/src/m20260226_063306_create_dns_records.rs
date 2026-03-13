@@ -18,12 +18,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(DnsRecords::Domain)
-                            .text()
-                            .not_null()
-                            .unique_key(),
-                    )
+                    .col(ColumnDef::new(DnsRecords::Domain).text().not_null())
                     .col(ColumnDef::new(DnsRecords::DeploymentId).integer())
                     .col(
                         ColumnDef::new(DnsRecords::ProviderRecordId)
@@ -68,9 +63,11 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("idx_dns_records_domain")
+                    .name("idx_dns_records_domain_type")
                     .table(DnsRecords::Table)
                     .col(DnsRecords::Domain)
+                    .col(DnsRecords::RecordType)
+                    .unique()
                     .to_owned(),
             )
             .await?;

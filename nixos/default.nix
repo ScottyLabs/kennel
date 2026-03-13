@@ -307,16 +307,16 @@ in
           "WORK_DIR=${cfg.builder.workDir}"
           "AUTO_EXPIRY_CHECK_INTERVAL_SECS=${toString cfg.cleanup.interval}"
         ] ++ optionals cfg.router.tls.enable [
+          "TLS_ENABLED=true"
           "ACME_EMAIL=${cfg.router.tls.email}"
           "ACME_STAGING=${if cfg.router.tls.staging then "true" else "false"}"
         ] ++ optionals cfg.builder.cachix.enable [
           "CACHIX_CACHE_NAME=${cfg.builder.cachix.cacheName}"
         ] ++ optionals cfg.dns.enable [
           "DNS_ENABLED=true"
-          "DNS_PROVIDER=${cfg.dns.provider}"
-          "CLOUDFLARE_ZONES=${concatStringsSep "," (mapAttrsToList (domain: zoneId: "${domain}:${zoneId}") cfg.dns.cloudflare.zones)}"
-          "SERVER_IPV4=${cfg.dns.serverIpv4}"
-          "SERVER_IPV6=${cfg.dns.serverIpv6}"
+          "DNS_CLOUDFLARE_ZONES=${builtins.toJSON (mapAttrs (domain: zoneId: zoneId) cfg.dns.cloudflare.zones)}"
+          "DNS_SERVER_IPV4=${cfg.dns.serverIpv4}"
+          "DNS_SERVER_IPV6=${cfg.dns.serverIpv6}"
         ];
 
         EnvironmentFile =
@@ -324,8 +324,8 @@ in
           ++ (optionals cfg.dns.enable [ cfg.dns.cloudflare.apiTokenFile ]);
 
         # User switching (setuid/setgid) for per-deployment process isolation
-        AmbientCapabilities = [ "CAP_SETUID" "CAP_SETGID" ];
-        CapabilityBoundingSet = [ "CAP_SETUID" "CAP_SETGID" ];
+        AmbientCapabilities = [ "CAP_SETUID" "CAP_SETGID" "CAP_NET_BIND_SERVICE" ];
+        CapabilityBoundingSet = [ "CAP_SETUID" "CAP_SETGID" "CAP_NET_BIND_SERVICE" ];
       };
     };
 

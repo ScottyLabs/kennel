@@ -137,6 +137,10 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Signal systemd that startup is complete (migrations, reconciliation,
+    // and all worker tasks are running).
+    let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
+
     tracing::info!("Starting API server on {api_addr}");
     let listener = TcpListener::bind(&api_addr).await?;
     let server_handle = tokio::spawn(async move {

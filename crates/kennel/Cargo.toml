@@ -20,6 +20,7 @@ kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
 kennel-webhook = { version = "0.1.0", path = "../kennel-webhook" }
 migration = { version = "0.1.0", path = "../migration" }
+sd-notify = "0.5.0"
 sea-orm = "1.1.19"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"

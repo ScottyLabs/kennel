@@ -45,9 +45,9 @@ pub fn create_router_config(store: Arc<Store>) -> kennel_router::RouterConfig {
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false),
         acme_email: std::env::var("ACME_EMAIL").ok(),
-        acme_production: std::env::var("ACME_PRODUCTION")
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(false),
+        acme_production: std::env::var("ACME_STAGING")
+            .map(|v| v != "true" && v != "1")
+            .unwrap_or(true),
         acme_cache_dir: std::env::var("ACME_CACHE_DIR")
             .ok()
             .map(std::path::PathBuf::from),
