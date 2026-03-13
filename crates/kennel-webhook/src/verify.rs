@@ -28,39 +28,26 @@ pub fn verify_signature(headers: &HeaderMap, body: &[u8], secret: &str) -> Resul
 }
 
 fn verify_forgejo_signature(body: &[u8], secret: &str, signature: &str) -> Result<()> {
+    let sig_bytes = hex::decode(signature).map_err(|_| WebhookError::InvalidSignature)?;
+
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
         .map_err(|_| WebhookError::InvalidSignature)?;
     mac.update(body);
-
-    let expected = mac.finalize().into_bytes();
-    let expected_hex = hex::encode(expected);
-
-    if expected_hex == signature {
-        Ok(())
-    } else {
-        Err(WebhookError::InvalidSignature)
-    }
+    mac.verify_slice(&sig_bytes)
+        .map_err(|_| WebhookError::InvalidSignature)
 }
 
 fn verify_github_signature(body: &[u8], secret: &str, signature: &str) -> Result<()> {
-    if !signature.starts_with("sha256=") {
-        return Err(WebhookError::InvalidSignature);
-    }
-
-    let signature = &signature[7..]; // Remove "sha256=" prefix
+    let hex_sig = signature
+        .strip_prefix("sha256=")
+        .ok_or(WebhookError::InvalidSignature)?;
+    let sig_bytes = hex::decode(hex_sig).map_err(|_| WebhookError::InvalidSignature)?;
 
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
         .map_err(|_| WebhookError::InvalidSignature)?;
     mac.update(body);
-
-    let expected = mac.finalize().into_bytes();
-    let expected_hex = hex::encode(expected);
-
-    if expected_hex == signature {
-        Ok(())
-    } else {
-        Err(WebhookError::InvalidSignature)
-    }
+    mac.verify_slice(&sig_bytes)
+        .map_err(|_| WebhookError::InvalidSignature)
 }
 
 #[cfg(test)]
