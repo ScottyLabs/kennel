@@ -9,6 +9,7 @@ result-*
 .mcp.json
 .claude
 PLAN.md
+CODE_REVIEW.md
 
 # direnv
 .direnv/
