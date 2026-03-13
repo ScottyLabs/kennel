@@ -23,13 +23,6 @@ impl ValkeyProvider {
     fn allocation_key(request: &ResourceRequest) -> String {
         format!("{}/{}", request.project_name, request.branch_slug)
     }
-
-    fn find_available_db(&self) -> Option<u32> {
-        let allocated = self.allocated_dbs.lock().unwrap();
-        let used: std::collections::HashSet<u32> = allocated.values().copied().collect();
-
-        (0..MAX_DBS).find(|db| !used.contains(db))
-    }
 }
 
 #[async_trait]
@@ -49,8 +42,9 @@ impl ResourceProvider for ValkeyProvider {
             if let Some(&existing) = allocated.get(&key) {
                 existing
             } else {
-                let db = self
-                    .find_available_db()
+                let used: std::collections::HashSet<u32> = allocated.values().copied().collect();
+                let db = (0..MAX_DBS)
+                    .find(|db| !used.contains(db))
                     .ok_or_else(|| anyhow::anyhow!("Valkey DB pool exhausted (max {MAX_DBS})"))?;
                 allocated.insert(key, db);
                 db
