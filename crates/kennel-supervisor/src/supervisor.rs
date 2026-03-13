@@ -167,15 +167,30 @@ impl Supervisor {
                     #[cfg(target_os = "linux")]
                     if let Some(ref username) = pre_exec_user {
                         if let Ok((uid, gid)) = resolve_user(username) {
-                            let _ = nix::unistd::setgid(gid);
-                            let _ = nix::unistd::setuid(uid);
+                            nix::unistd::setgid(gid).map_err(|e| {
+                                std::io::Error::new(
+                                    std::io::ErrorKind::PermissionDenied,
+                                    format!("setgid failed: {e}"),
+                                )
+                            })?;
+                            nix::unistd::setuid(uid).map_err(|e| {
+                                std::io::Error::new(
+                                    std::io::ErrorKind::PermissionDenied,
+                                    format!("setuid failed: {e}"),
+                                )
+                            })?;
                         }
                     }
 
                     #[cfg(target_os = "linux")]
                     for cap_name in &pre_exec_caps {
                         if let Ok(cap) = cap_name.parse::<caps::Capability>() {
-                            let _ = caps::raise(None, caps::CapSet::Ambient, cap);
+                            caps::raise(None, caps::CapSet::Ambient, cap).map_err(|e| {
+                                std::io::Error::new(
+                                    std::io::ErrorKind::PermissionDenied,
+                                    format!("cap raise failed: {e}"),
+                                )
+                            })?;
                         }
                     }
 
@@ -541,7 +556,7 @@ fn spawn_supervision_task(
                     }
                 }
 
-                _ = probe::liveness_tick(&config.ready), if config.ready.is_some() => {
+                _ = probe::liveness_tick(&config.ready), if config.ready.as_ref().is_some_and(|r| !r.notify) => {
                     let ready_config = config.ready.as_ref().unwrap();
                     let probe_result = probe::run_single_probe(ready_config).await;
 
