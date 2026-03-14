@@ -87,7 +87,7 @@ pub async fn handle_webhook(
             {
                 Ok(b) => b,
                 Err(e) => {
-                    if e.to_string().contains("duplicate") || e.to_string().contains("unique") {
+                    if e.is_unique_violation() {
                         info!(
                             "Build already exists for {}/{}/{}",
                             project_name, git_ref, commit_sha

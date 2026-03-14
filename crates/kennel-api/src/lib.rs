@@ -28,8 +28,16 @@ use utoipa_swagger_ui::SwaggerUi;
 struct ApiDoc;
 
 #[utoipa::path(get, path = "/health", responses((status = OK, body = str)))]
-async fn health() -> &'static str {
-    "ok"
+async fn health(
+    axum::extract::State(store): axum::extract::State<Arc<Store>>,
+) -> (axum::http::StatusCode, &'static str) {
+    match store.db().ping().await {
+        Ok(()) => (axum::http::StatusCode::OK, "ok"),
+        Err(_) => (
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            "database unreachable",
+        ),
+    }
 }
 
 pub fn router(store: Arc<Store>) -> Router {

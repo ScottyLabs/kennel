@@ -15,4 +15,15 @@ pub enum StoreError {
     ServiceNotFound { project: String, service: String },
 }
 
+impl StoreError {
+    pub fn is_unique_violation(&self) -> bool {
+        match self {
+            StoreError::Database(sea_orm::DbErr::Query(sea_orm::RuntimeErr::SqlxError(e))) => e
+                .as_database_error()
+                .is_some_and(|db_err| db_err.code().as_deref() == Some("23505")),
+            _ => false,
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, StoreError>;

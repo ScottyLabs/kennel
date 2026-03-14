@@ -81,7 +81,8 @@ pub async fn process_teardown(
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
-    if remaining_deployments.is_none() {
+    let has_other_deployments = remaining_deployments.is_some_and(|d| d.id != deployment_id);
+    if !has_other_deployments {
         let username = utils::sanitize_username(
             &deployment.project_name,
             &deployment.branch_slug,
