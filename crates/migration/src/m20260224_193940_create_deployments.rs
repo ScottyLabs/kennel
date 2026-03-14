@@ -81,18 +81,6 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("idx_deployments_lookup")
-                    .table(Deployments::Table)
-                    .col(Deployments::ProjectName)
-                    .col(Deployments::ServiceName)
-                    .col(Deployments::Branch)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_index(
-                Index::create()
                     .name("idx_deployments_domain")
                     .table(Deployments::Table)
                     .col(Deployments::Domain)
