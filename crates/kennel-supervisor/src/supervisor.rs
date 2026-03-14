@@ -504,7 +504,16 @@ fn spawn_supervision_task(
         loop {
             tokio::select! {
                 _ = job.to_wait() => {
-                    if should_restart(&config.restart, restarts, window_start) {
+                    let exit_success = Arc::new(StdMutex::new(false));
+                    let exit_flag = exit_success.clone();
+                    job.run(move |ctx| {
+                        if let watchexec_supervisor::job::CommandState::Finished { status, .. } = ctx.current {
+                            *exit_flag.lock().unwrap() = matches!(status, watchexec_supervisor::ProcessEnd::Success);
+                        }
+                    }).await;
+                    let exit_success = *exit_success.lock().unwrap();
+
+                    if should_restart(&config.restart, restarts, window_start, exit_success) {
                         if let Some(window) = config.restart.window
                             && window_start.elapsed() > window {
                                 restarts = 0;
@@ -601,9 +610,11 @@ fn should_restart(
     config: &crate::config::RestartConfig,
     restarts: u32,
     window_start: tokio::time::Instant,
+    exit_success: bool,
 ) -> bool {
     match config.on {
         RestartPolicy::Never => false,
+        RestartPolicy::OnFailure if exit_success => false,
         RestartPolicy::Always | RestartPolicy::OnFailure => match config.max {
             None => true,
             Some(max) => {
