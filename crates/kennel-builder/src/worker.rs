@@ -19,8 +19,7 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         return Ok(());
     }
 
-    let (_project_name, _git_ref, work_dir) =
-        setup_build_environment(&config, &build, build_id).await?;
+    let work_dir = PathBuf::from(&config.work_dir).join(build_id.to_string());
 
     let kennel_config = clone_and_parse_config(&config, &build, build_id, &work_dir).await?;
 
@@ -147,25 +146,6 @@ async fn update_build_status_to_building(
         .map_err(|e| anyhow::anyhow!(e))?;
 
     Ok(build)
-}
-
-async fn setup_build_environment(
-    config: &Arc<BuilderConfig>,
-    build: &entity::builds::Model,
-    build_id: i32,
-) -> Result<(String, String, PathBuf)> {
-    let project = config
-        .store
-        .projects()
-        .find_by_name(&build.project_name)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Project {} not found", build.project_name))?;
-
-    let project_name = project.name.clone();
-    let git_ref = build.git_ref.clone();
-    let work_dir = PathBuf::from(&config.work_dir).join(build_id.to_string());
-
-    Ok((project_name, git_ref, work_dir))
 }
 
 async fn clone_and_parse_config(
