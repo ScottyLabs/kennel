@@ -269,28 +269,11 @@ async fn deploy_service(
         devenv_config.name, process_name
     );
 
-    // Create DNS records for custom domain if configured.
     if let Some(dns_manager) = &config.dns_manager
         && let Some(custom_domain) = service_config.and_then(|s| s.custom_domain.as_ref())
     {
-        info!("Creating DNS records for custom domain: {custom_domain}");
-        match dns_manager
-            .create_record_for_deployment(deployment_id, custom_domain)
-            .await
-        {
-            Ok(_) => {
-                info!("DNS records created for {custom_domain}");
-                if let Err(e) = config
-                    .store
-                    .deployments()
-                    .update_dns_status(deployment_id, "active")
-                    .await
-                {
-                    warn!("Failed to update dns_status: {e}");
-                }
-            }
-            Err(e) => warn!("Failed to create DNS records for {custom_domain}: {e}"),
-        }
+        utils::create_custom_domain_dns(dns_manager, &config.store, deployment_id, custom_domain)
+            .await;
     }
 
     Ok(())

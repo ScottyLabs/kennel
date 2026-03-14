@@ -93,28 +93,17 @@ pub async fn deploy_site(
         site_link.display()
     );
 
-    // Create DNS records for custom domain if configured.
     let site_config = kennel_config.static_sites.get(&build_result.service_name);
     if let Some(dns_manager) = &config.dns_manager
         && let Some(custom_domain) = site_config.and_then(|s| s.custom_domain.as_ref())
     {
-        info!("Creating DNS records for custom domain: {custom_domain}");
-        match dns_manager
-            .create_record_for_deployment(new_deployment.id, custom_domain)
-            .await
-        {
-            Ok(_) => {
-                info!("DNS records created for {custom_domain}");
-                if let Err(e) = store
-                    .deployments()
-                    .update_dns_status(new_deployment.id, "active")
-                    .await
-                {
-                    warn!("Failed to update dns_status: {e}");
-                }
-            }
-            Err(e) => warn!("Failed to create DNS records for {custom_domain}: {e}"),
-        }
+        crate::utils::create_custom_domain_dns(
+            dns_manager,
+            store,
+            new_deployment.id,
+            custom_domain,
+        )
+        .await;
     }
 
     let _ = config
