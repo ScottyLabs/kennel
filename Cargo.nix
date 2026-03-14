@@ -3847,6 +3847,7 @@ rec {
           {
             name = "serde";
             packageId = "serde";
+            features = [ "derive" ];
           }
           {
             name = "utoipa";
@@ -6781,7 +6782,7 @@ rec {
           {
             name = "tokio-util";
             packageId = "tokio-util";
-            features = [ "rt" ];
+            features = [ "rt" "io" ];
           }
           {
             name = "tracing";
@@ -6903,7 +6904,7 @@ rec {
           {
             name = "tokio-util";
             packageId = "tokio-util";
-            features = [ "rt" ];
+            features = [ "rt" "io" ];
           }
           {
             name = "tracing";
@@ -6933,7 +6934,7 @@ rec {
           {
             name = "tokio";
             packageId = "tokio";
-            features = [ "full" "signal" ];
+            features = [ "full" ];
           }
           {
             name = "toml";
@@ -7018,7 +7019,7 @@ rec {
           {
             name = "tokio-util";
             packageId = "tokio-util";
-            features = [ "rt" ];
+            features = [ "rt" "io" ];
           }
           {
             name = "tracing";
@@ -7094,6 +7095,7 @@ rec {
           {
             name = "serde";
             packageId = "serde";
+            features = [ "derive" ];
           }
           {
             name = "serde_json";
@@ -7188,7 +7190,7 @@ rec {
           {
             name = "tokio-util";
             packageId = "tokio-util";
-            features = [ "io" ];
+            features = [ "rt" "io" ];
           }
           {
             name = "tower-http";
@@ -7234,7 +7236,7 @@ rec {
           {
             name = "tokio";
             packageId = "tokio";
-            features = [ "macros" "rt-multi-thread" ];
+            features = [ "full" ];
           }
         ];
 
@@ -7341,6 +7343,7 @@ rec {
           {
             name = "serde";
             packageId = "serde";
+            features = [ "derive" ];
           }
           {
             name = "serde_json";
@@ -7357,7 +7360,7 @@ rec {
           {
             name = "tokio";
             packageId = "tokio";
-            features = [ "sync" ];
+            features = [ "full" ];
           }
           {
             name = "tracing";

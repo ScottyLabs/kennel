@@ -10,9 +10,9 @@ bytes = "1.11.1"
 hex = "0.4.3"
 hmac = "0.12.1"
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
-serde = "1.0.228"
-serde_json = "1.0.149"
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.10.9"
-thiserror = "2.0.18"
-tokio = { version = "1", features = ["sync"] }
-tracing = "0.1.44"
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true

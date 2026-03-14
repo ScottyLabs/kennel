@@ -5,20 +5,20 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow = "1.0.102"
-chrono = "0.4.44"
+anyhow.workspace = true
+chrono.workspace = true
 entity = { version = "0.1.0", path = "../entity" }
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
 kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-provision = { version = "0.1.0", path = "../kennel-provision" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
-reqwest = "0.13.2"
-sea-orm = "1.1.19"
+reqwest.workspace = true
+sea-orm.workspace = true
 secrecy = "0.10.3"
 secretspec = { version = "0.8.0", features = ["vault"] }
-serde_json = "1.0.149"
-thiserror = "2.0.18"
-tokio = { version = "1.49.0", features = ["full"] }
-tokio-util = { version = "0.7.18", features = ["rt"] }
-tracing = "0.1.44"
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
