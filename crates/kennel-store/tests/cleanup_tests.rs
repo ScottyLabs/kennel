@@ -1,7 +1,7 @@
 use chrono::{Duration, NaiveDateTime, Utc};
 use entity::{builds, deployments, projects, sea_orm_active_enums::*, services};
 use kennel_store::Store;
-use sea_orm::{Database, DbErr, Set};
+use sea_orm::{ActiveModelTrait, Database, DbErr, Set};
 
 fn now() -> NaiveDateTime {
     Utc::now().naive_utc()
@@ -38,7 +38,7 @@ async fn create_test_service(store: &Store, project: &str, service: &str) -> Res
         ..Default::default()
     };
 
-    let _ = store.services().create(svc).await.ok();
+    let _ = svc.insert(store.db()).await.ok();
     Ok(())
 }
 
