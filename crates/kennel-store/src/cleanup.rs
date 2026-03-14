@@ -9,9 +9,10 @@ impl Store {
     pub async fn find_expired_deployments(
         &self,
         inactive_days: i64,
+        protected_environments: &[&str],
     ) -> Result<Vec<::entity::deployments::Model>> {
         self.deployments()
-            .find_expired(inactive_days, &["prod", "staging"])
+            .find_expired(inactive_days, protected_environments)
             .await
     }
 

@@ -130,7 +130,11 @@ pub async fn run_cleanup_job(
             _ = cancel.cancelled() => break,
         }
 
-        match config.store.find_expired_deployments(7).await {
+        match config
+            .store
+            .find_expired_deployments(7, &["prod", "staging"])
+            .await
+        {
             Ok(expired) if !expired.is_empty() => {
                 let ids: Vec<i32> = expired.iter().map(|d| d.id).collect();
 
