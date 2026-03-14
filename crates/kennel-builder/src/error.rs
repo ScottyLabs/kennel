@@ -8,9 +8,6 @@ pub enum BuilderError {
     #[error("nix build failed: {0}")]
     NixBuild(String),
 
-    #[error("build cancelled")]
-    Cancelled,
-
     #[error("invalid store path: {0}")]
     InvalidStorePath(String),
 

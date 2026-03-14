@@ -8,4 +8,3 @@ license.workspace = true
 serde.workspace = true
 tokio.workspace = true
 toml = "1.0.3"
-tracing.workspace = true

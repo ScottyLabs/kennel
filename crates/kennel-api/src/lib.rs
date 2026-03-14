@@ -1,5 +1,3 @@
-mod builds;
-
 use axum::Router;
 use kennel_store::Store;
 use std::sync::Arc;
@@ -12,10 +10,8 @@ use utoipa_swagger_ui::SwaggerUi;
 #[openapi(
     paths(
         health,
-        builds::cancel_build,
     ),
     tags(
-        (name = "builds", description = "Build management endpoints"),
         (name = "health", description = "Health check endpoints"),
     ),
     info(
@@ -43,7 +39,6 @@ async fn health(
 pub fn router(store: Arc<Store>) -> Router {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(utoipa_axum::routes!(health))
-        .routes(utoipa_axum::routes!(builds::cancel_build))
         .split_for_parts();
 
     router

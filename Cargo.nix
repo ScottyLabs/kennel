@@ -6940,10 +6940,6 @@ rec {
             name = "toml";
             packageId = "toml 1.0.3+spec-1.1.0";
           }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
         ];
 
       };

@@ -2,7 +2,6 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ProcessState {
-    Pending,
     Starting,
     Ready,
     Running,

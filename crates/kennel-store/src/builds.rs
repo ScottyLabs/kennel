@@ -104,7 +104,6 @@ impl<'a> BuildRepository<'a> {
         project_name: String,
         git_ref: String,
         commit_sha: String,
-        _author: String,
     ) -> crate::Result<builds::Model> {
         use chrono::Utc;
 

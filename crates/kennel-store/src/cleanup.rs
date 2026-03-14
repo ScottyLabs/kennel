@@ -1,12 +1,5 @@
 use crate::{Result, Store};
 
-/// Summary of cleanup operations performed
-#[derive(Debug, Default, Clone)]
-pub struct CleanupSummary {
-    pub expired_deployments: usize,
-    pub old_build_logs: usize,
-}
-
 impl Store {
     /// Find deployments that have been inactive for the specified number of days
     /// and are not in protected environments (prod, staging by default).

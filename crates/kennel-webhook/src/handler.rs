@@ -55,8 +55,8 @@ pub async fn handle_webhook(
         WebhookEvent::Push {
             git_ref,
             commit_sha,
-            author,
             deleted,
+            ..
         } => {
             let branch = normalize_branch(&git_ref);
 
@@ -77,12 +77,7 @@ pub async fn handle_webhook(
             let build = match config
                 .store
                 .builds()
-                .create_build(
-                    project.name.clone(),
-                    git_ref.clone(),
-                    commit_sha.clone(),
-                    author,
-                )
+                .create_build(project.name.clone(), git_ref.clone(), commit_sha.clone())
                 .await
             {
                 Ok(b) => b,
@@ -120,7 +115,7 @@ pub async fn handle_webhook(
             action,
             pr_number,
             commit_sha,
-            author,
+            ..
         } => {
             match action.as_str() {
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
@@ -129,19 +124,12 @@ pub async fn handle_webhook(
                     let build = match config
                         .store
                         .builds()
-                        .create_build(
-                            project.name.clone(),
-                            git_ref.clone(),
-                            commit_sha.clone(),
-                            author,
-                        )
+                        .create_build(project.name.clone(), git_ref.clone(), commit_sha.clone())
                         .await
                     {
                         Ok(b) => b,
                         Err(e) => {
-                            if e.to_string().contains("duplicate")
-                                || e.to_string().contains("unique")
-                            {
+                            if e.is_unique_violation() {
                                 info!(
                                     "Build already exists for {}/{}/{}",
                                     project_name, git_ref, commit_sha

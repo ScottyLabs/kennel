@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
@@ -20,13 +19,13 @@ pub struct Route {
 }
 
 pub struct RoutingTable {
-    routes: Arc<RwLock<HashMap<String, Route>>>,
+    routes: RwLock<HashMap<String, Route>>,
 }
 
 impl RoutingTable {
     pub fn new() -> Self {
         Self {
-            routes: Arc::new(RwLock::new(HashMap::new())),
+            routes: RwLock::new(HashMap::new()),
         }
     }
 

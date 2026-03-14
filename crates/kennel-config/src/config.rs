@@ -25,8 +25,6 @@ pub struct ServiceConfig {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StaticSiteConfig {
-    pub flake_output: Option<String>,
-
     #[serde(default)]
     pub spa: bool,
 
@@ -87,7 +85,6 @@ custom_domain = "api.myapp.com"
     fn test_parse_static_site_config() {
         let toml_str = r#"
 [static_sites.docs]
-flake_output = "docs"
 spa = false
 
 [static_sites.web]
@@ -97,7 +94,6 @@ spa = true
         assert_eq!(config.static_sites.len(), 2);
 
         let docs = config.static_sites.get("docs").unwrap();
-        assert_eq!(docs.flake_output, Some("docs".to_string()));
         assert!(!docs.spa);
 
         let web = config.static_sites.get("web").unwrap();
