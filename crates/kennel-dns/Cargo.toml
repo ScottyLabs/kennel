@@ -8,6 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 async-trait = "0.1.89"
 cloudflare = "0.14.0"
+entity = { version = "0.1.0", path = "../entity" }
 kennel-store = { version = "0.1.0", path = "../kennel-store" }
 thiserror.workspace = true
 tokio.workspace = true

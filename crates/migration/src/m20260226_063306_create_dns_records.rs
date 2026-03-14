@@ -25,7 +25,11 @@ impl MigrationTrait for Migration {
                             .text()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(DnsRecords::RecordType).text().not_null())
+                    .col(
+                        ColumnDef::new(DnsRecords::RecordType)
+                            .custom(Alias::new("record_type"))
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(DnsRecords::IpAddress).text().not_null())
                     .col(
                         ColumnDef::new(DnsRecords::CreatedAt)
@@ -79,7 +83,7 @@ impl MigrationTrait for Migration {
                     .table(Deployments::Table)
                     .add_column(
                         ColumnDef::new(Deployments::DnsStatus)
-                            .text()
+                            .custom(Alias::new("dns_status"))
                             .not_null()
                             .default("pending"),
                     )

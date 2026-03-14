@@ -8,13 +8,14 @@ use tracing::{error, info, warn};
 use crate::error::Result;
 use crate::{DeployerConfig, static_site, user, utils};
 
-pub(crate) fn determine_environment(git_ref: &str) -> String {
+pub(crate) fn determine_environment(git_ref: &str) -> entity::sea_orm_active_enums::Environment {
+    use entity::sea_orm_active_enums::Environment;
     match git_ref {
-        "main" => "prod".to_string(),
-        "staging" => "staging".to_string(),
-        "dev" => "dev".to_string(),
-        s if s.starts_with("pr-") => "preview".to_string(),
-        _ => "dev".to_string(),
+        "main" => Environment::Prod,
+        "staging" => Environment::Staging,
+        "dev" => Environment::Dev,
+        s if s.starts_with("pr-") => Environment::Preview,
+        _ => Environment::Dev,
     }
 }
 
@@ -142,7 +143,7 @@ async fn deploy_service(
         service_name: devenv_config.name.clone(),
         branch: branch.clone(),
         branch_slug: branch_sanitized.clone(),
-        environment: environment.clone(),
+        environment: format!("{:?}", environment).to_lowercase(),
         system_user: username.clone(),
     };
 
@@ -165,7 +166,8 @@ async fn deploy_service(
         let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
             .join(build.id.to_string())
             .join("repo");
-        match crate::secrets::resolve_secrets(&work_dir, &environment, vault_endpoint) {
+        let env_str = format!("{:?}", environment).to_lowercase();
+        match crate::secrets::resolve_secrets(&work_dir, &env_str, vault_endpoint) {
             Ok(secrets) => {
                 process_config.env.extend(secrets);
             }
@@ -285,14 +287,18 @@ fn merge_config(
     process_name: &str,
     username: &str,
     cwd: PathBuf,
-    environment: &str,
+    environment: &entity::sea_orm_active_enums::Environment,
 ) -> ProcessConfig {
+    let env_str = match environment {
+        entity::sea_orm_active_enums::Environment::Prod => "prod",
+        entity::sea_orm_active_enums::Environment::Staging => "staging",
+        entity::sea_orm_active_enums::Environment::Dev => "dev",
+        entity::sea_orm_active_enums::Environment::Preview => "preview",
+    };
     let mut config = devenv_config.clone();
     config.name = process_name.to_string();
     config.user = Some(username.to_string());
     config.cwd = Some(cwd);
-    config
-        .env
-        .insert("ENVIRONMENT".into(), environment.to_string());
+    config.env.insert("ENVIRONMENT".into(), env_str.to_string());
     config
 }

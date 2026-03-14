@@ -22,7 +22,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(Deployments::ServiceName).text().not_null())
                     .col(ColumnDef::new(Deployments::Branch).text().not_null())
                     .col(ColumnDef::new(Deployments::BranchSlug).text().not_null())
-                    .col(ColumnDef::new(Deployments::Environment).text().not_null())
+                    .col(
+                        ColumnDef::new(Deployments::Environment)
+                            .custom(Alias::new("environment"))
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(Deployments::GitRef).text().not_null())
                     .col(ColumnDef::new(Deployments::StorePath).text())
                     .col(ColumnDef::new(Deployments::ProcessConfig).json_binary())

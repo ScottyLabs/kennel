@@ -86,6 +86,66 @@ pub enum DeploymentStatus {
     Deserialize,
     utoipa :: ToSchema,
 )]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "dns_status")]
+pub enum DnsStatus {
+    #[sea_orm(string_value = "pending")]
+    Pending,
+    #[sea_orm(string_value = "active")]
+    Active,
+    #[sea_orm(string_value = "failed")]
+    Failed,
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    EnumIter,
+    DeriveActiveEnum,
+    Serialize,
+    Deserialize,
+    utoipa :: ToSchema,
+)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "environment")]
+pub enum Environment {
+    #[sea_orm(string_value = "prod")]
+    Prod,
+    #[sea_orm(string_value = "staging")]
+    Staging,
+    #[sea_orm(string_value = "dev")]
+    Dev,
+    #[sea_orm(string_value = "preview")]
+    Preview,
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    EnumIter,
+    DeriveActiveEnum,
+    Serialize,
+    Deserialize,
+    utoipa :: ToSchema,
+)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "record_type")]
+pub enum RecordType {
+    #[sea_orm(string_value = "a")]
+    A,
+    #[sea_orm(string_value = "aaaa")]
+    Aaaa,
+}
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    EnumIter,
+    DeriveActiveEnum,
+    Serialize,
+    Deserialize,
+    utoipa :: ToSchema,
+)]
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "repo_type")]
 pub enum RepoType {
     #[sea_orm(string_value = "forgejo")]

@@ -75,7 +75,7 @@ impl DnsManager {
                 domain,
                 deployment_id,
                 &a_record.provider_record_id,
-                "A",
+                entity::sea_orm_active_enums::RecordType::A,
                 &self.server_ipv4.to_string(),
             )
             .await?;
@@ -90,7 +90,7 @@ impl DnsManager {
                 domain,
                 deployment_id,
                 &aaaa_record.provider_record_id,
-                "AAAA",
+                entity::sea_orm_active_enums::RecordType::Aaaa,
                 &self.server_ipv6.to_string(),
             )
             .await?;
@@ -109,7 +109,7 @@ impl DnsManager {
 
         for record in records {
             info!(
-                "Deleting DNS record: {} ({})",
+                "Deleting DNS record: {} ({:?})",
                 record.domain, record.record_type
             );
 
@@ -153,7 +153,7 @@ impl DnsManager {
                 &wildcard_domain,
                 None,
                 &a_record.provider_record_id,
-                "A",
+                entity::sea_orm_active_enums::RecordType::A,
                 &self.server_ipv4.to_string(),
             )
             .await?;
@@ -172,7 +172,7 @@ impl DnsManager {
                 &wildcard_domain,
                 None,
                 &aaaa_record.provider_record_id,
-                "AAAA",
+                entity::sea_orm_active_enums::RecordType::Aaaa,
                 &self.server_ipv6.to_string(),
             )
             .await?;
@@ -197,7 +197,7 @@ impl DnsManager {
 
         for record in records {
             info!(
-                "Deleting wildcard DNS record: {} ({})",
+                "Deleting wildcard DNS record: {} ({:?})",
                 record.domain, record.record_type
             );
 
@@ -225,7 +225,7 @@ impl DnsManager {
         let deployments = self
             .store
             .deployments()
-            .find_by_dns_status("pending")
+            .find_by_dns_status(entity::sea_orm_active_enums::DnsStatus::Pending)
             .await?;
 
         for deployment in deployments {
@@ -236,7 +236,10 @@ impl DnsManager {
                 Ok(_) => {
                     self.store
                         .deployments()
-                        .update_dns_status(deployment.id, "active")
+                        .update_dns_status(
+                            deployment.id,
+                            entity::sea_orm_active_enums::DnsStatus::Active,
+                        )
                         .await?;
                     summary.dns_created += 1;
                 }

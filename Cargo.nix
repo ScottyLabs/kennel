@@ -7044,6 +7044,10 @@ rec {
             packageId = "cloudflare";
           }
           {
+            name = "entity";
+            packageId = "entity";
+          }
+          {
             name = "kennel-store";
             packageId = "kennel-store";
           }

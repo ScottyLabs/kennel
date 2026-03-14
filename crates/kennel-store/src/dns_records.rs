@@ -1,5 +1,6 @@
 use crate::Result;
 use entity::dns_records;
+use entity::sea_orm_active_enums::RecordType;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
@@ -14,14 +15,14 @@ impl<'a> Repository<'a> {
         domain: &str,
         deployment_id: impl Into<Option<i32>>,
         provider_record_id: &str,
-        record_type: &str,
+        record_type: RecordType,
         ip_address: &str,
     ) -> Result<dns_records::Model> {
         let model = dns_records::ActiveModel {
             domain: ActiveValue::Set(domain.to_string()),
             deployment_id: ActiveValue::Set(deployment_id.into()),
             provider_record_id: ActiveValue::Set(provider_record_id.to_string()),
-            record_type: ActiveValue::Set(record_type.to_string()),
+            record_type: ActiveValue::Set(record_type),
             ip_address: ActiveValue::Set(ip_address.to_string()),
             ..Default::default()
         };

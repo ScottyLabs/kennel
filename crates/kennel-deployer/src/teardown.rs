@@ -56,7 +56,7 @@ pub async fn process_teardown(
         service_name: deployment.service_name.clone(),
         branch: deployment.branch.clone(),
         branch_slug: deployment.branch_slug.clone(),
-        environment: deployment.environment.clone(),
+        environment: format!("{:?}", deployment.environment).to_lowercase(),
         system_user: process_name.clone(),
     };
 

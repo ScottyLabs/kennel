@@ -38,7 +38,10 @@ pub async fn create_custom_domain_dns(
             tracing::info!("DNS records created for {custom_domain}");
             if let Err(e) = store
                 .deployments()
-                .update_dns_status(deployment_id, "active")
+                .update_dns_status(
+                    deployment_id,
+                    entity::sea_orm_active_enums::DnsStatus::Active,
+                )
                 .await
             {
                 tracing::warn!("Failed to update dns_status: {e}");

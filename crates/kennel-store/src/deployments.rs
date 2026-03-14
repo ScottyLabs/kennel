@@ -1,4 +1,9 @@
-use ::entity::{deployments, prelude::*, sea_orm_active_enums::DeploymentStatus, services};
+use ::entity::{
+    deployments,
+    prelude::*,
+    sea_orm_active_enums::{DeploymentStatus, DnsStatus},
+    services,
+};
 use sea_orm::sea_query::{LockBehavior, LockType};
 use sea_orm::{entity::*, query::*, sea_query::Expr, *};
 
@@ -160,7 +165,7 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn find_by_dns_status(
         &self,
-        dns_status: &str,
+        dns_status: DnsStatus,
     ) -> crate::Result<Vec<deployments::Model>> {
         Ok(Deployments::find()
             .filter(deployments::Column::DnsStatus.eq(dns_status))
@@ -168,7 +173,7 @@ impl<'a> DeploymentRepository<'a> {
             .await?)
     }
 
-    pub async fn update_dns_status(&self, id: i32, dns_status: &str) -> crate::Result<()> {
+    pub async fn update_dns_status(&self, id: i32, dns_status: DnsStatus) -> crate::Result<()> {
         use chrono::Utc;
 
         Deployments::update_many()

@@ -69,10 +69,58 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("dns_status"))
+                    .values(vec![
+                        Alias::new("pending"),
+                        Alias::new("active"),
+                        Alias::new("failed"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("environment"))
+                    .values(vec![
+                        Alias::new("prod"),
+                        Alias::new("staging"),
+                        Alias::new("dev"),
+                        Alias::new("preview"),
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("record_type"))
+                    .values(vec![Alias::new("a"), Alias::new("aaaa")])
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_type(Type::drop().name(Alias::new("record_type")).to_owned())
+            .await?;
+
+        manager
+            .drop_type(Type::drop().name(Alias::new("environment")).to_owned())
+            .await?;
+
+        manager
+            .drop_type(Type::drop().name(Alias::new("dns_status")).to_owned())
+            .await?;
+
         manager
             .drop_type(
                 Type::drop()

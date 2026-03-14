@@ -2192,6 +2192,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cloudflare",
+ "entity",
  "kennel-store",
  "thiserror 2.0.18",
  "tokio",
