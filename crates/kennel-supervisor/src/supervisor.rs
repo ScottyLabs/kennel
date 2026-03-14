@@ -41,6 +41,7 @@ impl Supervisor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn event_sender(&self) -> &broadcast::Sender<SupervisorEvent> {
         &self.event_tx
     }
@@ -55,10 +56,12 @@ impl Supervisor {
             .map(|p| p.state.lock().unwrap().clone())
     }
 
+    #[allow(dead_code)]
     pub fn process_names(&self) -> impl Iterator<Item = &str> {
         self.processes.keys().map(String::as_str)
     }
 
+    #[allow(dead_code)]
     pub fn stats(&self, name: &str) -> Result<Option<CgroupStats>> {
         let managed = self
             .processes
@@ -289,6 +292,7 @@ impl Supervisor {
     /// Start all processes respecting dependency order. Processes in the
     /// same topological batch start concurrently. Each batch waits for all
     /// readiness probes to pass before the next batch starts.
+    #[allow(dead_code)]
     pub async fn start_all(&mut self, configs: Vec<ProcessConfig>) -> Result<()> {
         let batches = crate::order::topological_sort(&configs)?;
 
