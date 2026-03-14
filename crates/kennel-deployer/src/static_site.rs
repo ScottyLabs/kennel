@@ -117,9 +117,8 @@ pub async fn deploy_site(
         }
     }
 
-    // Notify the router via supervisor event channel.
-    let supervisor = config.supervisor.lock().await;
-    let _ = supervisor
+    let _ = config
+        .supervisor
         .event_sender()
         .send(SupervisorEvent::ProcessReady {
             name: format!(

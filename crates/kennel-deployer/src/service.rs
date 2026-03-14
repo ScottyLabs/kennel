@@ -238,18 +238,16 @@ async fn deploy_service(
         new.id
     };
 
-    // Start or replace the process.
     if existing_deployment.is_some() {
-        let mut supervisor = config.supervisor.lock().await;
-        supervisor
+        config
+            .supervisor
             .blue_green_deploy(
                 process_config,
                 kennel_config::constants::BLUE_GREEN_DRAIN_TIMEOUT,
             )
             .await?;
     } else {
-        let mut supervisor = config.supervisor.lock().await;
-        supervisor.start(process_config).await?;
+        config.supervisor.start(process_config).await?;
     }
 
     // Mark deployment as Deployed.

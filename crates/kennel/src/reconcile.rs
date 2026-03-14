@@ -1,12 +1,11 @@
 use entity::sea_orm_active_enums::RepoType;
 use kennel_config::constants;
 use kennel_store::Store;
-use kennel_supervisor::{ProcessConfig, Supervisor};
+use kennel_supervisor::{ProcessConfig, SupervisorHandle};
 use sea_orm::ActiveValue;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 #[derive(Debug, Deserialize)]
@@ -43,7 +42,7 @@ pub async fn reconcile_projects(store: Arc<Store>) -> anyhow::Result<()> {
 
 pub async fn reconcile_deployments(
     store: Arc<Store>,
-    supervisor: Arc<Mutex<Supervisor>>,
+    supervisor: SupervisorHandle,
 ) -> anyhow::Result<()> {
     info!("Running startup resource reconciliation");
 
@@ -143,7 +142,7 @@ async fn cleanup_removed_projects(
 /// reconstruct ProcessConfigs from stored deployment records.
 async fn reconcile_supervisor_processes(
     store: &Store,
-    supervisor: &Arc<Mutex<Supervisor>>,
+    supervisor: &SupervisorHandle,
 ) -> anyhow::Result<()> {
     info!("Reconciling supervisor processes");
 
@@ -158,8 +157,7 @@ async fn reconcile_supervisor_processes(
         match process_config {
             Some(config) => {
                 info!("Re-starting process {} from stored config", config.name);
-                let mut sup = supervisor.lock().await;
-                if let Err(e) = sup.start(config).await {
+                if let Err(e) = supervisor.start(config).await {
                     error!(
                         "Failed to restart process for deployment {}: {e}",
                         deployment.id

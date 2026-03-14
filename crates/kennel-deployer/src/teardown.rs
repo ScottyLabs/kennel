@@ -20,17 +20,15 @@ pub async fn process_teardown(
     );
 
     // Stop the supervised process
-    {
-        let mut supervisor = config.supervisor.lock().await;
-        if supervisor.is_running(&process_name) {
-            if let Err(e) = supervisor
-                .stop(&process_name, Duration::from_secs(30))
-                .await
-            {
-                warn!("Failed to stop process {process_name}: {e}");
-            }
-            supervisor.remove(&process_name);
+    if config.supervisor.is_running(&process_name).await {
+        if let Err(e) = config
+            .supervisor
+            .stop(&process_name, Duration::from_secs(30))
+            .await
+        {
+            warn!("Failed to stop process {process_name}: {e}");
         }
+        config.supervisor.remove(&process_name).await;
     }
 
     // Remove static symlink if it's a static site deployment

@@ -13,16 +13,16 @@ pub use log_cleanup::run_log_cleanup_job;
 use kennel_dns::DnsManager;
 use kennel_provision::ResourceProvider;
 use kennel_store::Store;
-use kennel_supervisor::Supervisor;
+use kennel_supervisor::SupervisorHandle;
 use std::sync::Arc;
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct DeployerConfig {
     pub store: Arc<Store>,
-    pub supervisor: Arc<Mutex<Supervisor>>,
+    pub supervisor: SupervisorHandle,
     pub dns_manager: Option<Arc<DnsManager>>,
     pub resource_providers: Vec<Arc<dyn ResourceProvider>>,
     pub vault_endpoint: Option<String>,

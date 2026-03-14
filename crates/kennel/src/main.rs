@@ -6,12 +6,11 @@ mod signals;
 
 use kennel_config::constants;
 use kennel_store::Store;
-use kennel_supervisor::{Supervisor, SupervisorEvent};
+use kennel_supervisor::{SupervisorEvent, SupervisorHandle};
 use migration::MigratorTrait;
 use sea_orm::{ConnectionTrait, Database};
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -71,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
     // are captured by the router.
     let (event_tx, _) =
         tokio::sync::broadcast::channel::<SupervisorEvent>(constants::SUPERVISOR_EVENT_CAPACITY);
-    let supervisor = Arc::new(Mutex::new(Supervisor::new(event_tx.clone())));
+    let supervisor = SupervisorHandle::spawn(event_tx.clone());
     let event_rx = event_tx.subscribe();
 
     if let Err(e) = reconcile::reconcile_deployments(store.clone(), supervisor.clone()).await {
@@ -116,6 +115,7 @@ async fn main() -> anyhow::Result<()> {
     let deployer_config = kennel_deployer::DeployerConfig {
         store: store.clone(),
         supervisor: supervisor.clone(),
+
         dns_manager,
         resource_providers,
         vault_endpoint: std::env::var("VAULT_ENDPOINT").ok(),
