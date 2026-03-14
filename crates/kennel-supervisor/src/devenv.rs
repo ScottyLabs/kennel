@@ -96,7 +96,7 @@ impl TaskConfig {
     pub fn is_infrastructure(&self) -> bool {
         INFRASTRUCTURE_PROCESSES
             .iter()
-            .any(|prefix| self.name.starts_with(prefix))
+            .any(|name| self.name == *name)
     }
 
     /// Strip the `devenv:processes:` prefix from the task name.

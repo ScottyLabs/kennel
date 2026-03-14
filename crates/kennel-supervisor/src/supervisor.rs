@@ -268,11 +268,18 @@ impl Supervisor {
     }
 
     pub async fn stop_all(&mut self, grace: Duration) -> Result<()> {
-        let names: Vec<String> = self.processes.keys().cloned().collect();
+        let configs: Vec<ProcessConfig> =
+            self.processes.values().map(|p| p.config.clone()).collect();
 
-        for name in &names {
-            if let Err(e) = self.stop(name, grace).await {
-                tracing::warn!(process = %name, error = %e, "failed to stop process");
+        let batches = crate::order::topological_sort(&configs)
+            .unwrap_or_else(|_| vec![configs.iter().collect()]);
+
+        // Stop in reverse dependency order.
+        for batch in batches.into_iter().rev() {
+            for config in batch {
+                if let Err(e) = self.stop(&config.name, grace).await {
+                    tracing::warn!(process = %config.name, error = %e, "failed to stop process");
+                }
             }
         }
 

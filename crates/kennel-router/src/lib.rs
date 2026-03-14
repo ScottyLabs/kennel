@@ -140,7 +140,16 @@ async fn run_update_handler(
 
     loop {
         tokio::select! {
-            Ok(event) = event_rx.recv() => {
+            result = event_rx.recv() => { match result {
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(skipped = n, "event receiver lagged, reloading routes");
+                    if let Err(e) = reload_static_routes(&table, &store).await {
+                        error!("Failed to reload routes after lag: {e}");
+                    }
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Ok(event) => {
                 match event {
                     SupervisorEvent::ProcessReady { name, port, store_path } => {
                         info!("Process ready: {name}");
@@ -196,7 +205,7 @@ async fn run_update_handler(
                     }
                     _ => {}
                 }
-            }
+            } } }
             _ = reload_interval.tick() => {
                 if let Err(e) = reload_static_routes(&table, &store).await {
                     error!("Failed to reload routing table: {e}");

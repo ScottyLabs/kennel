@@ -21,7 +21,8 @@ pub async fn build(work_dir: &Path, service_name: &str, build_id: i32) -> Result
     }
 
     // Build the Nix package
-    let flake_ref = format!(".#packages.x86_64-linux.{}", service_name);
+    let system = format!("{}-linux", std::env::consts::ARCH);
+    let flake_ref = format!(".#packages.{system}.{service_name}");
 
     debug!("Running nix build {}", flake_ref);
 
