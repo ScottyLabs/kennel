@@ -459,7 +459,7 @@ fn spawn_supervision_task(
                     .unwrap_or(std::time::Duration::from_secs(30));
                 crate::notify::wait_for_ready(socket_path, timeout).await
             } else {
-                probe::run_readiness_probe(&name, ready_config).await
+                probe::run_readiness_probe(&name, ready_config, config.user.as_deref()).await
             };
 
             match probe_result {
@@ -541,7 +541,7 @@ fn spawn_supervision_task(
                         job.start().await;
 
                         if let Some(ready_config) = &config.ready {
-                            match probe::run_readiness_probe(&name, ready_config).await {
+                            match probe::run_readiness_probe(&name, ready_config, config.user.as_deref()).await {
                                 Ok(()) => {
                                     healthy = true;
                                     *state.lock().unwrap() = ProcessState::Ready;
@@ -588,7 +588,7 @@ fn spawn_supervision_task(
 
                 _ = probe::liveness_tick(&config.ready), if config.ready.as_ref().is_some_and(|r| !r.notify) => {
                     let ready_config = config.ready.as_ref().unwrap();
-                    let probe_result = probe::run_single_probe(ready_config).await;
+                    let probe_result = probe::run_single_probe(ready_config, config.user.as_deref()).await;
 
                     if probe_result.is_err() {
                         consecutive_failures += 1;

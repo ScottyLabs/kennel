@@ -2,7 +2,11 @@ use std::time::Duration;
 
 use crate::config::ReadyConfig;
 
-pub async fn run_readiness_probe(name: &str, config: &ReadyConfig) -> crate::Result<()> {
+pub async fn run_readiness_probe(
+    name: &str,
+    config: &ReadyConfig,
+    user: Option<&str>,
+) -> crate::Result<()> {
     tokio::time::sleep(config.initial_delay).await;
 
     let deadline = config.timeout.map(|t| tokio::time::Instant::now() + t);
@@ -14,7 +18,7 @@ pub async fn run_readiness_probe(name: &str, config: &ReadyConfig) -> crate::Res
             return Err(crate::SupervisorError::ProbeTimeout(name.to_string()));
         }
 
-        match run_single_probe(config).await {
+        match run_single_probe(config, user).await {
             Ok(()) => {
                 failures = 0;
                 successes += 1;
@@ -39,7 +43,7 @@ pub async fn run_readiness_probe(name: &str, config: &ReadyConfig) -> crate::Res
     }
 }
 
-pub async fn run_single_probe(config: &ReadyConfig) -> anyhow::Result<()> {
+pub async fn run_single_probe(config: &ReadyConfig, user: Option<&str>) -> anyhow::Result<()> {
     if config.notify {
         // Notify readiness is handled by the notify socket listener,
         // not by polling. Return error so the readiness probe loop
@@ -54,7 +58,7 @@ pub async fn run_single_probe(config: &ReadyConfig) -> anyhow::Result<()> {
     }
 
     if let Some(exec) = &config.exec {
-        return probe_exec(exec, config.probe_timeout).await;
+        return probe_exec(exec, config.probe_timeout, user).await;
     }
 
     Ok(())
@@ -80,15 +84,19 @@ async fn probe_http(config: &crate::config::HttpProbe, timeout: Duration) -> any
     }
 }
 
-async fn probe_exec(command: &str, timeout: Duration) -> anyhow::Result<()> {
-    let result = tokio::time::timeout(
-        timeout,
-        tokio::process::Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .output(),
-    )
-    .await??;
+async fn probe_exec(command: &str, timeout: Duration, user: Option<&str>) -> anyhow::Result<()> {
+    let mut cmd = tokio::process::Command::new("sh");
+    cmd.arg("-c").arg(command);
+
+    #[cfg(target_os = "linux")]
+    if let Some(username) = user {
+        if let Ok(Some(user_info)) = nix::unistd::User::from_name(username) {
+            cmd.uid(user_info.uid.as_raw());
+            cmd.gid(user_info.gid.as_raw());
+        }
+    }
+
+    let result = tokio::time::timeout(timeout, cmd.output()).await??;
 
     if result.status.success() {
         Ok(())
@@ -130,26 +138,26 @@ mod tests {
 
     #[tokio::test]
     async fn exec_probe_success() {
-        let result = probe_exec("true", Duration::from_secs(5)).await;
+        let result = probe_exec("true", Duration::from_secs(5), None).await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn exec_probe_failure() {
-        let result = probe_exec("false", Duration::from_secs(5)).await;
+        let result = probe_exec("false", Duration::from_secs(5), None).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn exec_probe_timeout() {
-        let result = probe_exec("sleep 60", Duration::from_millis(100)).await;
+        let result = probe_exec("sleep 60", Duration::from_millis(100), None).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn readiness_probe_exec_passes() {
         let config = ready_config_with_exec("true");
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_ok());
     }
 
@@ -159,7 +167,7 @@ mod tests {
         config.failure_threshold = 2;
         config.period = Duration::from_millis(50);
 
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_err());
     }
 
@@ -170,7 +178,7 @@ mod tests {
         config.period = Duration::from_millis(50);
         config.probe_timeout = Duration::from_millis(50);
 
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_err());
     }
 
@@ -188,7 +196,7 @@ mod tests {
             failure_threshold: 5,
         };
 
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_ok());
     }
 
@@ -198,7 +206,7 @@ mod tests {
         config.initial_delay = Duration::from_millis(100);
 
         let start = tokio::time::Instant::now();
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_ok());
         assert!(start.elapsed() >= Duration::from_millis(100));
     }
@@ -210,7 +218,7 @@ mod tests {
         config.period = Duration::from_millis(50);
 
         let start = tokio::time::Instant::now();
-        let result = run_readiness_probe("test", &config).await;
+        let result = run_readiness_probe("test", &config, None).await;
         assert!(result.is_ok());
         // Should take at least 2 periods (3 successes with sleep between each)
         assert!(start.elapsed() >= Duration::from_millis(100));
@@ -230,7 +238,7 @@ mod tests {
             failure_threshold: 5,
         };
 
-        let result = run_single_probe(&config).await;
+        let result = run_single_probe(&config, None).await;
         assert!(result.is_ok());
     }
 
@@ -248,7 +256,7 @@ mod tests {
             failure_threshold: 5,
         };
 
-        let result = run_single_probe(&config).await;
+        let result = run_single_probe(&config, None).await;
         assert!(result.is_err());
     }
 }
