@@ -305,7 +305,6 @@ in
           "BASE_DOMAIN=${cfg.router.baseDomain}"
           "MAX_CONCURRENT_BUILDS=${toString cfg.builder.maxConcurrentBuilds}"
           "WORK_DIR=${cfg.builder.workDir}"
-          "AUTO_EXPIRY_CHECK_INTERVAL_SECS=${toString cfg.cleanup.interval}"
         ] ++ optionals cfg.router.tls.enable [
           "TLS_ENABLED=true"
           "ACME_EMAIL=${cfg.router.tls.email}"

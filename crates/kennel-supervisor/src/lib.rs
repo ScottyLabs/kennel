@@ -1,13 +1,13 @@
-pub mod cgroup;
+pub(crate) mod cgroup;
 pub mod config;
 pub mod devenv;
 pub mod error;
 pub mod event;
 mod handle;
-pub mod notify;
-pub mod order;
-pub mod probe;
-pub mod socket;
+pub(crate) mod notify;
+pub(crate) mod order;
+pub(crate) mod probe;
+pub(crate) mod socket;
 pub mod state;
 pub(crate) mod supervisor;
 
