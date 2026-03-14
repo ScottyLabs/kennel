@@ -105,7 +105,6 @@ pub async fn process_teardown(
         warn!("Failed to delete DNS records: {e}");
     }
 
-    // Delete the deployment record (already in TearingDown state).
     config
         .store
         .deployments()

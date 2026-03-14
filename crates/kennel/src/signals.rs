@@ -1,9 +1,8 @@
 use std::sync::Arc;
 use tokio::sync::Notify;
 
-/// Subsecond dispatch signals for the DB-as-queue architecture. Each signal
-/// wakes the corresponding worker to check the database for new work items.
-/// Losing a signal is harmless -- the DB is the source of truth.
+/// Wakeup signals for worker tasks. Each signal notifies the corresponding
+/// worker to check the database for new work items.
 pub struct Signals {
     pub build: Arc<Notify>,
     pub deploy: Arc<Notify>,

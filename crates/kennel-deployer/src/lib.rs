@@ -64,12 +64,10 @@ pub async fn run_deployer(
 
         if let Err(e) = service::deploy_build(&build, &config).await {
             error!("Deployment failed for build {build_id}: {e}");
-            // Mark the build as Failed since deployment failed.
             if let Err(e2) = config.store.builds().mark_failed(build_id).await {
                 error!("Failed to mark build {build_id} as failed: {e2}");
             }
         } else {
-            // Mark the build as Success since deployment completed.
             if let Err(e) = config.store.builds().mark_success(build_id).await {
                 error!("Failed to mark build {build_id} as success: {e}");
             }

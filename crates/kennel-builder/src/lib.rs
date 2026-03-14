@@ -62,7 +62,6 @@ pub async fn run_worker_pool(config: BuilderConfig) {
         tokio::spawn(async move {
             match worker::process_build(build_id, config.clone()).await {
                 Ok(()) => {
-                    // Build succeeded and was marked Built -- wake the deployer.
                     config.deploy_signal.notify_one();
                 }
                 Err(e) => {

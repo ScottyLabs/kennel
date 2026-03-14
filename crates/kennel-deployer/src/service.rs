@@ -192,8 +192,6 @@ async fn deploy_service(
     );
 
     // Check for existing deployment (blue-green vs fresh deploy).
-    // C01 fix: UPDATE existing record instead of INSERTing a second one.
-    // C10 fix: create/update deployment record BEFORE starting the process.
     let existing_deployment = config
         .store
         .deployments()
@@ -284,7 +282,6 @@ async fn deploy_service(
         {
             Ok(_) => {
                 info!("DNS records created for {custom_domain}");
-                // Update dns_status to active (fixes H27).
                 if let Err(e) = config
                     .store
                     .deployments()

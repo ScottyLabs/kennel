@@ -250,42 +250,32 @@ impl DnsManager {
             }
         }
 
-        // Find orphaned DNS records
-        for (zone, provider) in &self.providers {
-            info!("Checking for orphaned DNS records in zone {}", zone);
-
-            let provider_records = match provider.list_records().await {
-                Ok(records) => records,
-                Err(e) => {
-                    error!("Failed to list DNS records for zone {}: {}", zone, e);
-                    continue;
-                }
+        // Clean up DNS records whose deployment no longer exists. Only
+        // considers records tracked in the local DB, leaving any records
+        // not managed by Kennel untouched.
+        let all_records = self.store.dns_records().find_all().await?;
+        for record in all_records {
+            let Some(deployment_id) = record.deployment_id else {
+                continue;
             };
-
-            let our_records = self.store.dns_records().find_all().await?;
-
-            for provider_record in provider_records {
-                if !our_records
-                    .iter()
-                    .any(|r| r.provider_record_id == provider_record.provider_record_id)
-                {
-                    warn!(
-                        "Found orphaned DNS record: {}, deleting",
-                        provider_record.name
-                    );
-
-                    if let Err(e) = provider
-                        .delete_record(&provider_record.provider_record_id)
-                        .await
-                    {
+            let deployment = self
+                .store
+                .deployments()
+                .find_by_id(deployment_id)
+                .await
+                .map_err(|e| crate::Error::Other(anyhow::anyhow!(e)))?;
+            if deployment.is_none() {
+                warn!("DNS record {} has no deployment, deleting", record.domain);
+                if let Ok(provider) = self.get_provider_for_domain(&record.domain) {
+                    if let Err(e) = provider.delete_record(&record.provider_record_id).await {
                         error!(
                             "Failed to delete orphaned DNS record {}: {}",
-                            provider_record.name, e
+                            record.domain, e
                         );
-                    } else {
-                        summary.dns_orphaned += 1;
                     }
                 }
+                self.store.dns_records().delete(record.id).await?;
+                summary.dns_orphaned += 1;
             }
         }
 

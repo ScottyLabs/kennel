@@ -113,8 +113,25 @@ async fn cleanup_removed_projects(
 
     for db_project in db_projects {
         if !config_project_names.contains(&db_project.name) {
-            info!("Removing project no longer in config: {}", db_project.name);
-            store.projects().delete(&db_project.name).await?;
+            let deployments = store
+                .deployments()
+                .list_by_project(&db_project.name)
+                .await?;
+            if deployments.is_empty() {
+                info!(
+                    "Deleting project with no remaining deployments: {}",
+                    db_project.name
+                );
+                store.projects().delete(&db_project.name).await?;
+            } else {
+                let ids: Vec<i32> = deployments.iter().map(|d| d.id).collect();
+                info!(
+                    "Marking {} deployments for teardown (project {} removed from config)",
+                    ids.len(),
+                    db_project.name
+                );
+                store.deployments().mark_tearing_down(&ids).await?;
+            }
         }
     }
 

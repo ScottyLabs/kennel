@@ -50,7 +50,7 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         warn!("Failed to push to Cachix: {}", e);
     }
 
-    finalize_build(
+    let result = finalize_build(
         &config,
         build,
         build_id,
@@ -59,7 +59,17 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
         required_resources,
         &kennel_config,
     )
-    .await
+    .await;
+
+    // Clean up the build work directory.
+    if let Err(e) = tokio::fs::remove_dir_all(&work_dir).await {
+        warn!(
+            "Failed to clean up build work directory {:?}: {}",
+            work_dir, e
+        );
+    }
+
+    result
 }
 
 async fn record_failed_build_result(
@@ -172,15 +182,24 @@ async fn clone_and_parse_config(
         .ok_or_else(|| anyhow::anyhow!("Project {} not found", build.project_name))?;
 
     info!("Cloning repository for build {}", build_id);
-    if let Err(e) = git::clone(&project.repo_url, &build.commit_sha, work_dir).await {
+    if let Err(e) = git::clone(
+        &project.repo_url,
+        &build.git_ref,
+        &build.commit_sha,
+        work_dir,
+    )
+    .await
+    {
         error!("Git clone failed for build {}: {}", build_id, e);
         mark_build_failed(&config.store, build_id, &e.to_string()).await?;
         return Err(e);
     }
 
-    let kennel_config = parse_kennel_toml(work_dir).await.map_err(|e| {
-        crate::BuilderError::Other(anyhow::anyhow!("Failed to parse kennel.toml: {}", e))
-    })?;
+    let kennel_config = parse_kennel_toml(&work_dir.join("repo"))
+        .await
+        .map_err(|e| {
+            crate::BuilderError::Other(anyhow::anyhow!("Failed to parse kennel.toml: {}", e))
+        })?;
 
     if kennel_config.services.is_empty() && kennel_config.static_sites.is_empty() {
         warn!(

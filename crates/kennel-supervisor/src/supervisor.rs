@@ -150,14 +150,23 @@ impl Supervisor {
                 inner.pre_exec(move || {
                     // Renumber socket FDs to be contiguous starting at
                     // FD 3 per the systemd socket activation protocol.
-                    for (i, &fd) in pre_exec_socket_fds.iter().enumerate() {
-                        let target_fd = (crate::socket::LISTEN_FDS_START as usize + i) as i32;
-                        if fd != target_fd {
-                            if libc::dup2(fd, target_fd) < 0 {
-                                return Err(std::io::Error::last_os_error());
-                            }
-                            libc::close(fd);
+                    // Source FDs are moved to temporary high FDs first so
+                    // that overlapping source and target ranges don't collide.
+                    let mut temp_fds = Vec::new();
+                    for &fd in pre_exec_socket_fds.iter() {
+                        let tmp = libc::fcntl(fd, libc::F_DUPFD, 100);
+                        if tmp < 0 {
+                            return Err(std::io::Error::last_os_error());
                         }
+                        libc::close(fd);
+                        temp_fds.push(tmp);
+                    }
+                    for (i, &tmp) in temp_fds.iter().enumerate() {
+                        let target_fd = (crate::socket::LISTEN_FDS_START as usize + i) as i32;
+                        if libc::dup2(tmp, target_fd) < 0 {
+                            return Err(std::io::Error::last_os_error());
+                        }
+                        libc::close(tmp);
                     }
 
                     if !pre_exec_socket_fds.is_empty() {
@@ -490,6 +499,7 @@ fn spawn_supervision_task(
         let mut restarts = 0u32;
         let mut window_start = tokio::time::Instant::now();
         let mut healthy = true;
+        let mut consecutive_failures = 0u32;
 
         loop {
             tokio::select! {
@@ -560,20 +570,26 @@ fn spawn_supervision_task(
                     let ready_config = config.ready.as_ref().unwrap();
                     let probe_result = probe::run_single_probe(ready_config).await;
 
-                    if probe_result.is_err() && healthy {
-                        healthy = false;
-                        *state.lock().unwrap() = ProcessState::Unhealthy;
-                        send_event(&event_tx,SupervisorEvent::ProcessUnhealthy {
-                            name: name.clone(),
-                        });
-                    } else if probe_result.is_ok() && !healthy {
-                        healthy = true;
-                        *state.lock().unwrap() = ProcessState::Ready;
-                        let port = config.ports.values().next().copied();
-                        send_event(&event_tx,SupervisorEvent::ProcessHealthy {
-                            name: name.clone(),
-                            port,
-                        });
+                    if probe_result.is_err() {
+                        consecutive_failures += 1;
+                        if healthy && consecutive_failures >= ready_config.failure_threshold {
+                            healthy = false;
+                            *state.lock().unwrap() = ProcessState::Unhealthy;
+                            send_event(&event_tx,SupervisorEvent::ProcessUnhealthy {
+                                name: name.clone(),
+                            });
+                        }
+                    } else {
+                        consecutive_failures = 0;
+                        if !healthy {
+                            healthy = true;
+                            *state.lock().unwrap() = ProcessState::Ready;
+                            let port = config.ports.values().next().copied();
+                            send_event(&event_tx,SupervisorEvent::ProcessHealthy {
+                                name: name.clone(),
+                                port,
+                            });
+                        }
                     }
                 }
             }

@@ -25,16 +25,25 @@ pub async fn build(work_dir: &Path, service_name: &str, build_id: i32) -> Result
 
     debug!("Running nix build {}", flake_ref);
 
-    let output = Command::new("nix")
-        .arg("build")
-        .arg(&flake_ref)
-        .arg("--out-link")
-        .arg(&out_link)
-        .arg("--log-format")
-        .arg("bar-with-logs")
-        .current_dir(&repo_path)
-        .output()
-        .await?;
+    let build_timeout = std::time::Duration::from_secs(30 * 60);
+    let output = tokio::time::timeout(
+        build_timeout,
+        Command::new("nix")
+            .arg("build")
+            .arg(&flake_ref)
+            .arg("--out-link")
+            .arg(&out_link)
+            .arg("--log-format")
+            .arg("bar-with-logs")
+            .current_dir(&repo_path)
+            .output(),
+    )
+    .await
+    .map_err(|_| {
+        BuilderError::NixBuild(format!(
+            "Build timed out after {build_timeout:?} for {service_name}"
+        ))
+    })??;
 
     // Write stderr to log file
     tokio::fs::write(&log_file, &output.stderr).await?;

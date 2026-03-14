@@ -282,8 +282,7 @@ impl<'a> BuildRepository<'a> {
     }
 
     /// Cancel any queued or in-progress builds for the same (project, branch)
-    /// except the given build ID. Used when a new push arrives to supersede
-    /// stale builds. Returns the number of cancelled builds.
+    /// except the given build ID. Returns the number of cancelled builds.
     pub async fn cancel_stale_builds(
         &self,
         project_name: &str,

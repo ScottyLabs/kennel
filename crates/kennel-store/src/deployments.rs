@@ -159,7 +159,7 @@ impl<'a> DeploymentRepository<'a> {
             .map(|d| d.id)
             .collect();
 
-        self.mark_ids_torn_down(&ids).await?;
+        self.mark_tearing_down(&ids).await?;
 
         Ok(ids)
     }

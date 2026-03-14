@@ -8,7 +8,7 @@ use kennel_config::constants;
 use kennel_store::Store;
 use kennel_supervisor::{Supervisor, SupervisorEvent};
 use migration::MigratorTrait;
-use sea_orm::Database;
+use sea_orm::{ConnectionTrait, Database};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
@@ -30,13 +30,28 @@ async fn main() -> anyhow::Result<()> {
 
     let db = Database::connect(&database_url).await?;
 
+    // Prevent concurrent instances from running.
+    let lock_result: Vec<sea_orm::QueryResult> = db
+        .query_all(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Postgres,
+            "SELECT pg_try_advisory_lock(hashtext('kennel'))".to_string(),
+        ))
+        .await?;
+    let locked: bool = lock_result
+        .first()
+        .and_then(|r| r.try_get_by_index::<bool>(0).ok())
+        .unwrap_or(false);
+    if !locked {
+        anyhow::bail!("Another instance is already running (advisory lock held)");
+    }
+
     migration::Migrator::up(&db, None).await?;
 
     let store = Arc::new(Store::new(db));
 
     tracing::info!("Database migrations complete");
 
-    // Startup recovery: reset stuck states so workers re-process them.
+    // Reset builds that were in progress when the previous instance crashed.
     let building_reset = store.builds().reset_building_to_queued().await?;
     if building_reset > 0 {
         tracing::info!("Reset {building_reset} stuck Building builds to Queued");
@@ -52,7 +67,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Initialize supervisor with event channel.
-    // Subscribe to events BEFORE reconciliation starts processes (fixes H02).
+    // Subscribe before reconciliation so events from restarted processes
+    // are captured by the router.
     let (event_tx, _) =
         tokio::sync::broadcast::channel::<SupervisorEvent>(constants::SUPERVISOR_EVENT_CAPACITY);
     let supervisor = Arc::new(Mutex::new(Supervisor::new(event_tx.clone())));
