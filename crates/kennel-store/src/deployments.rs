@@ -44,13 +44,6 @@ impl<'a> DeploymentRepository<'a> {
             .await
     }
 
-    pub async fn find_by_domain(&self, domain: &str) -> Result<Option<deployments::Model>, DbErr> {
-        Deployments::find()
-            .filter(deployments::Column::Domain.eq(domain))
-            .one(self.db)
-            .await
-    }
-
     pub async fn list_by_project(
         &self,
         project_name: &str,
@@ -59,20 +52,6 @@ impl<'a> DeploymentRepository<'a> {
             .filter(deployments::Column::ProjectName.eq(project_name))
             .all(self.db)
             .await
-    }
-
-    pub async fn list_by_status(
-        &self,
-        status: DeploymentStatus,
-    ) -> Result<Vec<deployments::Model>, DbErr> {
-        Deployments::find()
-            .filter(deployments::Column::Status.eq(status))
-            .all(self.db)
-            .await
-    }
-
-    pub async fn list_deployed(&self) -> Result<Vec<deployments::Model>, DbErr> {
-        self.list_by_status(DeploymentStatus::Deployed).await
     }
 
     pub async fn list_deployed_with_services(

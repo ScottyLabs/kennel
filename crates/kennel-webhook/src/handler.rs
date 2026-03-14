@@ -12,9 +12,67 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-/// Normalize a git ref to a short branch name by stripping the refs/heads/ prefix.
 fn normalize_branch(git_ref: &str) -> &str {
     git_ref.strip_prefix("refs/heads/").unwrap_or(git_ref)
+}
+
+async fn create_build_and_notify(
+    config: &WebhookConfig,
+    project_name: &str,
+    git_ref: &str,
+    commit_sha: &str,
+    branch: &str,
+) -> Result<StatusCode> {
+    let build = match config
+        .store
+        .builds()
+        .create_build(
+            project_name.to_string(),
+            git_ref.to_string(),
+            commit_sha.to_string(),
+        )
+        .await
+    {
+        Ok(b) => b,
+        Err(e) => {
+            if e.is_unique_violation() {
+                info!("Build already exists for {project_name}/{git_ref}/{commit_sha}");
+                return Ok(StatusCode::OK);
+            }
+            return Err(e.into());
+        }
+    };
+
+    if let Err(e) = config
+        .store
+        .builds()
+        .cancel_stale_builds(project_name, branch, build.id)
+        .await
+    {
+        warn!("Failed to cancel stale builds: {e}");
+    }
+
+    info!(
+        "Created build {} for {project_name}/{git_ref}/{commit_sha}",
+        build.id
+    );
+
+    config.build_signal.notify_one();
+    Ok(StatusCode::OK)
+}
+
+async fn mark_teardown_and_notify(
+    config: &WebhookConfig,
+    project_name: &str,
+    branch: &str,
+) -> Result<StatusCode> {
+    config
+        .store
+        .deployments()
+        .mark_for_teardown(project_name, branch)
+        .await?;
+    config.teardown_signal.notify_one();
+    Ok(StatusCode::ACCEPTED)
 }
 
 pub async fn handle_webhook(
@@ -61,122 +119,32 @@ pub async fn handle_webhook(
             let branch = normalize_branch(&git_ref);
 
             if deleted {
-                info!(
-                    "Branch deleted: {}/{}, marking deployments for teardown",
-                    project_name, branch
-                );
-                config
-                    .store
-                    .deployments()
-                    .mark_for_teardown(&project.name, branch)
-                    .await?;
-                config.teardown_signal.notify_one();
-                return Ok(StatusCode::ACCEPTED);
+                info!("Branch deleted: {project_name}/{branch}, marking deployments for teardown");
+                return mark_teardown_and_notify(&config, &project.name, branch).await;
             }
 
-            let build = match config
-                .store
-                .builds()
-                .create_build(project.name.clone(), git_ref.clone(), commit_sha.clone())
-                .await
-            {
-                Ok(b) => b,
-                Err(e) => {
-                    if e.is_unique_violation() {
-                        info!(
-                            "Build already exists for {}/{}/{}",
-                            project_name, git_ref, commit_sha
-                        );
-                        return Ok(StatusCode::OK);
-                    }
-                    return Err(e.into());
-                }
-            };
-
-            // Cancel stale builds for the same branch.
-            if let Err(e) = config
-                .store
-                .builds()
-                .cancel_stale_builds(&project.name, branch, build.id)
-                .await
-            {
-                warn!("Failed to cancel stale builds: {e}");
-            }
-
-            info!(
-                "Created build {} for {}/{}/{}",
-                build.id, project_name, git_ref, commit_sha
-            );
-
-            config.build_signal.notify_one();
-            Ok(StatusCode::OK)
+            create_build_and_notify(&config, &project.name, &git_ref, &commit_sha, branch).await
         }
         WebhookEvent::PullRequest {
             action,
             pr_number,
             commit_sha,
             ..
-        } => {
-            match action.as_str() {
-                "opened" | "synchronize" | "synchronized" | "reopened" => {
-                    let git_ref = format!("pr-{}", pr_number);
-
-                    let build = match config
-                        .store
-                        .builds()
-                        .create_build(project.name.clone(), git_ref.clone(), commit_sha.clone())
-                        .await
-                    {
-                        Ok(b) => b,
-                        Err(e) => {
-                            if e.is_unique_violation() {
-                                info!(
-                                    "Build already exists for {}/{}/{}",
-                                    project_name, git_ref, commit_sha
-                                );
-                                return Ok(StatusCode::OK);
-                            }
-                            return Err(e.into());
-                        }
-                    };
-
-                    // Cancel stale builds for this PR branch.
-                    if let Err(e) = config
-                        .store
-                        .builds()
-                        .cancel_stale_builds(&project.name, &git_ref, build.id)
-                        .await
-                    {
-                        warn!("Failed to cancel stale builds: {e}");
-                    }
-
-                    info!(
-                        "Created PR build {} for {}/PR#{}/{}",
-                        build.id, project_name, pr_number, commit_sha
-                    );
-
-                    config.build_signal.notify_one();
-                    Ok(StatusCode::OK)
-                }
-                "closed" => {
-                    let branch = format!("pr-{}", pr_number);
-                    info!(
-                        "PR closed: {}/PR#{}, marking deployments for teardown",
-                        project_name, pr_number
-                    );
-                    config
-                        .store
-                        .deployments()
-                        .mark_for_teardown(&project.name, &branch)
-                        .await?;
-                    config.teardown_signal.notify_one();
-                    Ok(StatusCode::ACCEPTED)
-                }
-                _ => {
-                    warn!("Ignoring PR action: {}", action);
-                    Ok(StatusCode::ACCEPTED)
-                }
+        } => match action.as_str() {
+            "opened" | "synchronize" | "synchronized" | "reopened" => {
+                let git_ref = format!("pr-{pr_number}");
+                create_build_and_notify(&config, &project.name, &git_ref, &commit_sha, &git_ref)
+                    .await
             }
-        }
+            "closed" => {
+                let branch = format!("pr-{pr_number}");
+                info!("PR closed: {project_name}/PR#{pr_number}, marking deployments for teardown");
+                mark_teardown_and_notify(&config, &project.name, &branch).await
+            }
+            _ => {
+                warn!("Ignoring PR action: {action}");
+                Ok(StatusCode::ACCEPTED)
+            }
+        },
     }
 }

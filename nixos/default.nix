@@ -165,22 +165,8 @@ in
       };
     };
 
-    cleanup = {
-      interval = mkOption {
-        type = types.int;
-        default = 600;
-        description = "Auto-expiry check interval in seconds";
-      };
-    };
-
     dns = {
       enable = mkEnableOption "Automatic DNS management";
-
-      provider = mkOption {
-        type = types.enum [ "cloudflare" ];
-        default = "cloudflare";
-        description = "DNS provider to use";
-      };
 
       cloudflare = {
         apiTokenFile = mkOption {

@@ -135,7 +135,7 @@ async fn deploy_service(
         &process_name,
         &username,
         service_work_dir,
-        branch,
+        &environment,
     );
 
     // Provision required infrastructure resources.
@@ -304,7 +304,7 @@ fn merge_config(
     process_name: &str,
     username: &str,
     cwd: PathBuf,
-    branch: &str,
+    environment: &str,
 ) -> ProcessConfig {
     let mut config = devenv_config.clone();
     config.name = process_name.to_string();
@@ -312,6 +312,6 @@ fn merge_config(
     config.cwd = Some(cwd);
     config
         .env
-        .insert("ENVIRONMENT".into(), determine_environment(branch));
+        .insert("ENVIRONMENT".into(), environment.to_string());
     config
 }

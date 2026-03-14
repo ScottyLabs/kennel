@@ -15,13 +15,6 @@ impl<'a> BuildResultRepository<'a> {
         Self { db }
     }
 
-    pub async fn find_by_build_id(&self, build_id: i32) -> Result<Vec<build_results::Model>> {
-        Ok(build_results::Entity::find()
-            .filter(build_results::Column::BuildId.eq(build_id))
-            .all(self.db)
-            .await?)
-    }
-
     pub async fn find_successful_by_build_id(
         &self,
         build_id: i32,
