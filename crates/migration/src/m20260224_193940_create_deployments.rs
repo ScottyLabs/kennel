@@ -33,6 +33,7 @@ impl MigrationTrait for Migration {
                             .default("deployed"),
                     )
                     .col(ColumnDef::new(Deployments::Domain).text().not_null())
+                    .col(ColumnDef::new(Deployments::ProcessName).text())
                     .col(
                         ColumnDef::new(Deployments::CreatedAt)
                             .timestamp()
@@ -119,6 +120,16 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_deployments_process_name")
+                    .table(Deployments::Table)
+                    .col(Deployments::ProcessName)
+                    .to_owned(),
+            )
+            .await?;
+
         Ok(())
     }
 
@@ -143,6 +154,7 @@ enum Deployments {
     ProcessConfig,
     Status,
     Domain,
+    ProcessName,
     CreatedAt,
     UpdatedAt,
     LastActivity,

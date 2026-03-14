@@ -205,6 +205,7 @@ async fn deploy_service(
         active.status = sea_orm::ActiveValue::Set(DeploymentStatus::Deploying);
         active.store_path = sea_orm::ActiveValue::Set(Some(devenv_config.exec.clone()));
         active.process_config = sea_orm::ActiveValue::Set(Some(process_config_json));
+        active.process_name = sea_orm::ActiveValue::Set(Some(process_name.clone()));
         active.git_ref = sea_orm::ActiveValue::Set(build.git_ref.clone());
         active.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now().naive_utc());
         let updated = config
@@ -227,6 +228,7 @@ async fn deploy_service(
             status: sea_orm::ActiveValue::Set(DeploymentStatus::Deploying),
             domain: sea_orm::ActiveValue::Set(domain.clone()),
             process_config: sea_orm::ActiveValue::Set(Some(process_config_json)),
+            process_name: sea_orm::ActiveValue::Set(Some(process_name.clone())),
             ..Default::default()
         };
         let new = config

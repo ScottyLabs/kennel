@@ -215,8 +215,6 @@ async fn run_update_handler(
     }
 }
 
-/// Map a supervisor process name (e.g., "kennel-myproject-main-api") back
-/// to its deployment record.
 async fn find_deployment_by_process_name(
     store: &Store,
     process_name: &str,
@@ -224,19 +222,10 @@ async fn find_deployment_by_process_name(
     Option<(entity::deployments::Model, Option<entity::services::Model>)>,
     anyhow::Error,
 > {
-    let deployments = store.deployments().list_deployed_with_services().await?;
-
-    for (deployment, service) in deployments {
-        let expected_name = format!(
-            "kennel-{}-{}-{}",
-            deployment.project_name, deployment.branch_slug, deployment.service_name
-        );
-        if expected_name == process_name {
-            return Ok(Some((deployment, service)));
-        }
-    }
-
-    Ok(None)
+    Ok(store
+        .deployments()
+        .find_deployed_by_process_name(process_name)
+        .await?)
 }
 
 async fn reload_static_routes(table: &RoutingTable, store: &Store) -> Result<()> {

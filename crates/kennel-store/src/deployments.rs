@@ -15,6 +15,21 @@ impl<'a> DeploymentRepository<'a> {
         Deployments::find_by_id(id).one(self.db).await
     }
 
+    pub async fn find_deployed_by_process_name(
+        &self,
+        process_name: &str,
+    ) -> crate::Result<Option<(deployments::Model, Option<services::Model>)>> {
+        Ok(Deployments::find()
+            .filter(deployments::Column::ProcessName.eq(process_name))
+            .filter(
+                deployments::Column::Status
+                    .is_in([DeploymentStatus::Deployed, DeploymentStatus::Deploying]),
+            )
+            .find_also_related(services::Entity)
+            .one(self.db)
+            .await?)
+    }
+
     pub async fn find_by_project_service_branch(
         &self,
         project_name: &str,

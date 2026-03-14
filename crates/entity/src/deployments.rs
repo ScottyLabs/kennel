@@ -30,6 +30,8 @@ pub struct Model {
     pub status: DeploymentStatus,
     #[sea_orm(column_type = "Text")]
     pub domain: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub process_name: Option<String>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub last_activity: DateTime,
