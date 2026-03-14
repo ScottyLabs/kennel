@@ -13,10 +13,21 @@ use cloudflare::framework::client::async_api::Client;
 pub struct CloudflareProvider {
     client: Client,
     zone_identifier: String,
+    proxied: bool,
+    ttl: u32,
 }
 
 impl CloudflareProvider {
     pub fn new(api_token: String, zone_id: String) -> Result<Self> {
+        Self::with_options(api_token, zone_id, true, 300)
+    }
+
+    pub fn with_options(
+        api_token: String,
+        zone_id: String,
+        proxied: bool,
+        ttl: u32,
+    ) -> Result<Self> {
         let credentials = Credentials::UserAuthToken { token: api_token };
         let client = Client::new(
             credentials,
@@ -27,6 +38,8 @@ impl CloudflareProvider {
         Ok(Self {
             client,
             zone_identifier: zone_id,
+            proxied,
+            ttl,
         })
     }
 }
@@ -51,8 +64,8 @@ impl DnsProvider for CloudflareProvider {
         let params = CreateDnsRecordParams {
             name,
             content: dns_content,
-            ttl: Some(300),
-            proxied: Some(true),
+            ttl: Some(self.ttl),
+            proxied: Some(self.proxied),
             priority: None,
         };
 
