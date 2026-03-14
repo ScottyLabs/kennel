@@ -121,9 +121,10 @@ pub async fn deploy_site(
         .supervisor
         .event_sender()
         .send(SupervisorEvent::ProcessReady {
-            name: format!(
-                "kennel-{}-{}-{}",
-                build.project_name, branch_sanitized, build_result.service_name
+            name: utils::process_name(
+                &build.project_name,
+                &branch_sanitized,
+                &build_result.service_name,
             ),
             port: None,
             store_path: Some(store_path.clone()),

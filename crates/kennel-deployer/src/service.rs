@@ -114,10 +114,8 @@ async fn deploy_service(
 
     let branch = &build.branch;
     let branch_sanitized = utils::sanitize_identifier(branch);
-    let process_name = format!(
-        "kennel-{}-{}-{}",
-        build.project_name, branch_sanitized, devenv_config.name
-    );
+    let process_name =
+        utils::process_name(&build.project_name, &branch_sanitized, &devenv_config.name);
     let username =
         utils::sanitize_username(&build.project_name, &branch_sanitized, &devenv_config.name);
 

@@ -13,10 +13,10 @@ pub async fn process_teardown(
     let deployment_id = deployment.id;
     info!("Tearing down deployment {deployment_id}");
 
-    let branch_sanitized = deployment.branch_slug.clone();
-    let process_name = format!(
-        "kennel-{}-{}-{}",
-        deployment.project_name, branch_sanitized, deployment.service_name
+    let process_name = utils::process_name(
+        &deployment.project_name,
+        &deployment.branch_slug,
+        &deployment.service_name,
     );
 
     // Stop the supervised process
@@ -55,7 +55,7 @@ pub async fn process_teardown(
         project_name: deployment.project_name.clone(),
         service_name: deployment.service_name.clone(),
         branch: deployment.branch.clone(),
-        branch_slug: branch_sanitized.clone(),
+        branch_slug: deployment.branch_slug.clone(),
         environment: deployment.environment.clone(),
         system_user: process_name.clone(),
     };

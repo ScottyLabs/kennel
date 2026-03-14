@@ -10,13 +10,17 @@ pub fn sanitize_identifier(s: &str) -> String {
         .collect()
 }
 
-pub fn sanitize_username(project: &str, branch: &str, service: &str) -> String {
+pub fn process_name(project: &str, branch_slug: &str, service: &str) -> String {
     format!(
         "kennel-{}-{}-{}",
         sanitize_identifier(project),
-        sanitize_identifier(branch),
+        sanitize_identifier(branch_slug),
         sanitize_identifier(service)
     )
+}
+
+pub fn sanitize_username(project: &str, branch: &str, service: &str) -> String {
+    process_name(project, branch, service)
 }
 
 pub fn generate_deployment_domain(
