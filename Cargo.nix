@@ -7186,6 +7186,11 @@ rec {
             packageId = "tokio-stream";
           }
           {
+            name = "tokio-util";
+            packageId = "tokio-util";
+            features = [ "io" ];
+          }
+          {
             name = "tower-http";
             packageId = "tower-http";
           }

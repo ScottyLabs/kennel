@@ -2233,6 +2233,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tower-http",
  "tracing",
  "webpki-roots 1.0.6",

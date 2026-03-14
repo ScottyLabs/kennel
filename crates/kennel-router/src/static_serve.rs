@@ -65,16 +65,19 @@ pub async fn serve_static(path: &Path, request_path: &str, spa: bool) -> Respons
         file_path = file_canonical;
     }
 
-    match tokio::fs::read(&file_path).await {
-        Ok(contents) => {
+    match tokio::fs::File::open(&file_path).await {
+        Ok(file) => {
             let mime_type = mime_guess::from_path(&file_path)
                 .first_or_octet_stream()
                 .to_string();
 
+            let stream = tokio_util::io::ReaderStream::new(file);
+
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime_type)
-                .body(Body::from(contents))
+                .header(header::CACHE_CONTROL, "public, max-age=3600")
+                .body(Body::from_stream(stream))
                 .unwrap()
         }
         Err(_) if spa => serve_spa_fallback(&path.join("index.html")).await,
