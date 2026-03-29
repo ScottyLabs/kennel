@@ -6,6 +6,7 @@ use ::entity::{
 };
 use sea_orm::sea_query::{LockBehavior, LockType};
 use sea_orm::{entity::*, query::*, sea_query::Expr, *};
+use uuid::Uuid;
 
 pub struct DeploymentRepository<'a> {
     db: &'a DatabaseConnection,
@@ -16,7 +17,7 @@ impl<'a> DeploymentRepository<'a> {
         Self { db }
     }
 
-    pub async fn find_by_id(&self, id: i32) -> Result<Option<deployments::Model>, DbErr> {
+    pub async fn find_by_id(&self, id: Uuid) -> Result<Option<deployments::Model>, DbErr> {
         Deployments::find_by_id(id).one(self.db).await
     }
 
@@ -98,7 +99,7 @@ impl<'a> DeploymentRepository<'a> {
         deployment.update(self.db).await
     }
 
-    pub async fn delete(&self, id: i32) -> Result<DeleteResult, DbErr> {
+    pub async fn delete(&self, id: Uuid) -> Result<DeleteResult, DbErr> {
         Deployments::delete_by_id(id).exec(self.db).await
     }
 
@@ -122,7 +123,7 @@ impl<'a> DeploymentRepository<'a> {
         Ok(query.all(self.db).await?)
     }
 
-    pub async fn mark_ids_torn_down(&self, ids: &[i32]) -> crate::Result<()> {
+    pub async fn mark_ids_torn_down(&self, ids: &[Uuid]) -> crate::Result<()> {
         use chrono::Utc;
 
         if !ids.is_empty() {
@@ -147,8 +148,8 @@ impl<'a> DeploymentRepository<'a> {
         &self,
         project_name: &str,
         git_ref: &str,
-    ) -> crate::Result<Vec<i32>> {
-        let ids: Vec<i32> = Deployments::find()
+    ) -> crate::Result<Vec<Uuid>> {
+        let ids: Vec<Uuid> = Deployments::find()
             .filter(deployments::Column::ProjectName.eq(project_name))
             .filter(deployments::Column::Branch.eq(git_ref))
             .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
@@ -173,7 +174,7 @@ impl<'a> DeploymentRepository<'a> {
             .await?)
     }
 
-    pub async fn update_dns_status(&self, id: i32, dns_status: DnsStatus) -> crate::Result<()> {
+    pub async fn update_dns_status(&self, id: Uuid, dns_status: DnsStatus) -> crate::Result<()> {
         use chrono::Utc;
 
         Deployments::update_many()
@@ -210,7 +211,7 @@ impl<'a> DeploymentRepository<'a> {
 
     /// Mark the given deployment IDs as `TearingDown` so they are picked up
     /// by the teardown worker.
-    pub async fn mark_tearing_down(&self, ids: &[i32]) -> crate::Result<()> {
+    pub async fn mark_tearing_down(&self, ids: &[Uuid]) -> crate::Result<()> {
         use chrono::Utc;
 
         if !ids.is_empty() {

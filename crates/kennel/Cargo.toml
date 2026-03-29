@@ -28,3 +28,4 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
+uuid = "1.23.0"

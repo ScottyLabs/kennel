@@ -7,4 +7,4 @@ license.workspace = true
 [dependencies]
 sea-orm.workspace = true
 serde.workspace = true
-utoipa = { version = "5.4.0", features = ["chrono"] }
+utoipa = { version = "5.4.0", features = ["chrono", "uuid"] }

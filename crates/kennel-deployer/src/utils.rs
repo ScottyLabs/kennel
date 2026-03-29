@@ -26,7 +26,7 @@ pub fn sanitize_username(project: &str, branch: &str, service: &str) -> String {
 pub async fn create_custom_domain_dns(
     dns_manager: &kennel_dns::DnsManager,
     store: &kennel_store::Store,
-    deployment_id: i32,
+    deployment_id: uuid::Uuid,
     custom_domain: &str,
 ) {
     tracing::info!("Creating DNS records for custom domain: {custom_domain}");

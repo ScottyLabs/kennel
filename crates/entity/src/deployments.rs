@@ -11,12 +11,13 @@ use serde::{Deserialize, Serialize};
 )]
 #[sea_orm(table_name = "deployments")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub project_name: String,
     #[sea_orm(column_type = "Text")]
     pub service_name: String,
+    pub service_id: Option<Uuid>,
     #[sea_orm(column_type = "Text")]
     pub branch: String,
     #[sea_orm(column_type = "Text")]
@@ -44,9 +45,17 @@ pub enum Relation {
     #[sea_orm(has_many = "super::dns_records::Entity")]
     DnsRecords,
     #[sea_orm(
+        belongs_to = "super::projects::Entity",
+        from = "Column::ProjectName",
+        to = "super::projects::Column::Name",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Projects,
+    #[sea_orm(
         belongs_to = "super::services::Entity",
-        from = "(Column::ProjectName, Column::ServiceName)",
-        to = "(super::services::Column::ProjectName, super::services::Column::Name)",
+        from = "Column::ServiceId",
+        to = "super::services::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
@@ -56,6 +65,12 @@ pub enum Relation {
 impl Related<super::dns_records::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::DnsRecords.def()
+    }
+}
+
+impl Related<super::projects::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Projects.def()
     }
 }
 

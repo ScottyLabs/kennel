@@ -13,13 +13,14 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Deployments::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(Expr::cust("uuid_generate_v7()")),
                     )
                     .col(ColumnDef::new(Deployments::ProjectName).text().not_null())
                     .col(ColumnDef::new(Deployments::ServiceName).text().not_null())
+                    .col(ColumnDef::new(Deployments::ServiceId).uuid())
                     .col(ColumnDef::new(Deployments::Branch).text().not_null())
                     .col(ColumnDef::new(Deployments::BranchSlug).text().not_null())
                     .col(
@@ -58,11 +59,16 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_deployments_service")
+                            .name("fk_deployments_project")
                             .from(Deployments::Table, Deployments::ProjectName)
-                            .from_col(Deployments::ServiceName)
-                            .to(Services::Table, Services::ProjectName)
-                            .to_col(Services::Name)
+                            .to(Projects::Table, Projects::Name)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_deployments_service")
+                            .from(Deployments::Table, Deployments::ServiceId)
+                            .to(Services::Table, Services::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -138,6 +144,7 @@ enum Deployments {
     Id,
     ProjectName,
     ServiceName,
+    ServiceId,
     Branch,
     BranchSlug,
     Environment,
@@ -153,8 +160,13 @@ enum Deployments {
 }
 
 #[derive(DeriveIden)]
+enum Projects {
+    Table,
+    Name,
+}
+
+#[derive(DeriveIden)]
 enum Services {
     Table,
-    ProjectName,
-    Name,
+    Id,
 }

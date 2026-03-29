@@ -136,7 +136,7 @@ pub async fn run_cleanup_job(
             .await
         {
             Ok(expired) if !expired.is_empty() => {
-                let ids: Vec<i32> = expired.iter().map(|d| d.id).collect();
+                let ids: Vec<uuid::Uuid> = expired.iter().map(|d| d.id).collect();
 
                 for deployment in &expired {
                     info!(

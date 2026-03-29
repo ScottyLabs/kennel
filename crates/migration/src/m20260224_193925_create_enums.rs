@@ -8,6 +8,11 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .get_connection()
+            .execute_unprepared("CREATE EXTENSION IF NOT EXISTS pg_uuidv7")
+            .await?;
+
+        manager
             .create_type(
                 Type::create()
                     .as_enum(Alias::new("repo_type"))

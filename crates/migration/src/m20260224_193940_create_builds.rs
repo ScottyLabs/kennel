@@ -13,10 +13,10 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(Builds::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(Expr::cust("uuid_generate_v7()")),
                     )
                     .col(ColumnDef::new(Builds::ProjectName).text().not_null())
                     .col(ColumnDef::new(Builds::Branch).text().not_null())

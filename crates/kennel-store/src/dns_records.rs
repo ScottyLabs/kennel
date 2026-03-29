@@ -4,6 +4,7 @@ use entity::sea_orm_active_enums::RecordType;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
 };
+use uuid::Uuid;
 
 pub struct Repository<'a> {
     pub db: &'a DatabaseConnection,
@@ -13,7 +14,7 @@ impl<'a> Repository<'a> {
     pub async fn create(
         &self,
         domain: &str,
-        deployment_id: impl Into<Option<i32>>,
+        deployment_id: impl Into<Option<Uuid>>,
         provider_record_id: &str,
         record_type: RecordType,
         ip_address: &str,
@@ -31,7 +32,7 @@ impl<'a> Repository<'a> {
         Ok(record)
     }
 
-    pub async fn find_by_deployment(&self, deployment_id: i32) -> Result<Vec<dns_records::Model>> {
+    pub async fn find_by_deployment(&self, deployment_id: Uuid) -> Result<Vec<dns_records::Model>> {
         let records = dns_records::Entity::find()
             .filter(dns_records::Column::DeploymentId.eq(deployment_id))
             .all(self.db)
@@ -54,7 +55,7 @@ impl<'a> Repository<'a> {
         Ok(records)
     }
 
-    pub async fn delete(&self, id: i32) -> Result<()> {
+    pub async fn delete(&self, id: Uuid) -> Result<()> {
         dns_records::Entity::delete_by_id(id).exec(self.db).await?;
         Ok(())
     }

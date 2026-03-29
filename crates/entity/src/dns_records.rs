@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 )]
 #[sea_orm(table_name = "dns_records")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub domain: String,
-    pub deployment_id: Option<i32>,
+    pub deployment_id: Option<Uuid>,
     #[sea_orm(column_type = "Text")]
     pub provider_record_id: String,
     pub record_type: RecordType,

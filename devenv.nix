@@ -29,7 +29,6 @@ in
 
     DATABASE_URL = "postgresql://127.0.0.1:5432/kennel";
     RUST_LOG = "kennel=debug";
-    DYLD_LIBRARY_PATH = "${config.languages.rust.toolchainPackage}/lib";
   };
 
   languages.rust = {
@@ -52,6 +51,7 @@ in
   services.postgres = {
     enable = true;
     package = pkgs.postgresql_18;
+    extensions = e: [ e.pg_uuidv7 ];
     listen_addresses = "127.0.0.1";
     port = 5432;
     initialDatabases = [

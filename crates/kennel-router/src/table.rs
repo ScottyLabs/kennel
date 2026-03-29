@@ -15,7 +15,7 @@ pub enum RouteTarget {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub target: RouteTarget,
-    pub deployment_id: i32,
+    pub deployment_id: uuid::Uuid,
 }
 
 pub struct RoutingTable {

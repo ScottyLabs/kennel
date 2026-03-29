@@ -24,4 +24,5 @@ tokio-stream = "0.1.18"
 tokio-util.workspace = true
 tower-http = "0.6.8"
 tracing.workspace = true
+uuid = "1.23.0"
 webpki-roots = "1.0.6"

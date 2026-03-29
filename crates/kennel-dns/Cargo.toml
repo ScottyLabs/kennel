@@ -13,3 +13,4 @@ kennel-store = { version = "0.1.0", path = "../kennel-store" }
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid = "1.23.0"

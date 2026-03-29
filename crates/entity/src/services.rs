@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 )]
 #[sea_orm(table_name = "services")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub project_name: String,
     #[sea_orm(column_type = "Text")]

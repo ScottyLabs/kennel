@@ -17,7 +17,7 @@ impl<'a> BuildResultRepository<'a> {
 
     pub async fn find_successful_by_build_id(
         &self,
-        build_id: i32,
+        build_id: uuid::Uuid,
     ) -> Result<Vec<build_results::Model>> {
         Ok(build_results::Entity::find()
             .filter(build_results::Column::BuildId.eq(build_id))

@@ -13,13 +13,13 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(DnsRecords::Id)
-                            .integer()
+                            .uuid()
                             .not_null()
-                            .auto_increment()
-                            .primary_key(),
+                            .primary_key()
+                            .default(Expr::cust("uuid_generate_v7()")),
                     )
                     .col(ColumnDef::new(DnsRecords::Domain).text().not_null())
-                    .col(ColumnDef::new(DnsRecords::DeploymentId).integer())
+                    .col(ColumnDef::new(DnsRecords::DeploymentId).uuid())
                     .col(
                         ColumnDef::new(DnsRecords::ProviderRecordId)
                             .text()

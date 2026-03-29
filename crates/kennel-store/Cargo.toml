@@ -9,6 +9,7 @@ chrono.workspace = true
 entity = { version = "0.1.0", path = "../entity" }
 sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 thiserror.workspace = true
+uuid = "1.23.0"
 
 [dev-dependencies]
 tokio.workspace = true

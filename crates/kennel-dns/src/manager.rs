@@ -43,7 +43,7 @@ impl DnsManager {
 
     pub async fn create_record_for_deployment(
         &self,
-        deployment_id: i32,
+        deployment_id: uuid::Uuid,
         domain: &str,
     ) -> Result<()> {
         // Check for domain conflicts: another deployment already owns this domain.
@@ -100,7 +100,7 @@ impl DnsManager {
         Ok(())
     }
 
-    pub async fn delete_record_for_deployment(&self, deployment_id: i32) -> Result<()> {
+    pub async fn delete_record_for_deployment(&self, deployment_id: uuid::Uuid) -> Result<()> {
         let records = self
             .store
             .dns_records()

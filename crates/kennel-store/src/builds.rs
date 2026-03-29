@@ -1,6 +1,7 @@
 use ::entity::{builds, prelude::*, sea_orm_active_enums::BuildStatus};
 use sea_orm::sea_query::{LockBehavior, LockType};
 use sea_orm::*;
+use uuid::Uuid;
 
 pub struct BuildRepository<'a> {
     db: &'a DatabaseConnection,
@@ -11,7 +12,7 @@ impl<'a> BuildRepository<'a> {
         Self { db }
     }
 
-    pub async fn find_by_id(&self, id: i32) -> crate::Result<Option<builds::Model>> {
+    pub async fn find_by_id(&self, id: Uuid) -> crate::Result<Option<builds::Model>> {
         Ok(Builds::find_by_id(id).one(self.db).await?)
     }
 
@@ -31,7 +32,7 @@ impl<'a> BuildRepository<'a> {
         build.update(self.db).await
     }
 
-    pub async fn delete(&self, id: i32) -> Result<DeleteResult, DbErr> {
+    pub async fn delete(&self, id: Uuid) -> Result<DeleteResult, DbErr> {
         Builds::delete_by_id(id).exec(self.db).await
     }
 
@@ -185,7 +186,7 @@ impl<'a> BuildRepository<'a> {
     }
 
     /// Mark a build as `Success` (deployment completed).
-    pub async fn mark_success(&self, id: i32) -> crate::Result<()> {
+    pub async fn mark_success(&self, id: Uuid) -> crate::Result<()> {
         use chrono::Utc;
         use sea_orm::sea_query::Expr;
 
@@ -207,7 +208,7 @@ impl<'a> BuildRepository<'a> {
     }
 
     /// Mark a build as `Failed`.
-    pub async fn mark_failed(&self, id: i32) -> crate::Result<()> {
+    pub async fn mark_failed(&self, id: Uuid) -> crate::Result<()> {
         use chrono::Utc;
         use sea_orm::sea_query::Expr;
 
@@ -234,7 +235,7 @@ impl<'a> BuildRepository<'a> {
         &self,
         project_name: &str,
         branch: &str,
-        exclude_id: i32,
+        exclude_id: Uuid,
     ) -> crate::Result<u64> {
         use chrono::Utc;
         use sea_orm::sea_query::Expr;

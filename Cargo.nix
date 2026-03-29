@@ -3852,7 +3852,7 @@ rec {
           {
             name = "utoipa";
             packageId = "utoipa";
-            features = [ "chrono" ];
+            features = [ "chrono" "uuid" ];
           }
         ];
 
@@ -6793,6 +6793,10 @@ rec {
             packageId = "tracing-subscriber";
             features = [ "env-filter" "json" ];
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+          }
         ];
 
       };
@@ -6910,6 +6914,10 @@ rec {
             name = "tracing";
             packageId = "tracing";
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+          }
         ];
         devDependencies = [
           {
@@ -7021,6 +7029,10 @@ rec {
             name = "tracing";
             packageId = "tracing";
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+          }
         ];
 
       };
@@ -7063,6 +7075,10 @@ rec {
           {
             name = "tracing";
             packageId = "tracing";
+          }
+          {
+            name = "uuid";
+            packageId = "uuid";
           }
         ];
 
@@ -7201,6 +7217,10 @@ rec {
             packageId = "tracing";
           }
           {
+            name = "uuid";
+            packageId = "uuid";
+          }
+          {
             name = "webpki-roots";
             packageId = "webpki-roots 1.0.6";
           }
@@ -7230,6 +7250,10 @@ rec {
           {
             name = "thiserror";
             packageId = "thiserror 2.0.18";
+          }
+          {
+            name = "uuid";
+            packageId = "uuid";
           }
         ];
         devDependencies = [
@@ -17521,7 +17545,7 @@ rec {
           "uuid" = [ "utoipa-gen?/uuid" ];
           "yaml" = [ "serde_norway" "utoipa-gen?/yaml" ];
         };
-        resolvedDefaultFeatures = [ "axum_extras" "chrono" "default" "macros" ];
+        resolvedDefaultFeatures = [ "axum_extras" "chrono" "default" "macros" "uuid" ];
       };
       "utoipa-axum" = rec {
         crateName = "utoipa-axum";
@@ -17597,6 +17621,12 @@ rec {
             packageId = "syn 2.0.117";
             features = [ "full" "extra-traits" ];
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+            optional = true;
+            features = [ "serde" ];
+          }
         ];
         features = {
           "actix_extras" = [ "regex" "syn/extra-traits" ];
@@ -17609,7 +17639,7 @@ rec {
           "url" = [ "dep:url" ];
           "uuid" = [ "dep:uuid" ];
         };
-        resolvedDefaultFeatures = [ "axum_extras" "chrono" "regex" ];
+        resolvedDefaultFeatures = [ "axum_extras" "chrono" "regex" "uuid" ];
       };
       "utoipa-swagger-ui" = rec {
         crateName = "utoipa-swagger-ui";
@@ -17704,9 +17734,9 @@ rec {
       };
       "uuid" = rec {
         crateName = "uuid";
-        version = "1.21.0";
+        version = "1.23.0";
         edition = "2021";
-        sha256 = "1nsxfd17gfkvl1jmwcy5lnq6z32b8kf19is04byl6b95an2k6wmn";
+        sha256 = "1nbrzkdhwr4clshsks7flc2jq6lavjrsx65hyn63c9dd5vsbdj2s";
         authors = [
           "Ashley Mannix<ashleymannix@live.com.au>"
           "Dylan DPC<dylan.dpc@gmail.com>"

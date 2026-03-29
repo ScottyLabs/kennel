@@ -123,7 +123,7 @@ async fn cleanup_removed_projects(
                 );
                 store.projects().delete(&db_project.name).await?;
             } else {
-                let ids: Vec<i32> = deployments.iter().map(|d| d.id).collect();
+                let ids: Vec<uuid::Uuid> = deployments.iter().map(|d| d.id).collect();
                 info!(
                     "Marking {} deployments for teardown (project {} removed from config)",
                     ids.len(),

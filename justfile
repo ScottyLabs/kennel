@@ -38,14 +38,10 @@ web:
 docs:
     cd sites/docs && mdbook serve
 
-# Attach to process-compose interface
-attach:
-    process-compose attach
-
 # Stop infrastructure services
 down:
-    process-compose down
+    devenv processes down
 
 # Clean devenv state (removes all service data)
-clean: down
+clean:
     rm -rf .devenv/state

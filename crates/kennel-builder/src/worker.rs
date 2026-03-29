@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<()> {
+pub async fn process_build(build_id: uuid::Uuid, config: Arc<BuilderConfig>) -> Result<()> {
     info!("Processing build {}", build_id);
 
     let build = update_build_status_to_building(&config.store, build_id).await?;
@@ -73,7 +73,7 @@ pub async fn process_build(build_id: i32, config: Arc<BuilderConfig>) -> Result<
 
 async fn record_failed_build_result(
     store: &Store,
-    build_id: i32,
+    build_id: uuid::Uuid,
     service_name: &str,
     error_message: &str,
 ) {
@@ -97,7 +97,7 @@ async fn record_failed_build_result(
     }
 }
 
-async fn check_cancelled(store: &Store, build_id: i32) -> Result<bool> {
+async fn check_cancelled(store: &Store, build_id: uuid::Uuid) -> Result<bool> {
     let build = store.builds().find_by_id(build_id).await?;
 
     Ok(build
@@ -105,7 +105,7 @@ async fn check_cancelled(store: &Store, build_id: i32) -> Result<bool> {
         .unwrap_or(false))
 }
 
-async fn mark_build_failed(store: &Store, build_id: i32, error: &str) -> Result<()> {
+async fn mark_build_failed(store: &Store, build_id: uuid::Uuid, error: &str) -> Result<()> {
     let build = store
         .builds()
         .find_by_id(build_id)
@@ -128,7 +128,7 @@ async fn mark_build_failed(store: &Store, build_id: i32, error: &str) -> Result<
 
 async fn update_build_status_to_building(
     store: &Store,
-    build_id: i32,
+    build_id: uuid::Uuid,
 ) -> Result<entity::builds::Model> {
     let build = store
         .builds()
@@ -151,7 +151,7 @@ async fn update_build_status_to_building(
 async fn clone_and_parse_config(
     config: &Arc<BuilderConfig>,
     build: &entity::builds::Model,
-    build_id: i32,
+    build_id: uuid::Uuid,
     work_dir: &Path,
 ) -> Result<kennel_config::KennelConfig> {
     let project = config
@@ -205,7 +205,7 @@ async fn build_all_packages(
     build: &entity::builds::Model,
     kennel_config: &kennel_config::KennelConfig,
     work_dir: &Path,
-    build_id: i32,
+    build_id: uuid::Uuid,
     store_paths: &mut Vec<String>,
 ) -> bool {
     let mut all_succeeded = true;
@@ -266,7 +266,7 @@ async fn build_package(
     build: &entity::builds::Model,
     work_dir: &Path,
     package_name: &str,
-    build_id: i32,
+    build_id: uuid::Uuid,
     store_paths: &mut Vec<String>,
     is_service: bool,
 ) -> bool {
@@ -350,7 +350,7 @@ async fn build_package(
 
 async fn evaluate_devenv_tasks(
     work_dir: &Path,
-    build_id: i32,
+    build_id: uuid::Uuid,
 ) -> Result<(Vec<kennel_supervisor::ProcessConfig>, Vec<String>)> {
     info!(
         "Evaluating devenv task configuration for build {}",
@@ -379,7 +379,7 @@ async fn evaluate_devenv_tasks(
 async fn finalize_build(
     config: &Arc<BuilderConfig>,
     build: entity::builds::Model,
-    _build_id: i32,
+    _build_id: uuid::Uuid,
     all_succeeded: bool,
     process_configs: Vec<kennel_supervisor::ProcessConfig>,
     required_resources: Vec<String>,

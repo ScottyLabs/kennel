@@ -3,7 +3,7 @@ use kennel_config::constants;
 use std::path::PathBuf;
 use tracing::{error, info, warn};
 
-async fn clean_build(config: &DeployerConfig, build_id: i32) {
+async fn clean_build(config: &DeployerConfig, build_id: uuid::Uuid) {
     let log_dir = PathBuf::from(constants::LOGS_DIR).join(build_id.to_string());
 
     if log_dir.exists()
