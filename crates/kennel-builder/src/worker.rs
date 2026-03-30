@@ -321,6 +321,7 @@ async fn build_package(
                 build_id: Set(build_id),
                 service_name: Set(package_name.to_string()),
                 status: Set(BuildResultStatus::Success),
+                changed: Set(!is_unchanged),
                 store_path: Set(Some(store_path)),
                 log_path: Set(Some(format!(
                     "{}/{}/{}.log",
