@@ -1347,6 +1347,32 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "atomic" = rec {
+        crateName = "atomic";
+        version = "0.6.1";
+        edition = "2018";
+        sha256 = "0h43ljcgbl6vk62hs6yk7zg7qn3myzvpw8k7isb9nzhkbdvvz758";
+        authors = [
+          "Amanieu d'Antras <amanieu@gmail.com>"
+        ];
+        dependencies = [
+          {
+            name = "bytemuck";
+            packageId = "bytemuck";
+          }
+        ];
+        devDependencies = [
+          {
+            name = "bytemuck";
+            packageId = "bytemuck";
+            features = [ "derive" ];
+          }
+        ];
+        features = {
+          "default" = [ "fallback" ];
+          "serde" = [ "dep:serde" ];
+        };
+      };
       "atomic-waker" = rec {
         crateName = "atomic-waker";
         version = "1.1.2";
@@ -2299,6 +2325,24 @@ rec {
           "default" = [ "std" ];
         };
         resolvedDefaultFeatures = [ "std" ];
+      };
+      "bytemuck" = rec {
+        crateName = "bytemuck";
+        version = "1.25.0";
+        edition = "2018";
+        sha256 = "1v1z32igg9zq49phb3fra0ax5r2inf3aw473vldnm886sx5vdvy8";
+        authors = [
+          "Lokathor <zefria@gmail.com>"
+        ];
+        features = {
+          "bytemuck_derive" = [ "dep:bytemuck_derive" ];
+          "derive" = [ "bytemuck_derive" ];
+          "extern_crate_std" = [ "extern_crate_alloc" ];
+          "latest_stable_rust" = [ "aarch64_simd" "avx512_simd" "align_offset" "alloc_uninit" "const_zeroed" "derive" "impl_core_error" "min_const_generics" "must_cast" "must_cast_extra" "pod_saturating" "track_caller" "transparentwrapper_extra" "wasm_simd" "zeroable_atomics" "zeroable_maybe_uninit" "zeroable_unwind_fn" ];
+          "must_cast_extra" = [ "must_cast" ];
+          "nightly_portable_simd" = [ "rustversion" ];
+          "rustversion" = [ "dep:rustversion" ];
+        };
       };
       "byteorder" = rec {
         crateName = "byteorder";
@@ -3848,6 +3892,10 @@ rec {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
+          }
+          {
+            name = "typeid_suffix";
+            packageId = "typeid_suffix";
           }
           {
             name = "utoipa";
@@ -6940,6 +6988,10 @@ rec {
             features = [ "derive" ];
           }
           {
+            name = "thiserror";
+            packageId = "thiserror 2.0.18";
+          }
+          {
             name = "tokio";
             packageId = "tokio";
             features = [ "full" ];
@@ -6947,6 +6999,14 @@ rec {
           {
             name = "toml";
             packageId = "toml 1.0.3+spec-1.1.0";
+          }
+          {
+            name = "typeid_suffix";
+            packageId = "typeid_suffix";
+          }
+          {
+            name = "uuid";
+            packageId = "uuid";
           }
         ];
 
@@ -13971,6 +14031,19 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "sha1_smol" = rec {
+        crateName = "sha1_smol";
+        version = "1.0.1";
+        edition = "2018";
+        sha256 = "0pbh2xjfnzgblws3hims0ib5bphv7r5rfdpizyh51vnzvnribymv";
+        authors = [
+          "Armin Ronacher <armin.ronacher@active-4.com>"
+        ];
+        features = {
+          "serde" = [ "dep:serde" ];
+          "std" = [ "alloc" ];
+        };
+      };
       "sha2" = rec {
         crateName = "sha2";
         version = "0.10.9";
@@ -17231,6 +17304,34 @@ rec {
         ];
 
       };
+      "typeid_suffix" = rec {
+        crateName = "typeid_suffix";
+        version = "1.3.0";
+        edition = "2021";
+        sha256 = "01bl7v4vlh4mcymbxklhvj8h0zska8jhf91g39fxpihhy6b5xdbp";
+        authors = [
+          "rrrodzilla@proton.me"
+        ];
+        dependencies = [
+          {
+            name = "uuid";
+            packageId = "uuid";
+            features = [ "v1" "v3" "v4" "v5" "v6" "v7" ];
+          }
+        ];
+        devDependencies = [
+          {
+            name = "uuid";
+            packageId = "uuid";
+            features = [ "v1" "v3" "v4" "v5" "v6" "v7" "arbitrary" "v8" ];
+          }
+        ];
+        features = {
+          "instrument" = [ "dep:tracing" ];
+          "serde" = [ "dep:serde" ];
+        };
+        resolvedDefaultFeatures = [ "default" ];
+      };
       "typenum" = rec {
         crateName = "typenum";
         version = "1.19.0";
@@ -17744,6 +17845,12 @@ rec {
         ];
         dependencies = [
           {
+            name = "atomic";
+            packageId = "atomic";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+          {
             name = "getrandom";
             packageId = "getrandom 0.4.1";
             optional = true;
@@ -17757,8 +17864,20 @@ rec {
             target = { target, features }: (("wasm32" == target."arch" or null) && (("unknown" == target."os" or null) || ("none" == target."os" or null)) && (builtins.elem "atomics" targetFeatures));
           }
           {
+            name = "md-5";
+            packageId = "md-5";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+          {
             name = "serde_core";
             packageId = "serde_core";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "sha1_smol";
+            packageId = "sha1_smol";
             optional = true;
             usesDefaultFeatures = false;
           }
@@ -17803,7 +17922,7 @@ rec {
           "v7" = [ "rng" ];
           "zerocopy" = [ "dep:zerocopy" ];
         };
-        resolvedDefaultFeatures = [ "default" "rng" "serde" "std" "v4" ];
+        resolvedDefaultFeatures = [ "atomic" "default" "md5" "rng" "serde" "sha1" "std" "v1" "v3" "v4" "v5" "v6" "v7" ];
       };
       "valuable" = rec {
         crateName = "valuable";
