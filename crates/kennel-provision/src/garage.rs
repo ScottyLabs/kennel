@@ -107,6 +107,37 @@ impl GarageProvider {
         Ok(())
     }
 
+    async fn empty_bucket(&self, bucket_name: &str) -> anyhow::Result<()> {
+        let region = s3::Region::Custom {
+            region: "garage".to_string(),
+            endpoint: self.s3_endpoint.clone(),
+        };
+        let creds = s3::creds::Credentials::new(
+            Some(&self.admin_token),
+            Some(&self.admin_token),
+            None,
+            None,
+            None,
+        )?;
+        let bucket = s3::Bucket::new(bucket_name, region, creds)?.with_path_style();
+
+        loop {
+            let results = bucket.list("".to_string(), None).await?;
+            let mut found = false;
+            for result in &results {
+                for obj in &result.contents {
+                    bucket.delete_object(&obj.key).await?;
+                    found = true;
+                }
+            }
+            if !found {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     async fn delete_bucket(&self, bucket_id: &str) -> anyhow::Result<()> {
         let response = self
             .client
@@ -197,9 +228,13 @@ impl ResourceProvider for GarageProvider {
                 let aliases = bucket["globalAliases"].as_array();
                 if aliases.is_some_and(|a| a.iter().any(|v| v.as_str() == Some(&bucket_name)))
                     && let Some(bucket_id) = bucket["id"].as_str()
-                    && let Err(e) = self.delete_bucket(bucket_id).await
                 {
-                    tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
+                    if let Err(e) = self.empty_bucket(&bucket_name).await {
+                        tracing::warn!("Failed to empty bucket {bucket_name}: {e}");
+                    }
+                    if let Err(e) = self.delete_bucket(bucket_id).await {
+                        tracing::warn!("Failed to delete bucket {bucket_name}: {e}");
+                    }
                 }
             }
         }

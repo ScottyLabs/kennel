@@ -8,6 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 async-trait = "0.1.89"
 reqwest = { workspace = true, features = ["json"] }
+s3 = { version = "0.37.1", package = "rust-s3", default-features = false, features = ["tokio-rustls-tls"] }
 sea-orm = { workspace = true, features = ["sqlx-postgres", "runtime-tokio-rustls"] }
 serde.workspace = true
 serde_json.workspace = true
