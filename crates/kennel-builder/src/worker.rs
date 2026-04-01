@@ -42,9 +42,9 @@ pub async fn process_build(build_id: uuid::Uuid, config: Arc<BuilderConfig>) -> 
     )
     .await;
 
-    if let Some(cachix_config) = &kennel_config.cachix
+    if let Ok(cache_name) = std::env::var("CACHIX_CACHE_NAME")
         && !store_paths.is_empty()
-        && let Err(e) = cachix::push_to_cachix(cachix_config, &store_paths).await
+        && let Err(e) = cachix::push_to_cachix(&cache_name, &store_paths).await
     {
         warn!("Failed to push to Cachix: {}", e);
     }

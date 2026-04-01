@@ -10,9 +10,6 @@ pub struct KennelConfig {
 
     #[serde(default)]
     pub static_sites: HashMap<String, StaticSiteConfig>,
-
-    #[serde(default)]
-    pub cachix: Option<CachixConfig>,
 }
 
 /// Kennel-specific metadata per service. Process configuration (exec, probes,
@@ -32,11 +29,6 @@ pub struct StaticSiteConfig {
     pub custom_domain: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CachixConfig {
-    pub cache_name: String,
-}
-
 pub async fn parse_kennel_toml(repo_path: &Path) -> std::io::Result<KennelConfig> {
     let config_path = repo_path.join("kennel.toml");
 
@@ -44,7 +36,6 @@ pub async fn parse_kennel_toml(repo_path: &Path) -> std::io::Result<KennelConfig
         return Ok(KennelConfig {
             services: HashMap::new(),
             static_sites: HashMap::new(),
-            cachix: None,
         });
     }
 
@@ -65,7 +56,6 @@ mod tests {
         let config: KennelConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.services.len(), 0);
         assert_eq!(config.static_sites.len(), 0);
-        assert!(config.cachix.is_none());
     }
 
     #[test]
@@ -98,18 +88,5 @@ spa = true
 
         let web = config.static_sites.get("web").unwrap();
         assert!(web.spa);
-    }
-
-    #[test]
-    fn test_parse_cachix_config() {
-        let toml_str = r#"
-[cachix]
-cache_name = "my-cache"
-"#;
-        let config: KennelConfig = toml::from_str(toml_str).unwrap();
-        assert!(config.cachix.is_some());
-
-        let cachix = config.cachix.unwrap();
-        assert_eq!(cachix.cache_name, "my-cache");
     }
 }

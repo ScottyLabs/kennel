@@ -53,7 +53,6 @@ pub async fn deploy_build(build: &entity::builds::Model, config: &DeployerConfig
         .unwrap_or_else(|| kennel_config::KennelConfig {
             services: Default::default(),
             static_sites: Default::default(),
-            cachix: None,
         });
 
     info!(

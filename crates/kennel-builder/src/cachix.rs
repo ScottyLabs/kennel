@@ -1,12 +1,8 @@
 use crate::error::Result;
-use kennel_config::CachixConfig;
 use tokio::process::Command;
 use tracing::{error, info};
 
-/// Push store paths to a Cachix binary cache. The auth token is read from
-/// the CACHIX_AUTH_TOKEN environment variable (set by the NixOS module's
-/// EnvironmentFile), not from the user's kennel.toml.
-pub async fn push_to_cachix(config: &CachixConfig, store_paths: &[String]) -> Result<()> {
+pub async fn push_to_cachix(cache_name: &str, store_paths: &[String]) -> Result<()> {
     if store_paths.is_empty() {
         return Ok(());
     }
@@ -14,11 +10,11 @@ pub async fn push_to_cachix(config: &CachixConfig, store_paths: &[String]) -> Re
     info!(
         "Pushing {} store paths to Cachix cache '{}'",
         store_paths.len(),
-        config.cache_name
+        cache_name
     );
 
     let mut cmd = Command::new("cachix");
-    cmd.arg("push").arg(&config.cache_name);
+    cmd.arg("push").arg(cache_name);
 
     for path in store_paths {
         cmd.arg(path);
@@ -37,19 +33,4 @@ pub async fn push_to_cachix(config: &CachixConfig, store_paths: &[String]) -> Re
 
     info!("Successfully pushed to Cachix");
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_push_empty_paths() {
-        let config = CachixConfig {
-            cache_name: "test-cache".to_string(),
-        };
-
-        let result = push_to_cachix(&config, &[]).await;
-        assert!(result.is_ok());
-    }
 }
