@@ -35,14 +35,14 @@ impl<'a> BuildResultRepository<'a> {
 
     pub async fn find_recent_successful(
         &self,
-        project_name: &str,
+        project_id: uuid::Uuid,
         git_ref: &str,
         service_name: &str,
         limit: u64,
     ) -> Result<Vec<build_results::Model>> {
         Ok(build_results::Entity::find()
             .inner_join(builds::Entity)
-            .filter(builds::Column::ProjectName.eq(project_name))
+            .filter(builds::Column::ProjectId.eq(project_id))
             .filter(builds::Column::GitRef.eq(git_ref))
             .filter(builds::Column::Status.eq(BuildStatus::Success))
             .filter(build_results::Column::ServiceName.eq(service_name))

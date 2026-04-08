@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 )]
 #[sea_orm(table_name = "projects")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false, column_type = "Text")]
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    #[sea_orm(column_type = "Text", unique)]
     pub name: String,
     #[sea_orm(column_type = "Text")]
     pub repo_url: String,

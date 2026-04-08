@@ -38,12 +38,12 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn find_by_project_service_branch(
         &self,
-        project_name: &str,
+        project_id: Uuid,
         service_name: &str,
         branch: &str,
     ) -> Result<Option<deployments::Model>, DbErr> {
         Deployments::find()
-            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::ProjectId.eq(project_id))
             .filter(deployments::Column::ServiceName.eq(service_name))
             .filter(deployments::Column::Branch.eq(branch))
             .one(self.db)
@@ -52,10 +52,10 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn list_by_project(
         &self,
-        project_name: &str,
+        project_id: Uuid,
     ) -> Result<Vec<deployments::Model>, DbErr> {
         Deployments::find()
-            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::ProjectId.eq(project_id))
             .all(self.db)
             .await
     }
@@ -72,12 +72,12 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn find_deployed_by_ref(
         &self,
-        project_name: &str,
+        project_id: Uuid,
         git_ref: &str,
         service_name: &str,
     ) -> Result<Option<deployments::Model>, DbErr> {
         Deployments::find()
-            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::ProjectId.eq(project_id))
             .filter(deployments::Column::GitRef.eq(git_ref))
             .filter(deployments::Column::ServiceName.eq(service_name))
             .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
@@ -146,11 +146,11 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn mark_for_teardown(
         &self,
-        project_name: &str,
+        project_id: Uuid,
         git_ref: &str,
     ) -> crate::Result<Vec<Uuid>> {
         let ids: Vec<Uuid> = Deployments::find()
-            .filter(deployments::Column::ProjectName.eq(project_name))
+            .filter(deployments::Column::ProjectId.eq(project_id))
             .filter(deployments::Column::Branch.eq(git_ref))
             .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed))
             .all(self.db)

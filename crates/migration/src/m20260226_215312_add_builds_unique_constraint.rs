@@ -11,7 +11,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_builds_unique_commit")
                     .table(Builds::Table)
-                    .col(Builds::ProjectName)
+                    .col(Builds::ProjectId)
                     .col(Builds::CommitSha)
                     .unique()
                     .to_owned(),
@@ -34,6 +34,6 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum Builds {
     Table,
-    ProjectName,
+    ProjectId,
     CommitSha,
 }

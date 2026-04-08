@@ -18,6 +18,7 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .default(Expr::cust("uuid_generate_v7()")),
                     )
+                    .col(ColumnDef::new(Deployments::ProjectId).uuid().not_null())
                     .col(ColumnDef::new(Deployments::ProjectName).text().not_null())
                     .col(ColumnDef::new(Deployments::ServiceName).text().not_null())
                     .col(ColumnDef::new(Deployments::ServiceId).uuid())
@@ -60,8 +61,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_deployments_project")
-                            .from(Deployments::Table, Deployments::ProjectName)
-                            .to(Projects::Table, Projects::Name)
+                            .from(Deployments::Table, Deployments::ProjectId)
+                            .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
@@ -80,7 +81,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_deployments_project_service_branch")
                     .table(Deployments::Table)
-                    .col(Deployments::ProjectName)
+                    .col(Deployments::ProjectId)
                     .col(Deployments::ServiceName)
                     .col(Deployments::Branch)
                     .unique()
@@ -142,6 +143,7 @@ impl MigrationTrait for Migration {
 enum Deployments {
     Table,
     Id,
+    ProjectId,
     ProjectName,
     ServiceName,
     ServiceId,
@@ -162,7 +164,7 @@ enum Deployments {
 #[derive(DeriveIden)]
 enum Projects {
     Table,
-    Name,
+    Id,
 }
 
 #[derive(DeriveIden)]

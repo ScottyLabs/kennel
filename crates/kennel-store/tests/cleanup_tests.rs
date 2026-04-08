@@ -15,23 +15,30 @@ async fn setup_test_db() -> Result<Store, DbErr> {
     Ok(Store::new(db))
 }
 
-async fn create_test_project(store: &Store, name: &str) -> Result<(), DbErr> {
+async fn create_test_project(store: &Store, name: &str) -> Result<projects::Model, DbErr> {
     let proj = projects::ActiveModel {
         name: Set(name.to_string()),
-        repo_url: Set(format!("https://github.com/{}", name)),
+        repo_url: Set(format!("https://github.com/{name}")),
         repo_type: Set(RepoType::Github),
         webhook_secret: Set("secret".to_string()),
         default_branch: Set("main".to_string()),
         ..Default::default()
     };
 
-    let _ = store.projects().create(proj).await.ok();
-    Ok(())
+    store.projects().create(proj).await.map_err(|e| match e {
+        kennel_store::StoreError::Database(db_err) => db_err,
+        other => DbErr::Custom(other.to_string()),
+    })
 }
 
-async fn create_test_service(store: &Store, project: &str, service: &str) -> Result<(), DbErr> {
+async fn create_test_service(
+    store: &Store,
+    project: &projects::Model,
+    service: &str,
+) -> Result<(), DbErr> {
     let svc = services::ActiveModel {
-        project_name: Set(project.to_string()),
+        project_id: Set(project.id),
+        project_name: Set(project.name.clone()),
         name: Set(service.to_string()),
         r#type: Set(ServiceType::Service),
         package: Set("default".to_string()),
@@ -42,25 +49,26 @@ async fn create_test_service(store: &Store, project: &str, service: &str) -> Res
     Ok(())
 }
 
-async fn cleanup(store: &Store, project: &str) {
-    let _ = store.projects().delete(project).await;
+async fn cleanup(store: &Store, project: &projects::Model) {
+    let _ = store.projects().delete(project.id).await;
 }
 
 #[tokio::test]
 async fn test_find_expired_deployments() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_project(&store, "cleanup-test1")
+    let project = create_test_project(&store, "cleanup-test1")
         .await
         .expect("Failed to create project");
-    create_test_service(&store, "cleanup-test1", "web")
+    create_test_service(&store, &project, "web")
         .await
         .expect("Failed to create service");
 
     let old_activity = Utc::now().naive_utc() - Duration::days(10);
 
     let deployment = deployments::ActiveModel {
-        project_name: Set("cleanup-test1".to_string()),
+        project_id: Set(project.id),
+        project_name: Set(project.name.clone()),
         service_name: Set("web".to_string()),
         branch: Set("old-branch".to_string()),
         branch_slug: Set("old_branch".to_string()),
@@ -88,24 +96,25 @@ async fn test_find_expired_deployments() {
         "Should find deployment inactive for 10 days when threshold is 7"
     );
 
-    cleanup(&store, "cleanup-test1").await;
+    cleanup(&store, &project).await;
 }
 
 #[tokio::test]
 async fn test_find_expired_excludes_prod() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_project(&store, "cleanup-test2")
+    let project = create_test_project(&store, "cleanup-test2")
         .await
         .expect("Failed to create project");
-    create_test_service(&store, "cleanup-test2", "api")
+    create_test_service(&store, &project, "api")
         .await
         .expect("Failed to create service");
 
     let old_activity = Utc::now().naive_utc() - Duration::days(10);
 
     let deployment = deployments::ActiveModel {
-        project_name: Set("cleanup-test2".to_string()),
+        project_id: Set(project.id),
+        project_name: Set(project.name.clone()),
         service_name: Set("api".to_string()),
         branch: Set("main".to_string()),
         branch_slug: Set("main".to_string()),
@@ -133,21 +142,22 @@ async fn test_find_expired_excludes_prod() {
         "Prod deployments should be excluded from expiry"
     );
 
-    cleanup(&store, "cleanup-test2").await;
+    cleanup(&store, &project).await;
 }
 
 #[tokio::test]
 async fn test_find_old_builds() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_project(&store, "cleanup-test3")
+    let project = create_test_project(&store, "cleanup-test3")
         .await
         .expect("Failed to create project");
 
     let old_finish_time = Utc::now().naive_utc() - Duration::days(35);
 
     let build = builds::ActiveModel {
-        project_name: Set("cleanup-test3".to_string()),
+        project_id: Set(project.id),
+        project_name: Set(project.name.clone()),
         branch: Set("old-build".to_string()),
         git_ref: Set("xyz789".to_string()),
         commit_sha: Set("abc123def456".to_string()),
@@ -174,19 +184,20 @@ async fn test_find_old_builds() {
         "Should find build finished 35 days ago when threshold is 30"
     );
 
-    cleanup(&store, "cleanup-test3").await;
+    cleanup(&store, &project).await;
 }
 
 #[tokio::test]
 async fn test_find_old_builds_excludes_unfinished() {
     let store = setup_test_db().await.expect("Failed to connect");
 
-    create_test_project(&store, "cleanup-test4")
+    let project = create_test_project(&store, "cleanup-test4")
         .await
         .expect("Failed to create project");
 
     let build = builds::ActiveModel {
-        project_name: Set("cleanup-test4".to_string()),
+        project_id: Set(project.id),
+        project_name: Set(project.name.clone()),
         branch: Set("running".to_string()),
         git_ref: Set("abc".to_string()),
         commit_sha: Set("def789ghi012".to_string()),
@@ -213,5 +224,5 @@ async fn test_find_old_builds_excludes_unfinished() {
         "Unfinished builds should be excluded from cleanup"
     );
 
-    cleanup(&store, "cleanup-test4").await;
+    cleanup(&store, &project).await;
 }

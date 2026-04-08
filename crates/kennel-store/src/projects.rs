@@ -1,5 +1,6 @@
 use ::entity::{prelude::*, projects};
 use sea_orm::*;
+use uuid::Uuid;
 
 pub struct ProjectRepository<'a> {
     db: &'a DatabaseConnection,
@@ -10,8 +11,15 @@ impl<'a> ProjectRepository<'a> {
         Self { db }
     }
 
+    pub async fn find_by_id(&self, id: Uuid) -> crate::Result<Option<projects::Model>> {
+        Ok(Projects::find_by_id(id).one(self.db).await?)
+    }
+
     pub async fn find_by_name(&self, name: &str) -> crate::Result<Option<projects::Model>> {
-        Ok(Projects::find_by_id(name).one(self.db).await?)
+        Ok(Projects::find()
+            .filter(projects::Column::Name.eq(name))
+            .one(self.db)
+            .await?)
     }
 
     pub async fn list_all(&self) -> crate::Result<Vec<projects::Model>> {
@@ -26,7 +34,7 @@ impl<'a> ProjectRepository<'a> {
         Ok(project.update(self.db).await?)
     }
 
-    pub async fn delete(&self, name: &str) -> crate::Result<DeleteResult> {
-        Ok(Projects::delete_by_id(name).exec(self.db).await?)
+    pub async fn delete(&self, id: Uuid) -> crate::Result<DeleteResult> {
+        Ok(Projects::delete_by_id(id).exec(self.db).await?)
     }
 }

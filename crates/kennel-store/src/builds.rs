@@ -16,9 +16,9 @@ impl<'a> BuildRepository<'a> {
         Ok(Builds::find_by_id(id).one(self.db).await?)
     }
 
-    pub async fn list_by_project(&self, project_name: &str) -> Result<Vec<builds::Model>, DbErr> {
+    pub async fn list_by_project(&self, project_id: Uuid) -> Result<Vec<builds::Model>, DbErr> {
         Builds::find()
-            .filter(builds::Column::ProjectName.eq(project_name))
+            .filter(builds::Column::ProjectId.eq(project_id))
             .order_by_desc(builds::Column::CreatedAt)
             .all(self.db)
             .await
@@ -50,6 +50,7 @@ impl<'a> BuildRepository<'a> {
 
     pub async fn create_build(
         &self,
+        project_id: Uuid,
         project_name: String,
         git_ref: String,
         commit_sha: String,
@@ -65,6 +66,7 @@ impl<'a> BuildRepository<'a> {
         };
 
         let build = builds::ActiveModel {
+            project_id: Set(project_id),
             project_name: Set(project_name),
             branch: Set(branch),
             git_ref: Set(git_ref),
@@ -233,7 +235,7 @@ impl<'a> BuildRepository<'a> {
     /// except the given build ID. Returns the number of cancelled builds.
     pub async fn cancel_stale_builds(
         &self,
-        project_name: &str,
+        project_id: Uuid,
         branch: &str,
         exclude_id: Uuid,
     ) -> crate::Result<u64> {
@@ -241,7 +243,7 @@ impl<'a> BuildRepository<'a> {
         use sea_orm::sea_query::Expr;
 
         let result = Builds::update_many()
-            .filter(builds::Column::ProjectName.eq(project_name))
+            .filter(builds::Column::ProjectId.eq(project_id))
             .filter(builds::Column::Branch.eq(branch))
             .filter(builds::Column::Id.ne(exclude_id))
             .filter(builds::Column::Status.is_in([BuildStatus::Queued, BuildStatus::Building]))

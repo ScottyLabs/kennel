@@ -194,7 +194,7 @@ async fn deploy_service(
     let existing_deployment = config
         .store
         .deployments()
-        .find_deployed_by_ref(&build.project_name, branch, &devenv_config.name)
+        .find_deployed_by_ref(build.project_id, branch, &devenv_config.name)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 
@@ -217,6 +217,7 @@ async fn deploy_service(
     } else {
         // Create new deployment record with Deploying status.
         let deployment = deployments::ActiveModel {
+            project_id: sea_orm::ActiveValue::Set(build.project_id),
             project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
             git_ref: sea_orm::ActiveValue::Set(build.git_ref.clone()),
             service_name: sea_orm::ActiveValue::Set(devenv_config.name.clone()),

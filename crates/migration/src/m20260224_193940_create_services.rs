@@ -18,6 +18,7 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .default(Expr::cust("uuid_generate_v7()")),
                     )
+                    .col(ColumnDef::new(Services::ProjectId).uuid().not_null())
                     .col(ColumnDef::new(Services::ProjectName).text().not_null())
                     .col(ColumnDef::new(Services::Name).text().not_null())
                     .col(
@@ -49,8 +50,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_services_project")
-                            .from(Services::Table, Services::ProjectName)
-                            .to(Projects::Table, Projects::Name)
+                            .from(Services::Table, Services::ProjectId)
+                            .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -62,7 +63,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_services_project_name")
                     .table(Services::Table)
-                    .col(Services::ProjectName)
+                    .col(Services::ProjectId)
                     .col(Services::Name)
                     .unique()
                     .to_owned(),
@@ -74,7 +75,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_services_project")
                     .table(Services::Table)
-                    .col(Services::ProjectName)
+                    .col(Services::ProjectId)
                     .to_owned(),
             )
             .await?;
@@ -103,6 +104,7 @@ impl MigrationTrait for Migration {
 enum Services {
     Table,
     Id,
+    ProjectId,
     ProjectName,
     Name,
     Type,
@@ -117,5 +119,5 @@ enum Services {
 #[derive(DeriveIden)]
 enum Projects {
     Table,
-    Name,
+    Id,
 }

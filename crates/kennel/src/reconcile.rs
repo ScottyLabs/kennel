@@ -70,9 +70,10 @@ async fn reconcile_project(store: &Store, project: &ProjectConfig) -> anyhow::Re
     };
 
     match store.projects().find_by_name(&project.name).await? {
-        Some(_existing) => {
+        Some(existing) => {
             let project_model = entity::projects::ActiveModel {
-                name: ActiveValue::Unchanged(project.name.clone()),
+                id: ActiveValue::Unchanged(existing.id),
+                name: ActiveValue::Set(project.name.clone()),
                 repo_url: ActiveValue::Set(project.repo_url.clone()),
                 repo_type: ActiveValue::Set(repo_type_enum),
                 webhook_secret: ActiveValue::Set(webhook_secret),
@@ -112,16 +113,13 @@ async fn cleanup_removed_projects(
 
     for db_project in db_projects {
         if !config_project_names.contains(&db_project.name) {
-            let deployments = store
-                .deployments()
-                .list_by_project(&db_project.name)
-                .await?;
+            let deployments = store.deployments().list_by_project(db_project.id).await?;
             if deployments.is_empty() {
                 info!(
                     "Deleting project with no remaining deployments: {}",
                     db_project.name
                 );
-                store.projects().delete(&db_project.name).await?;
+                store.projects().delete(db_project.id).await?;
             } else {
                 let ids: Vec<uuid::Uuid> = deployments.iter().map(|d| d.id).collect();
                 info!(

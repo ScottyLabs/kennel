@@ -7730,6 +7730,10 @@ rec {
             name = "tracing";
             packageId = "tracing";
           }
+          {
+            name = "uuid";
+            packageId = "uuid";
+          }
         ];
 
       };

@@ -290,7 +290,7 @@ async fn build_package(
         config
             .store
             .build_results()
-            .find_recent_successful(&build.project_name, &build.git_ref, package_name, 5)
+            .find_recent_successful(build.project_id, &build.git_ref, package_name, 5)
             .await
             .unwrap_or_default()
     } else {

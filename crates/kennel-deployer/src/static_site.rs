@@ -66,6 +66,7 @@ pub async fn deploy_site(
     );
 
     let deployment = deployments::ActiveModel {
+        project_id: sea_orm::ActiveValue::Set(build.project_id),
         project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
         git_ref: sea_orm::ActiveValue::Set(build.git_ref.clone()),
         service_name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),

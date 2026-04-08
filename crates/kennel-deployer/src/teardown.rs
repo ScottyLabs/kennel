@@ -74,7 +74,7 @@ pub async fn process_teardown(
         .store
         .deployments()
         .find_by_project_service_branch(
-            &deployment.project_name,
+            deployment.project_id,
             &deployment.service_name,
             &deployment.branch,
         )

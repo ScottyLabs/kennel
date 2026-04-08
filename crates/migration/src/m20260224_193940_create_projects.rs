@@ -12,10 +12,17 @@ impl MigrationTrait for Migration {
                     .table(Projects::Table)
                     .if_not_exists()
                     .col(
+                        ColumnDef::new(Projects::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key()
+                            .default(Expr::cust("uuid_generate_v7()")),
+                    )
+                    .col(
                         ColumnDef::new(Projects::Name)
                             .text()
                             .not_null()
-                            .primary_key(),
+                            .unique_key(),
                     )
                     .col(ColumnDef::new(Projects::RepoUrl).text().not_null())
                     .col(
@@ -69,6 +76,7 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum Projects {
     Table,
+    Id,
     Name,
     RepoUrl,
     RepoType,

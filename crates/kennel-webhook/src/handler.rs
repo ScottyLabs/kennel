@@ -18,6 +18,7 @@ fn normalize_branch(git_ref: &str) -> &str {
 
 async fn create_build_and_notify(
     config: &WebhookConfig,
+    project_id: uuid::Uuid,
     project_name: &str,
     git_ref: &str,
     commit_sha: &str,
@@ -27,6 +28,7 @@ async fn create_build_and_notify(
         .store
         .builds()
         .create_build(
+            project_id,
             project_name.to_string(),
             git_ref.to_string(),
             commit_sha.to_string(),
@@ -46,7 +48,7 @@ async fn create_build_and_notify(
     if let Err(e) = config
         .store
         .builds()
-        .cancel_stale_builds(project_name, branch, build.id)
+        .cancel_stale_builds(project_id, branch, build.id)
         .await
     {
         warn!("Failed to cancel stale builds: {e}");
@@ -63,13 +65,13 @@ async fn create_build_and_notify(
 
 async fn mark_teardown_and_notify(
     config: &WebhookConfig,
-    project_name: &str,
+    project_id: uuid::Uuid,
     branch: &str,
 ) -> Result<StatusCode> {
     config
         .store
         .deployments()
-        .mark_for_teardown(project_name, branch)
+        .mark_for_teardown(project_id, branch)
         .await?;
     config.teardown_signal.notify_one();
     Ok(StatusCode::ACCEPTED)
@@ -120,10 +122,18 @@ pub async fn handle_webhook(
 
             if deleted {
                 info!("Branch deleted: {project_name}/{branch}, marking deployments for teardown");
-                return mark_teardown_and_notify(&config, &project.name, branch).await;
+                return mark_teardown_and_notify(&config, project.id, branch).await;
             }
 
-            create_build_and_notify(&config, &project.name, &git_ref, &commit_sha, branch).await
+            create_build_and_notify(
+                &config,
+                project.id,
+                &project.name,
+                &git_ref,
+                &commit_sha,
+                branch,
+            )
+            .await
         }
         WebhookEvent::PullRequest {
             action,
@@ -133,13 +143,20 @@ pub async fn handle_webhook(
         } => match action.as_str() {
             "opened" | "synchronize" | "synchronized" | "reopened" => {
                 let git_ref = format!("pr-{pr_number}");
-                create_build_and_notify(&config, &project.name, &git_ref, &commit_sha, &git_ref)
-                    .await
+                create_build_and_notify(
+                    &config,
+                    project.id,
+                    &project.name,
+                    &git_ref,
+                    &commit_sha,
+                    &git_ref,
+                )
+                .await
             }
             "closed" => {
                 let branch = format!("pr-{pr_number}");
                 info!("PR closed: {project_name}/PR#{pr_number}, marking deployments for teardown");
-                mark_teardown_and_notify(&config, &project.name, &branch).await
+                mark_teardown_and_notify(&config, project.id, &branch).await
             }
             _ => {
                 warn!("Ignoring PR action: {action}");

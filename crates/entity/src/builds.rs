@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    pub project_id: Uuid,
     #[sea_orm(column_type = "Text")]
     pub project_name: String,
     #[sea_orm(column_type = "Text")]
@@ -38,8 +39,8 @@ pub enum Relation {
     BuildResults,
     #[sea_orm(
         belongs_to = "super::projects::Entity",
-        from = "Column::ProjectName",
-        to = "super::projects::Column::Name",
+        from = "Column::ProjectId",
+        to = "super::projects::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

@@ -18,6 +18,7 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .default(Expr::cust("uuid_generate_v7()")),
                     )
+                    .col(ColumnDef::new(Builds::ProjectId).uuid().not_null())
                     .col(ColumnDef::new(Builds::ProjectName).text().not_null())
                     .col(ColumnDef::new(Builds::Branch).text().not_null())
                     .col(ColumnDef::new(Builds::GitRef).text().not_null())
@@ -48,8 +49,8 @@ impl MigrationTrait for Migration {
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_builds_project")
-                            .from(Builds::Table, Builds::ProjectName)
-                            .to(Projects::Table, Projects::Name)
+                            .from(Builds::Table, Builds::ProjectId)
+                            .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -61,7 +62,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("idx_builds_project_branch")
                     .table(Builds::Table)
-                    .col(Builds::ProjectName)
+                    .col(Builds::ProjectId)
                     .col(Builds::Branch)
                     .to_owned(),
             )
@@ -101,6 +102,7 @@ impl MigrationTrait for Migration {
 enum Builds {
     Table,
     Id,
+    ProjectId,
     ProjectName,
     Branch,
     GitRef,
@@ -118,5 +120,5 @@ enum Builds {
 #[derive(DeriveIden)]
 enum Projects {
     Table,
-    Name,
+    Id,
 }
