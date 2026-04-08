@@ -22,6 +22,9 @@ jobs:
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
 
+      - name: Remove homeless-shelter
+        run: rm -rf /homeless-shelter || true
+
       - name: Check formatting
         run: devenv shell treefmt --fail-on-change
 
