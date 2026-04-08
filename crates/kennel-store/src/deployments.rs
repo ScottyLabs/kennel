@@ -106,7 +106,7 @@ impl<'a> DeploymentRepository<'a> {
     pub async fn find_expired(
         &self,
         days: i64,
-        exclude_environments: &[&str],
+        exclude_environments: &[::entity::sea_orm_active_enums::Environment],
     ) -> crate::Result<Vec<deployments::Model>> {
         use chrono::{Duration, Utc};
 
@@ -117,7 +117,10 @@ impl<'a> DeploymentRepository<'a> {
             .filter(deployments::Column::Status.eq(DeploymentStatus::Deployed));
 
         for env in exclude_environments {
-            query = query.filter(deployments::Column::Environment.ne(*env));
+            query = query.filter(
+                deployments::Column::Environment
+                    .ne::<::entity::sea_orm_active_enums::Environment>(env.clone()),
+            );
         }
 
         Ok(query.all(self.db).await?)

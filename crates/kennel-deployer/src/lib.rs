@@ -1,6 +1,6 @@
 mod error;
 mod log_cleanup;
-mod secrets;
+pub mod secrets;
 mod service;
 mod static_site;
 mod teardown;
@@ -132,7 +132,13 @@ pub async fn run_cleanup_job(
 
         match config
             .store
-            .find_expired_deployments(7, &["prod", "staging"])
+            .find_expired_deployments(
+                7,
+                &[
+                    entity::sea_orm_active_enums::Environment::Prod,
+                    entity::sea_orm_active_enums::Environment::Staging,
+                ],
+            )
             .await
         {
             Ok(expired) if !expired.is_empty() => {

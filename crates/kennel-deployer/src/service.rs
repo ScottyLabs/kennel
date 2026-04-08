@@ -107,6 +107,13 @@ async fn deploy_service(
     config: &DeployerConfig,
     config_file: &kennel_config::KennelConfig,
 ) -> Result<()> {
+    if devenv_config.ready.is_none() {
+        return Err(crate::DeployerError::Other(anyhow::anyhow!(
+            "service '{}' has no readiness probe configured",
+            devenv_config.name
+        )));
+    }
+
     info!(
         "Deploying service '{}' from exec: {}",
         devenv_config.name, devenv_config.exec
@@ -132,7 +139,7 @@ async fn deploy_service(
         devenv_config,
         &process_name,
         &username,
-        service_work_dir,
+        service_work_dir.clone(),
         &environment,
     );
 
@@ -160,14 +167,25 @@ async fn deploy_service(
 
     let service_config = config_file.services.get(&devenv_config.name);
 
-    // Resolve secrets from secretspec.toml if present.
+    // Copy secretspec.toml to the service work dir so secrets can be
+    // re-resolved on restart without the build work directory.
+    let mut secret_keys = Vec::new();
     if let Some(vault_endpoint) = &config.vault_endpoint {
-        let work_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
+        let repo_dir = PathBuf::from(kennel_config::constants::DEFAULT_WORK_DIR)
             .join(build.id.to_string())
             .join("repo");
+        let secretspec_src = repo_dir.join("secretspec.toml");
+        let secretspec_dst = service_work_dir.join("secretspec.toml");
+        if secretspec_src.exists() {
+            if let Err(e) = tokio::fs::copy(&secretspec_src, &secretspec_dst).await {
+                warn!("Failed to copy secretspec.toml: {e}");
+            }
+        }
+
         let env_str = format!("{:?}", environment).to_lowercase();
-        match crate::secrets::resolve_secrets(&work_dir, &env_str, vault_endpoint) {
+        match crate::secrets::resolve_secrets(&service_work_dir, &env_str, vault_endpoint) {
             Ok(secrets) => {
+                secret_keys = secrets.keys().cloned().collect();
                 process_config.env.extend(secrets);
             }
             Err(e) => {
@@ -176,10 +194,12 @@ async fn deploy_service(
         }
     }
 
-    // Strip secrets from the process config before persisting to DB.
-    // Secrets are resolved at deploy time and only live in memory.
-    let process_config_for_db = process_config.clone();
-    // TODO: identify and strip secret keys from process_config_for_db.env
+    // Remove secret values before persisting. The keys are recorded so
+    // reconciliation knows which env vars to re-resolve from Vault.
+    let mut process_config_for_db = process_config.clone();
+    for key in &secret_keys {
+        process_config_for_db.env.remove(key);
+    }
     let process_config_json = serde_json::to_value(&process_config_for_db)
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?;
 

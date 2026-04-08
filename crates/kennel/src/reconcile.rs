@@ -144,6 +144,7 @@ async fn reconcile_supervisor_processes(
 ) -> anyhow::Result<()> {
     info!("Reconciling supervisor processes");
 
+    let vault_endpoint = std::env::var("VAULT_ENDPOINT").ok();
     let deployed = store.find_deployed_service_deployments().await?;
 
     for deployment in deployed {
@@ -153,7 +154,27 @@ async fn reconcile_supervisor_processes(
             .and_then(|v| serde_json::from_value(v.clone()).ok());
 
         match process_config {
-            Some(config) => {
+            Some(mut config) => {
+                // Re-resolve secrets from the persisted secretspec.toml.
+                if let Some(ref endpoint) = vault_endpoint {
+                    let service_dir = std::path::PathBuf::from(constants::SERVICES_BASE_DIR)
+                        .join(&deployment.project_name)
+                        .join(&deployment.branch_slug)
+                        .join(&deployment.service_name);
+                    let env_str = format!("{:?}", deployment.environment).to_lowercase();
+                    match kennel_deployer::secrets::resolve_secrets(
+                        &service_dir,
+                        &env_str,
+                        endpoint,
+                    ) {
+                        Ok(secrets) => config.env.extend(secrets),
+                        Err(e) => warn!(
+                            "Secret re-resolution failed for deployment {}: {e}",
+                            deployment.id
+                        ),
+                    }
+                }
+
                 info!("Re-starting process {} from stored config", config.name);
                 if let Err(e) = supervisor.start(config).await {
                     error!(

@@ -351,11 +351,9 @@ impl Supervisor {
         let name = new_config.name.clone();
         let old_name = format!("{name}--old");
 
-        // Abort the old supervision task before renaming so it stops
-        // emitting events with the old name.
-        if let Some(old) = self.processes.get(&name) {
-            old.supervision_handle.abort();
-        }
+        // Move the old process aside while keeping its supervision task
+        // running so it continues serving traffic and can be restored if
+        // the new process fails to start.
         if let Some(old) = self.processes.remove(&name) {
             self.processes.insert(old_name.clone(), old);
         }
@@ -370,6 +368,11 @@ impl Supervisor {
                     name: ref n,
                     ref error,
                 }) if *n == name => {
+                    // Stop the failed new process and restore the old one.
+                    if self.processes.contains_key(&name) {
+                        let _ = self.stop(&name, Duration::from_secs(10)).await;
+                        self.processes.remove(&name);
+                    }
                     if let Some(old) = self.processes.remove(&old_name) {
                         self.processes.insert(name.clone(), old);
                     }
@@ -387,9 +390,10 @@ impl Supervisor {
             }
         }
 
+        // Both processes run simultaneously while in-flight requests
+        // to the old process complete.
         tokio::time::sleep(drain_period).await;
 
-        // Stop the old process if it exists.
         if self.processes.contains_key(&old_name) {
             self.stop(&old_name, Duration::from_secs(10)).await?;
             self.processes.remove(&old_name);

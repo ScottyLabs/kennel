@@ -87,7 +87,7 @@ async fn test_find_expired_deployments() {
         .expect("Failed to create deployment");
 
     let expired = store
-        .find_expired_deployments(7, &["prod", "staging"])
+        .find_expired_deployments(7, &[Environment::Prod, Environment::Staging])
         .await
         .expect("Failed to find expired");
 
@@ -133,7 +133,7 @@ async fn test_find_expired_excludes_prod() {
         .expect("Failed to create prod deployment");
 
     let expired = store
-        .find_expired_deployments(7, &["prod", "staging"])
+        .find_expired_deployments(7, &[Environment::Prod, Environment::Staging])
         .await
         .expect("Failed to find expired");
 
