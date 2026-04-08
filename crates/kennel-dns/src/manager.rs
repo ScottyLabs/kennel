@@ -10,7 +10,7 @@ pub struct DnsManager {
     providers: HashMap<String, Arc<dyn DnsProvider>>,
     store: Arc<Store>,
     server_ipv4: Ipv4Addr,
-    server_ipv6: Ipv6Addr,
+    server_ipv6: Option<Ipv6Addr>,
 }
 
 impl DnsManager {
@@ -18,7 +18,7 @@ impl DnsManager {
         providers: HashMap<String, Arc<dyn DnsProvider>>,
         store: Arc<Store>,
         server_ipv4: Ipv4Addr,
-        server_ipv6: Ipv6Addr,
+        server_ipv6: Option<Ipv6Addr>,
     ) -> Self {
         Self {
             providers,
@@ -80,20 +80,22 @@ impl DnsManager {
             )
             .await?;
 
-        let aaaa_record = provider
-            .create_record(domain, RecordType::AAAA, &self.server_ipv6.to_string())
-            .await?;
+        if let Some(ipv6) = self.server_ipv6 {
+            let aaaa_record = provider
+                .create_record(domain, RecordType::AAAA, &ipv6.to_string())
+                .await?;
 
-        self.store
-            .dns_records()
-            .create(
-                domain,
-                deployment_id,
-                &aaaa_record.provider_record_id,
-                entity::sea_orm_active_enums::RecordType::Aaaa,
-                &self.server_ipv6.to_string(),
-            )
-            .await?;
+            self.store
+                .dns_records()
+                .create(
+                    domain,
+                    deployment_id,
+                    &aaaa_record.provider_record_id,
+                    entity::sea_orm_active_enums::RecordType::Aaaa,
+                    &ipv6.to_string(),
+                )
+                .await?;
+        }
 
         info!("DNS records created successfully for {}", domain);
 
@@ -158,24 +160,22 @@ impl DnsManager {
             )
             .await?;
 
-        let aaaa_record = provider
-            .create_record(
-                &wildcard_domain,
-                RecordType::AAAA,
-                &self.server_ipv6.to_string(),
-            )
-            .await?;
+        if let Some(ipv6) = self.server_ipv6 {
+            let aaaa_record = provider
+                .create_record(&wildcard_domain, RecordType::AAAA, &ipv6.to_string())
+                .await?;
 
-        self.store
-            .dns_records()
-            .create(
-                &wildcard_domain,
-                None,
-                &aaaa_record.provider_record_id,
-                entity::sea_orm_active_enums::RecordType::Aaaa,
-                &self.server_ipv6.to_string(),
-            )
-            .await?;
+            self.store
+                .dns_records()
+                .create(
+                    &wildcard_domain,
+                    None,
+                    &aaaa_record.provider_record_id,
+                    entity::sea_orm_active_enums::RecordType::Aaaa,
+                    &ipv6.to_string(),
+                )
+                .await?;
+        }
 
         info!("Wildcard DNS created successfully for {}", wildcard_domain);
 

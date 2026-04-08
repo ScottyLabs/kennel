@@ -194,7 +194,8 @@ in
       };
 
       serverIpv6 = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
+        default = null;
         example = "2001:db8::1";
         description = "Server IPv6 address for DNS records";
       };
@@ -301,6 +302,7 @@ in
           "DNS_ENABLED=true"
           "DNS_CLOUDFLARE_ZONES=${builtins.toJSON (mapAttrs (domain: zoneId: zoneId) cfg.dns.cloudflare.zones)}"
           "DNS_SERVER_IPV4=${cfg.dns.serverIpv4}"
+        ] ++ optionals (cfg.dns.serverIpv6 != null) [
           "DNS_SERVER_IPV6=${cfg.dns.serverIpv6}"
         ];
 

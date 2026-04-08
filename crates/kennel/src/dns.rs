@@ -18,10 +18,10 @@ pub async fn initialize_dns(
         .expect("DNS_SERVER_IPV4 must be set when DNS is enabled")
         .parse()
         .expect("DNS_SERVER_IPV4 must be a valid IPv4 address");
-    let server_ipv6 = std::env::var("DNS_SERVER_IPV6")
-        .expect("DNS_SERVER_IPV6 must be set when DNS is enabled")
-        .parse()
-        .expect("DNS_SERVER_IPV6 must be a valid IPv6 address");
+    let server_ipv6 = std::env::var("DNS_SERVER_IPV6").ok().map(|v| {
+        v.parse()
+            .expect("DNS_SERVER_IPV6 must be a valid IPv6 address")
+    });
 
     let cloudflare_zones_json = std::env::var("DNS_CLOUDFLARE_ZONES")
         .expect("DNS_CLOUDFLARE_ZONES must be set when DNS is enabled");
