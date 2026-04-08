@@ -16,6 +16,7 @@ CODE_REVIEW.md
 
 # Rust
 target/
+.cargo/
 
 # Bun / Node
 node_modules/

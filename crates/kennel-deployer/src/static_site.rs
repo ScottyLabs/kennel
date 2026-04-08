@@ -6,7 +6,7 @@ use entity::sea_orm_active_enums::DeploymentStatus;
 use kennel_config::KennelConfig;
 use kennel_store::Store;
 use kennel_supervisor::SupervisorEvent;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::error::Result;
 use crate::{DeployerConfig, utils};

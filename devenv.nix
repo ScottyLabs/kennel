@@ -24,9 +24,6 @@ in
 
   env = {
     CARGO_PROFILE_DEV_DEBUG = "0";
-    CARGO_PROFILE_DEV_CODEGEN_BACKEND = "cranelift";
-    CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND = "llvm";
-
     DATABASE_URL = "postgresql://127.0.0.1:5432/kennel";
     RUST_LOG = "kennel=debug";
   };
@@ -42,10 +39,14 @@ in
       "rust-analyzer"
       "rust-src"
       "llvm-tools-preview"
-      "rustc-codegen-cranelift-preview"
     ];
-    mold.enable = pkgs.stdenv.isLinux;
-    rustflags = "-Zthreads=8";
+    lld.enable = pkgs.stdenv.isDarwin;
+    wild.enable = pkgs.stdenv.isLinux;
+    cranelift = {
+      enable = true;
+      forceBuildScriptsLlvm = true;
+      excludePackages = [ "aws-lc-sys" "aws-lc-rs" "rustls" "linkme" "secretspec" ];
+    };
   };
 
   services.postgres = {
