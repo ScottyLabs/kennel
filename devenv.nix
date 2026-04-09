@@ -5,8 +5,6 @@ let
   kennel = cargoNix.workspaceMembers.kennel.build;
 in
 {
-  cachix.pull = [ "scottylabs" ];
-
   packages = [
     kennel
     inputs.bun2nix.packages.${pkgs.stdenv.system}.default
