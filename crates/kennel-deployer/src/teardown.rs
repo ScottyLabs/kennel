@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::time::Duration;
 
 use tracing::{info, warn};
 
@@ -23,7 +22,10 @@ pub async fn process_teardown(
     if config.supervisor.is_running(&process_name).await {
         if let Err(e) = config
             .supervisor
-            .stop(&process_name, Duration::from_secs(30))
+            .stop(
+                &process_name,
+                kennel_config::constants::TEARDOWN_GRACE_PERIOD,
+            )
             .await
         {
             warn!("Failed to stop process {process_name}: {e}");

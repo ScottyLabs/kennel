@@ -22,10 +22,10 @@ pub const ROUTER_RELOAD_INTERVAL: Duration = Duration::from_secs(60);
 pub const CLEANUP_JOB_INTERVAL: Duration = Duration::from_secs(600);
 pub const LOG_CLEANUP_INTERVAL: Duration = Duration::from_secs(86400);
 pub const LOG_RETENTION_DAYS: i64 = 30;
+pub const DEPLOYMENT_EXPIRY_DAYS: i64 = 7;
 
-pub const BUILD_CHANNEL_CAPACITY: usize = 1000;
-pub const DEPLOY_CHANNEL_CAPACITY: usize = 100;
-pub const TEARDOWN_CHANNEL_CAPACITY: usize = 100;
 pub const SUPERVISOR_EVENT_CAPACITY: usize = 100;
 
+pub const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 pub const BLUE_GREEN_DRAIN_TIMEOUT: Duration = Duration::from_secs(30);

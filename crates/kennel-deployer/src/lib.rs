@@ -133,7 +133,7 @@ pub async fn run_cleanup_job(
         match config
             .store
             .find_expired_deployments(
-                7,
+                kennel_config::constants::DEPLOYMENT_EXPIRY_DAYS,
                 &[
                     entity::sea_orm_active_enums::Environment::Prod,
                     entity::sea_orm_active_enums::Environment::Staging,

@@ -26,7 +26,7 @@ pub async fn build(work_dir: &Path, service_name: &str, build_id: uuid::Uuid) ->
 
     debug!("Running nix build {}", flake_ref);
 
-    let build_timeout = std::time::Duration::from_secs(30 * 60);
+    let build_timeout = kennel_config::constants::BUILD_TIMEOUT;
     let output = tokio::time::timeout(
         build_timeout,
         Command::new("nix")

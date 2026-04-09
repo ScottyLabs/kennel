@@ -6,7 +6,6 @@ pub mod dns_records;
 pub mod error;
 pub mod projects;
 pub mod reconciliation;
-pub mod services;
 
 pub use error::{Result, StoreError};
 
@@ -27,10 +26,6 @@ impl Store {
 
     pub fn projects(&self) -> projects::ProjectRepository<'_> {
         projects::ProjectRepository::new(&self.db)
-    }
-
-    pub fn services(&self) -> services::ServiceRepository<'_> {
-        services::ServiceRepository::new(&self.db)
     }
 
     pub fn deployments(&self) -> deployments::DeploymentRepository<'_> {
