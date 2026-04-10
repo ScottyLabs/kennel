@@ -136,11 +136,20 @@ impl DnsManager {
         base_domain: &str,
     ) -> Result<()> {
         let wildcard_domain = format!("*.{}.{}", project_name, base_domain);
+
+        let existing = self
+            .store
+            .dns_records()
+            .find_by_domain(&wildcard_domain)
+            .await?;
+        if !existing.is_empty() {
+            return Ok(());
+        }
+
         let provider = self.get_provider_for_domain(&wildcard_domain)?;
 
         info!("Creating wildcard DNS for project: {}", wildcard_domain);
 
-        // Create both A and AAAA wildcard records
         let a_record = provider
             .create_record(
                 &wildcard_domain,

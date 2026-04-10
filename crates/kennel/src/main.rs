@@ -83,6 +83,10 @@ async fn main() -> anyhow::Result<()> {
     let base_domain =
         std::env::var("BASE_DOMAIN").unwrap_or_else(|_| constants::DEFAULT_BASE_DOMAIN.into());
 
+    // Signal systemd that startup is complete before DNS and network
+    // operations that may block.
+    let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
+
     let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
 
     let mut resource_providers: Vec<Arc<dyn kennel_provision::ResourceProvider>> = vec![];
@@ -180,9 +184,6 @@ async fn main() -> anyhow::Result<()> {
             tracing::error!("Router failed: {}", e);
         }
     });
-
-    // Signal systemd that startup is complete.
-    let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
 
     // Fire signals in case there are work items from before the crash.
     signals.build.notify_one();
