@@ -249,6 +249,8 @@ in
       wantedBy = [ "multi-user.target" ];
       restartTriggers = optional (cfg.projects != { }) (builtins.hashString "sha256" (builtins.toJSON cfg.projects));
 
+      path = with pkgs; [ git nix cachix ];
+
       environment = {
         RUST_LOG = "info";
         DATABASE_URL = "postgresql://${cfg.database.user}@localhost:${toString cfg.database.port}/${cfg.database.name}?host=${cfg.database.host}";
