@@ -248,6 +248,29 @@ in
       after = [ "network.target" ] ++ optional cfg.database.createLocally "postgresql.service";
       wantedBy = [ "multi-user.target" ];
 
+      environment = {
+        RUST_LOG = "info";
+        DATABASE_URL = "postgresql://${cfg.database.user}@localhost:${toString cfg.database.port}/${cfg.database.name}?host=${cfg.database.host}";
+        API_HOST = cfg.api.host;
+        API_PORT = toString cfg.api.port;
+        ROUTER_ADDR = cfg.router.address;
+        BASE_DOMAIN = cfg.router.baseDomain;
+        MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
+        WORK_DIR = cfg.builder.workDir;
+      } // optionalAttrs cfg.router.tls.enable {
+        TLS_ENABLED = "true";
+        ACME_EMAIL = cfg.router.tls.email;
+        ACME_STAGING = if cfg.router.tls.staging then "true" else "false";
+      } // optionalAttrs cfg.builder.cachix.enable {
+        CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
+      } // optionalAttrs cfg.dns.enable {
+        DNS_ENABLED = "true";
+        DNS_CLOUDFLARE_ZONES = builtins.toJSON (mapAttrs (domain: zoneId: zoneId) cfg.dns.cloudflare.zones);
+        DNS_SERVER_IPV4 = cfg.dns.serverIpv4;
+      } // optionalAttrs (cfg.dns.serverIpv6 != null) {
+        DNS_SERVER_IPV6 = cfg.dns.serverIpv6;
+      };
+
       serviceConfig = {
         Type = "notify";
         User = cfg.user;
@@ -267,29 +290,6 @@ in
 
         # cgroup v2 delegation for per-process resource isolation
         Delegate = "yes";
-
-        Environment = [
-          "RUST_LOG=info"
-          "DATABASE_URL=postgresql://${cfg.database.user}@localhost:${toString cfg.database.port}/${cfg.database.name}?host=${cfg.database.host}"
-          "API_HOST=${cfg.api.host}"
-          "API_PORT=${toString cfg.api.port}"
-          "ROUTER_ADDR=${cfg.router.address}"
-          "BASE_DOMAIN=${cfg.router.baseDomain}"
-          "MAX_CONCURRENT_BUILDS=${toString cfg.builder.maxConcurrentBuilds}"
-          "WORK_DIR=${cfg.builder.workDir}"
-        ] ++ optionals cfg.router.tls.enable [
-          "TLS_ENABLED=true"
-          "ACME_EMAIL=${cfg.router.tls.email}"
-          "ACME_STAGING=${if cfg.router.tls.staging then "true" else "false"}"
-        ] ++ optionals cfg.builder.cachix.enable [
-          "CACHIX_CACHE_NAME=${cfg.builder.cachix.cacheName}"
-        ] ++ optionals cfg.dns.enable [
-          "DNS_ENABLED=true"
-          "DNS_CLOUDFLARE_ZONES=${builtins.toJSON (mapAttrs (domain: zoneId: zoneId) cfg.dns.cloudflare.zones)}"
-          "DNS_SERVER_IPV4=${cfg.dns.serverIpv4}"
-        ] ++ optionals (cfg.dns.serverIpv6 != null) [
-          "DNS_SERVER_IPV6=${cfg.dns.serverIpv6}"
-        ];
 
         EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
 
