@@ -7,7 +7,7 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 libc = "0.2.183"
-nix = { version = "0.31.2", features = ["process", "signal", "fs"] }
+nix = { version = "0.31.2", features = ["process", "signal", "fs", "user"] }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

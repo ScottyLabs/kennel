@@ -7628,7 +7628,7 @@ rec {
           {
             name = "nix";
             packageId = "nix 0.31.2";
-            features = [ "process" "signal" "fs" ];
+            features = [ "process" "signal" "fs" "user" ];
           }
           {
             name = "reqwest";
@@ -8730,7 +8730,7 @@ rec {
           "user" = [ "feature" ];
           "zerocopy" = [ "fs" "uio" ];
         };
-        resolvedDefaultFeatures = [ "default" "fs" "poll" "process" "signal" ];
+        resolvedDefaultFeatures = [ "default" "feature" "fs" "poll" "process" "signal" "user" ];
       };
       "nom" = rec {
         crateName = "nom";

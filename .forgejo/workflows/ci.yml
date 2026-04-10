@@ -7,23 +7,18 @@ on:
 jobs:
   check:
     runs-on: docker
-    env:
-      NIX_CONFIG: sandbox = true
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
 
       - name: Install Nix
-        uses: https://github.com/cachix/install-nix-action@v31
+        uses: https://github.com/DeterminateSystems/nix-installer-action@main
         with:
-          extra_nix_config: |
+          extra-conf: |
             extra-substituters = https://scottylabs.cachix.org
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
 
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
-
-      - name: Remove homeless-shelter
-        run: rm -rf /homeless-shelter || true
 
       - name: Check formatting
         run: devenv shell treefmt --fail-on-change
