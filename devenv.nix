@@ -11,6 +11,7 @@ in
   ] ++ (with pkgs; [
     pkg-config
     openssl
+    dbus
     postgresql_18
     sea-orm-cli
     mdbook
