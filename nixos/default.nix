@@ -155,13 +155,6 @@ in
           example = "kennel";
           description = "Cachix cache name";
         };
-
-        authTokenFile = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          example = "/run/secrets/cachix-auth-token";
-          description = "Path to file containing Cachix auth token";
-        };
       };
     };
 
@@ -169,13 +162,6 @@ in
       enable = mkEnableOption "Automatic DNS management";
 
       cloudflare = {
-        apiTokenFile = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          example = "/run/secrets/cloudflare-api-token";
-          description = "Path to file containing Cloudflare API token";
-        };
-
         zones = mkOption {
           type = types.attrsOf types.str;
           default = { };
@@ -212,6 +198,13 @@ in
       default = "kennel";
       description = "Group to run Kennel service as";
     };
+
+    environmentFile = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      example = "/run/agenix/kennel";
+      description = "Path to environment file with secrets (CACHIX_AUTH_TOKEN, DNS_CLOUDFLARE_API_TOKEN, etc.)";
+    };
   };
 
   config = mkIf cfg.enable {
@@ -223,14 +216,6 @@ in
       {
         assertion = cfg.builder.cachix.enable -> cfg.builder.cachix.cacheName != null;
         message = "services.kennel.builder.cachix.cacheName must be set when Cachix is enabled";
-      }
-      {
-        assertion = cfg.builder.cachix.enable -> cfg.builder.cachix.authTokenFile != null;
-        message = "services.kennel.builder.cachix.authTokenFile must be set when Cachix is enabled";
-      }
-      {
-        assertion = cfg.dns.enable -> cfg.dns.cloudflare.apiTokenFile != null;
-        message = "services.kennel.dns.cloudflare.apiTokenFile must be set when DNS is enabled";
       }
       {
         assertion = cfg.dns.enable -> cfg.dns.cloudflare.zones != { };
@@ -306,9 +291,7 @@ in
           "DNS_SERVER_IPV6=${cfg.dns.serverIpv6}"
         ];
 
-        EnvironmentFile =
-          (optionals (cfg.builder.cachix.authTokenFile != null) [ cfg.builder.cachix.authTokenFile ])
-          ++ (optionals cfg.dns.enable [ cfg.dns.cloudflare.apiTokenFile ]);
+        EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
 
         # User switching (setuid/setgid) for per-deployment process isolation
         AmbientCapabilities = [ "CAP_SETUID" "CAP_SETGID" "CAP_NET_BIND_SERVICE" ];
