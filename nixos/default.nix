@@ -247,6 +247,7 @@ in
       description = "Kennel deployment platform";
       after = [ "network.target" ] ++ optional cfg.database.createLocally "postgresql.service";
       wantedBy = [ "multi-user.target" ];
+      restartTriggers = optional (cfg.projects != { }) (builtins.hashString "sha256" (builtins.toJSON cfg.projects));
 
       environment = {
         RUST_LOG = "info";
