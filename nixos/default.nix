@@ -252,6 +252,7 @@ in
       path = with pkgs; [ git nix cachix ];
 
       environment = {
+        HOME = "/var/lib/kennel";
         RUST_LOG = "info";
         DATABASE_URL = "postgresql://${cfg.database.user}@localhost:${toString cfg.database.port}/${cfg.database.name}?host=${cfg.database.host}";
         API_HOST = cfg.api.host;
