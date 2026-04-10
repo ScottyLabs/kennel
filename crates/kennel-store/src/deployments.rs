@@ -5,7 +5,7 @@ use ::entity::{
     services,
 };
 use sea_orm::sea_query::{LockBehavior, LockType};
-use sea_orm::{entity::*, query::*, sea_query::Expr, *};
+use sea_orm::{entity::*, query::*, *};
 use uuid::Uuid;
 
 pub struct DeploymentRepository<'a> {
@@ -129,19 +129,17 @@ impl<'a> DeploymentRepository<'a> {
     pub async fn mark_ids_torn_down(&self, ids: &[Uuid]) -> crate::Result<()> {
         use chrono::Utc;
 
-        if !ids.is_empty() {
-            Deployments::update_many()
-                .filter(deployments::Column::Id.is_in(ids.iter().copied()))
-                .col_expr(
-                    deployments::Column::Status,
-                    Expr::value(DeploymentStatus::TornDown),
-                )
-                .col_expr(
-                    deployments::Column::UpdatedAt,
-                    Expr::value(Utc::now().naive_utc()),
-                )
-                .exec(self.db)
-                .await?;
+        let deployments = Deployments::find()
+            .filter(deployments::Column::Id.is_in(ids.iter().copied()))
+            .all(self.db)
+            .await?;
+
+        let now = Utc::now().naive_utc();
+        for deployment in deployments {
+            let mut active: deployments::ActiveModel = deployment.into();
+            active.status = Set(DeploymentStatus::TornDown);
+            active.updated_at = Set(now);
+            active.update(self.db).await?;
         }
 
         Ok(())
@@ -180,15 +178,15 @@ impl<'a> DeploymentRepository<'a> {
     pub async fn update_dns_status(&self, id: Uuid, dns_status: DnsStatus) -> crate::Result<()> {
         use chrono::Utc;
 
-        Deployments::update_many()
-            .filter(deployments::Column::Id.eq(id))
-            .col_expr(deployments::Column::DnsStatus, Expr::value(dns_status))
-            .col_expr(
-                deployments::Column::UpdatedAt,
-                Expr::value(Utc::now().naive_utc()),
-            )
-            .exec(self.db)
-            .await?;
+        let deployment = Deployments::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| crate::StoreError::NotFound(format!("deployment {id}")))?;
+
+        let mut active: deployments::ActiveModel = deployment.into();
+        active.dns_status = Set(dns_status);
+        active.updated_at = Set(Utc::now().naive_utc());
+        active.update(self.db).await?;
 
         Ok(())
     }
@@ -217,19 +215,17 @@ impl<'a> DeploymentRepository<'a> {
     pub async fn mark_tearing_down(&self, ids: &[Uuid]) -> crate::Result<()> {
         use chrono::Utc;
 
-        if !ids.is_empty() {
-            Deployments::update_many()
-                .filter(deployments::Column::Id.is_in(ids.iter().copied()))
-                .col_expr(
-                    deployments::Column::Status,
-                    Expr::value(DeploymentStatus::TearingDown),
-                )
-                .col_expr(
-                    deployments::Column::UpdatedAt,
-                    Expr::value(Utc::now().naive_utc()),
-                )
-                .exec(self.db)
-                .await?;
+        let deployments = Deployments::find()
+            .filter(deployments::Column::Id.is_in(ids.iter().copied()))
+            .all(self.db)
+            .await?;
+
+        let now = Utc::now().naive_utc();
+        for deployment in deployments {
+            let mut active: deployments::ActiveModel = deployment.into();
+            active.status = Set(DeploymentStatus::TearingDown);
+            active.updated_at = Set(now);
+            active.update(self.db).await?;
         }
 
         Ok(())
