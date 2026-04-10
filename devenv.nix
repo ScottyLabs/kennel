@@ -1,7 +1,14 @@
 { pkgs, config, inputs, ... }:
 
 let
-  cargoNix = pkgs.callPackage ./Cargo.nix { };
+  cargoNix = pkgs.callPackage ./Cargo.nix {
+    defaultCrateOverrides = pkgs.defaultCrateOverrides // {
+      libdbus-sys = attrs: {
+        nativeBuildInputs = [ pkgs.pkg-config ];
+        buildInputs = [ pkgs.dbus ];
+      };
+    };
+  };
   kennel = cargoNix.workspaceMembers.kennel.build;
 in
 {
