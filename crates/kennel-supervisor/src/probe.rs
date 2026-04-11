@@ -89,11 +89,11 @@ async fn probe_exec(command: &str, timeout: Duration, user: Option<&str>) -> any
     cmd.arg("-c").arg(command);
 
     #[cfg(target_os = "linux")]
-    if let Some(username) = user {
-        if let Ok(Some(user_info)) = nix::unistd::User::from_name(username) {
-            cmd.uid(user_info.uid.as_raw());
-            cmd.gid(user_info.gid.as_raw());
-        }
+    if let Some(username) = user
+        && let Ok(Some(user_info)) = nix::unistd::User::from_name(username)
+    {
+        cmd.uid(user_info.uid.as_raw());
+        cmd.gid(user_info.gid.as_raw());
     }
 
     let result = tokio::time::timeout(timeout, cmd.output()).await??;

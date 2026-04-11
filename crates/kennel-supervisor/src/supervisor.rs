@@ -87,6 +87,12 @@ impl Supervisor {
 
         let bound_sockets = crate::socket::bind_sockets(&config.listen)?;
 
+        for sock in &bound_sockets {
+            if let Some(addr) = sock.address {
+                tracing::info!(process = %name, %addr, "bound socket");
+            }
+        }
+
         let cgroup = if let Some(ref limits) = config.resources {
             Some(CgroupWrapper::create(&name, limits)?)
         } else {
@@ -177,21 +183,21 @@ impl Supervisor {
                     }
 
                     #[cfg(target_os = "linux")]
-                    if let Some(ref username) = pre_exec_user {
-                        if let Ok((uid, gid)) = resolve_user(username) {
-                            nix::unistd::setgid(gid).map_err(|e| {
-                                std::io::Error::new(
-                                    std::io::ErrorKind::PermissionDenied,
-                                    format!("setgid failed: {e}"),
-                                )
-                            })?;
-                            nix::unistd::setuid(uid).map_err(|e| {
-                                std::io::Error::new(
-                                    std::io::ErrorKind::PermissionDenied,
-                                    format!("setuid failed: {e}"),
-                                )
-                            })?;
-                        }
+                    if let Some(ref username) = pre_exec_user
+                        && let Ok((uid, gid)) = resolve_user(username)
+                    {
+                        nix::unistd::setgid(gid).map_err(|e| {
+                            std::io::Error::new(
+                                std::io::ErrorKind::PermissionDenied,
+                                format!("setgid failed: {e}"),
+                            )
+                        })?;
+                        nix::unistd::setuid(uid).map_err(|e| {
+                            std::io::Error::new(
+                                std::io::ErrorKind::PermissionDenied,
+                                format!("setuid failed: {e}"),
+                            )
+                        })?;
                     }
 
                     #[cfg(target_os = "linux")]
@@ -431,7 +437,7 @@ fn build_command(config: &ProcessConfig) -> Arc<Command> {
 fn resolve_user(username: &str) -> std::io::Result<(nix::unistd::Uid, nix::unistd::Gid)> {
     use nix::unistd::User;
     let user = User::from_name(username)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+        .map_err(std::io::Error::other)?
         .ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,

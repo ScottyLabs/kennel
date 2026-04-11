@@ -58,17 +58,6 @@ impl CgroupWrapper {
         })
     }
 
-    /// Move a process into this cgroup.
-    #[cfg(target_os = "linux")]
-    pub fn add_pid(&self, pid: u32) -> crate::Result<()> {
-        write_limit(&self.path, "cgroup.procs", &pid.to_string())
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    pub fn add_pid(&self, _pid: u32) -> crate::Result<()> {
-        Ok(())
-    }
-
     /// Read live resource usage from cgroup control files.
     #[cfg(target_os = "linux")]
     pub fn stats(&self) -> crate::Result<CgroupStats> {
@@ -183,20 +172,6 @@ mod tests {
         // On macOS this is a no-op that succeeds.
         let wrapper = CgroupWrapper::create("test-process", &limits).unwrap();
         assert!(wrapper.path().ends_with("test-process"));
-    }
-
-    #[test]
-    fn add_pid_on_non_linux() {
-        let limits = ResourceLimits {
-            memory_max: None,
-            memory_high: None,
-            cpu_max: None,
-            cpu_weight: None,
-            tasks_max: None,
-        };
-
-        let wrapper = CgroupWrapper::create("test-pid", &limits).unwrap();
-        wrapper.add_pid(12345).unwrap();
     }
 
     #[test]

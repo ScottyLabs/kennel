@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tokio::net::UnixDatagram;
 
@@ -45,9 +45,4 @@ pub async fn wait_for_ready(socket_path: &Path, timeout: std::time::Duration) ->
             socket_path.display().to_string(),
         )),
     }
-}
-
-/// Generate a notify socket path for a process.
-pub fn socket_path(process_name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("kennel-notify-{process_name}"))
 }
