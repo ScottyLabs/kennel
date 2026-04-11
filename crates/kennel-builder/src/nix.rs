@@ -34,6 +34,7 @@ pub async fn build(work_dir: &Path, service_name: &str, build_id: uuid::Uuid) ->
             .arg(&flake_ref)
             .arg("--out-link")
             .arg(&out_link)
+            .arg("--accept-flake-config")
             .arg("--log-format")
             .arg("bar-with-logs")
             .current_dir(&repo_path)
@@ -84,6 +85,7 @@ pub async fn eval_task_config(work_dir: &Path) -> Result<std::path::PathBuf> {
         .arg(".#devenv.shells.default.config.task.config")
         .arg("--no-link")
         .arg("--print-out-paths")
+        .arg("--accept-flake-config")
         .current_dir(&repo_path)
         .output()
         .await?;

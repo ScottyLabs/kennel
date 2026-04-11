@@ -21,6 +21,9 @@ pub async fn process_build(build_id: uuid::Uuid, config: Arc<BuilderConfig>) -> 
 
     let work_dir = PathBuf::from(&config.work_dir).join(build_id.to_string());
 
+    // Remove any leftover work directory from a previous failed attempt.
+    let _ = tokio::fs::remove_dir_all(&work_dir).await;
+
     let kennel_config = clone_and_parse_config(&config, &build, build_id, &work_dir).await?;
 
     if check_cancelled(&config.store, build_id).await? {
@@ -358,15 +361,21 @@ async fn evaluate_devenv_tasks(
         build_id
     );
 
-    let task_config_path = nix::eval_task_config(work_dir).await?;
-    let tasks_json = tokio::fs::read_to_string(&task_config_path)
-        .await
-        .map_err(|e| {
-            crate::BuilderError::Other(anyhow::anyhow!("Failed to read tasks.json: {e}"))
-        })?;
-
-    let (process_configs, required_resources) = kennel_supervisor::devenv::parse_tasks(&tasks_json)
-        .map_err(|e| crate::BuilderError::Other(anyhow::anyhow!(e)))?;
+    let (process_configs, required_resources) = match nix::eval_task_config(work_dir).await {
+        Ok(task_config_path) => {
+            let tasks_json = tokio::fs::read_to_string(&task_config_path)
+                .await
+                .map_err(|e| {
+                    crate::BuilderError::Other(anyhow::anyhow!("Failed to read tasks.json: {e}"))
+                })?;
+            kennel_supervisor::devenv::parse_tasks(&tasks_json)
+                .map_err(|e| crate::BuilderError::Other(anyhow::anyhow!(e)))?
+        }
+        Err(_) => {
+            info!("No devenv task configuration found, skipping");
+            (vec![], vec![])
+        }
+    };
 
     info!(
         "Found {} application processes and {} infrastructure requirements",
