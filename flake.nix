@@ -38,7 +38,7 @@
           };
           kennel = cargoNix.workspaceMembers.kennel.build;
 
-          kennelDocs = pkgs.stdenv.mkDerivation {
+          docs = pkgs.stdenv.mkDerivation {
             pname = "kennel-docs";
             version = "0.1.0";
             src = ./sites/docs;
@@ -54,7 +54,7 @@
             '';
           };
 
-          kennelWeb = b2n.mkDerivation {
+          web = b2n.mkDerivation {
             pname = "kennel-web";
             version = (builtins.fromJSON (builtins.readFile ./sites/web/package.json)).version;
             src = ./sites/web;
@@ -74,7 +74,7 @@
           };
         in
         {
-          inherit kennel kennelDocs kennelWeb;
+          inherit kennel docs web;
           default = kennel;
           devenv = devenv.packages.${system}.devenv;
         }
