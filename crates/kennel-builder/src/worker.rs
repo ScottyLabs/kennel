@@ -237,7 +237,7 @@ async fn build_all_packages(
         }
     }
 
-    for site_name in kennel_config.static_sites.keys() {
+    for (site_name, site_config) in &kennel_config.static_sites {
         if check_cancelled(&config.store, build_id)
             .await
             .unwrap_or(false)
@@ -246,11 +246,16 @@ async fn build_all_packages(
             return false;
         }
 
+        let package_name = site_config
+            .flake_output
+            .as_deref()
+            .unwrap_or(site_name.as_str());
+
         if !build_package(
             config,
             build,
             work_dir,
-            site_name,
+            package_name,
             build_id,
             store_paths,
             false,

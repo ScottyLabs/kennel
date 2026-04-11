@@ -27,6 +27,9 @@ pub struct StaticSiteConfig {
 
     #[serde(default)]
     pub custom_domain: Option<String>,
+
+    #[serde(default)]
+    pub flake_output: Option<String>,
 }
 
 pub async fn parse_kennel_toml(repo_path: &Path) -> std::io::Result<KennelConfig> {
