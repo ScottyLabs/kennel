@@ -2,6 +2,7 @@ mod build;
 mod caddy;
 mod deploy;
 mod reconcile;
+mod secrets;
 mod signal;
 pub mod store;
 mod systemd;

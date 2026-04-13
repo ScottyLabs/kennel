@@ -177,7 +177,17 @@ async fn deploy_service(
         }
     }
 
-    // TODO: resolve secrets via secretspec/OpenBao
+    if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT") {
+        let env_str = environment.to_string();
+        match crate::secrets::resolve(std::path::Path::new(store_path), &env_str, &vault_endpoint) {
+            Ok(secrets) => env_vars.extend(secrets),
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "secret resolution failed for service '{name}': {e}"
+                ));
+            }
+        }
+    }
 
     let exec_start = find_executable(store_path).await?;
     let port = allocate_port(&unit_name);
@@ -251,7 +261,7 @@ fn allocate_port(unit_name: &str) -> u16 {
     PORT_RANGE_START + (hash % PORT_RANGE_SIZE as u32) as u16
 }
 
-async fn find_executable(store_path: &str) -> anyhow::Result<String> {
+pub async fn find_executable(store_path: &str) -> anyhow::Result<String> {
     let bin_dir = PathBuf::from(store_path).join("bin");
     if bin_dir.exists() {
         let mut entries = tokio::fs::read_dir(&bin_dir).await?;

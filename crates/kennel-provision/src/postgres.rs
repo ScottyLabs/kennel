@@ -73,8 +73,33 @@ impl ResourceProvider for PostgresProvider {
         Ok(())
     }
 
-    async fn reconcile(&self, _active: &[ResourceRequest]) -> anyhow::Result<()> {
-        // TODO: list kennel_* databases, drop those not in active set
+    async fn reconcile(&self, active: &[ResourceRequest]) -> anyhow::Result<()> {
+        let active_dbs: std::collections::HashSet<String> =
+            active.iter().map(Self::db_name).collect();
+
+        let output = tokio::process::Command::new("psql")
+            .args([
+                "-h", &self.socket_dir, "-tAc",
+                "SELECT datname FROM pg_database WHERE datname LIKE 'kennel_%'",
+            ])
+            .output()
+            .await?;
+
+        let existing: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(String::from)
+            .collect();
+
+        for db in existing {
+            if !active_dbs.contains(&db) {
+                tracing::info!(db = %db, "dropping orphaned database");
+                let _ = tokio::process::Command::new("dropdb")
+                    .args(["-h", &self.socket_dir, "--if-exists", &db])
+                    .output()
+                    .await;
+            }
+        }
+
         Ok(())
     }
 }

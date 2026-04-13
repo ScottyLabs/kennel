@@ -80,7 +80,12 @@ async fn process_build(
         store_paths.insert(name.clone(), store_path);
     }
 
-    // TODO: push to cachix if configured
+    if let Ok(cache_name) = dotenvy::var("CACHIX_CACHE_NAME") {
+        let paths: Vec<&str> = store_paths.values().map(String::as_str).collect();
+        if let Err(e) = cachix_push(&cache_name, &paths).await {
+            tracing::warn!(error = %e, "cachix push failed");
+        }
+    }
 
     state.store.builds().set_result(
         &build.id,
@@ -187,5 +192,24 @@ async fn run_cmd(program: &str, args: &[&str], cwd: &Path) -> anyhow::Result<()>
         args.join(" "),
         String::from_utf8_lossy(&output.stderr)
     );
+    Ok(())
+}
+
+async fn cachix_push(cache_name: &str, paths: &[&str]) -> anyhow::Result<()> {
+    let mut args = vec!["push", cache_name];
+    args.extend(paths);
+
+    let output = Command::new("cachix")
+        .args(&args)
+        .output()
+        .await?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "cachix push failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    tracing::info!(cache = %cache_name, count = paths.len(), "pushed to cachix");
     Ok(())
 }

@@ -1,6 +1,7 @@
 use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
 use crate::{deploy, AppState};
+use kennel_provision::ResourceProvider;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -55,7 +56,46 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
         if !systemd.is_active(unit_name).await {
             tracing::info!(unit = %unit_name, "restarting missing unit");
-            // TODO: re-resolve secrets, re-provision resources, start unit
+
+            let request = kennel_provision::ResourceRequest {
+                project_name: deployment.project_id.clone(),
+                service_name: deployment.service_name.clone(),
+                branch_slug: deployment.branch_slug.clone(),
+                environment: kennel_config::Environment::from_branch(&deployment.branch),
+            };
+
+            let mut env_vars: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new();
+            for provider in &state.providers {
+                if let Ok(vars) = provider.provision(&request).await {
+                    env_vars.extend(vars);
+                }
+            }
+
+            if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT") {
+                let env_str = request.environment.to_string();
+                if let Ok(secrets) = crate::secrets::resolve(
+                    std::path::Path::new(&deployment.store_path),
+                    &env_str,
+                    &vault_endpoint,
+                ) {
+                    env_vars.extend(secrets);
+                }
+            }
+
+            if let Some(port) = deployment.port {
+                env_vars.insert("PORT".to_string(), port.to_string());
+            }
+
+            let exec = deploy::find_executable(&deployment.store_path).await;
+            if let Ok(exec_start) = exec {
+                if let Err(e) = systemd
+                    .start_transient_unit(unit_name, &exec_start, Some(unit_name), &env_vars)
+                    .await
+                {
+                    tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
+                }
+            }
         }
     }
 
