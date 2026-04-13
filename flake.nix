@@ -21,13 +21,15 @@
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgsFor = system: nixpkgs.legacyPackages.${system};
+      pkgsFor = system: import nixpkgs {
+        inherit system;
+        overlays = [ bun2nix.overlays.default ];
+      };
     in
     {
       packages = forAllSystems (system:
         let
           pkgs = pkgsFor system;
-          b2n = bun2nix.packages.${system}.default;
           cargoNix = pkgs.callPackage ./Cargo.nix {
             defaultCrateOverrides = pkgs.defaultCrateOverrides // {
               libdbus-sys = attrs: {
@@ -54,12 +56,12 @@
             '';
           };
 
-          web = b2n.mkDerivation {
+          web = pkgs.bun2nix.mkDerivation {
             pname = "kennel-web";
             version = (builtins.fromJSON (builtins.readFile ./sites/web/package.json)).version;
             src = ./sites/web;
 
-            bunDeps = b2n.fetchBunDeps {
+            bunDeps = pkgs.bun2nix.fetchBunDeps {
               bunNix = ./sites/web/bun.nix;
             };
 
