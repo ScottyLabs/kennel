@@ -16,5 +16,8 @@ pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(300);
 
+pub const PORT_RANGE_START: u16 = 10000;
+pub const PORT_RANGE_SIZE: u16 = 50000;
+
 pub const DEPLOYMENT_EXPIRY_DAYS: i64 = 7;
 pub const LOG_RETENTION_DAYS: i64 = 30;

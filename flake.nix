@@ -11,17 +11,13 @@
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     devenv.url = "github:cachix/devenv";
-    bun2nix.url = "github:nix-community/bun2nix";
   };
 
-  outputs = { self, nixpkgs, devenv, bun2nix, ... }:
+  outputs = { self, nixpkgs, devenv, ... }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgsFor = system: import nixpkgs {
-        inherit system;
-        overlays = [ bun2nix.overlays.default ];
-      };
+      pkgsFor = system: nixpkgs.legacyPackages.${system};
     in
     {
       packages = forAllSystems (system:
@@ -29,51 +25,16 @@
           pkgs = pkgsFor system;
           cargoNix = pkgs.callPackage ./Cargo.nix {
             defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-              libdbus-sys = attrs: {
+              libsqlite3-sys = attrs: {
                 nativeBuildInputs = [ pkgs.pkg-config ];
-                buildInputs = [ pkgs.dbus ];
+                buildInputs = [ pkgs.sqlite ];
               };
             };
           };
           kennel = cargoNix.workspaceMembers.kennel.build;
-
-          docs = pkgs.stdenv.mkDerivation {
-            pname = "kennel-docs";
-            version = "0.1.0";
-            src = ./sites/docs;
-            nativeBuildInputs = [ pkgs.mdbook ];
-
-            buildPhase = ''
-              mdbook build
-            '';
-
-            installPhase = ''
-              mkdir -p $out
-              cp -r book/* $out/
-            '';
-          };
-
-          web = pkgs.bun2nix.mkDerivation {
-            pname = "kennel-web";
-            version = (builtins.fromJSON (builtins.readFile ./sites/web/package.json)).version;
-            src = ./sites/web;
-
-            bunDeps = pkgs.bun2nix.fetchBunDeps {
-              bunNix = ./sites/web/bun.nix;
-            };
-
-            buildPhase = ''
-              bun run build
-            '';
-
-            installPhase = ''
-              mkdir -p $out
-              cp -r dist/* $out/
-            '';
-          };
         in
         {
-          inherit kennel docs web;
+          inherit kennel;
           default = kennel;
           devenv = devenv.packages.${system}.devenv;
         }

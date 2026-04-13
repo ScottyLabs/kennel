@@ -6,6 +6,7 @@ use axum::{
     routing::post,
 };
 use hmac::{Hmac, Mac, digest::KeyInit};
+use sea_orm::ActiveValue::Set;
 use sha2::Sha256;
 use std::sync::Arc;
 
@@ -51,8 +52,21 @@ async fn handle_webhook(
             deleted,
         } => {
             if deleted {
-                // TODO: mark deployments for teardown
-                state.signal.notify_one();
+                let deleted = state
+                    .store
+                    .deployments()
+                    .delete_by_project_branch(&project.id, &branch)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                if !deleted.is_empty() {
+                    tracing::info!(
+                        project = %project.name,
+                        branch = %branch,
+                        count = deleted.len(),
+                        "marked deployments for teardown"
+                    );
+                    state.signal.notify_one();
+                }
                 return Ok(StatusCode::ACCEPTED);
             }
 
@@ -63,8 +77,10 @@ async fn handle_webhook(
                 format!("refs/heads/{branch}")
             };
 
-            // TODO: create build record, cancel stale builds
-            state.signal.notify_one();
+            create_build(&state, &project, &branch, &git_ref, &commit_sha)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
             Ok(StatusCode::OK)
         }
         EventKind::PullRequest {
@@ -73,21 +89,75 @@ async fn handle_webhook(
             commit_sha,
         } => {
             let branch = format!("pr-{pr_number}");
+            let git_ref = format!("refs/pull/{pr_number}/head");
 
             match action.as_str() {
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
-                    // TODO: create build record
-                    state.signal.notify_one();
+                    create_build(&state, &project, &branch, &git_ref, &commit_sha)
+                        .await
+                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                     Ok(StatusCode::OK)
                 }
                 "closed" => {
-                    // TODO: mark deployments for teardown
-                    state.signal.notify_one();
+                    let deleted = state
+                        .store
+                        .deployments()
+                        .delete_by_project_branch(&project.id, &branch)
+                        .await
+                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                    if !deleted.is_empty() {
+                        state.signal.notify_one();
+                    }
                     Ok(StatusCode::ACCEPTED)
                 }
                 _ => Ok(StatusCode::ACCEPTED),
             }
         }
+    }
+}
+
+async fn create_build(
+    state: &AppState,
+    project: &::entity::projects::Model,
+    branch: &str,
+    git_ref: &str,
+    commit_sha: &str,
+) -> anyhow::Result<()> {
+    let build_id = uuid::Uuid::now_v7().to_string();
+
+    let model = ::entity::builds::ActiveModel {
+        id: Set(build_id.clone()),
+        project_id: Set(project.id.clone()),
+        branch: Set(branch.to_string()),
+        git_ref: Set(git_ref.to_string()),
+        commit_sha: Set(commit_sha.to_string()),
+        status: Set("queued".to_string()),
+        ..Default::default()
+    };
+
+    match state.store.builds().create(model).await {
+        Ok(_) => {
+            let cancelled = state
+                .store
+                .builds()
+                .cancel_stale(&project.id, branch, &build_id)
+                .await?;
+            if cancelled > 0 {
+                tracing::info!(
+                    project = %project.name,
+                    branch = %branch,
+                    cancelled = cancelled,
+                    "cancelled stale builds"
+                );
+            }
+            state.signal.notify_one();
+            Ok(())
+        }
+        Err(e) if e.to_string().contains("UNIQUE constraint failed") => {
+            tracing::debug!(project = %project.name, commit = %commit_sha, "build already exists");
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -99,8 +169,10 @@ async fn check_domain(
         return StatusCode::BAD_REQUEST;
     };
 
-    // TODO: check if domain belongs to an active deployment
-    StatusCode::NOT_FOUND
+    match state.store.deployments().find_by_domain(domain).await {
+        Ok(Some(_)) => StatusCode::OK,
+        _ => StatusCode::NOT_FOUND,
+    }
 }
 
 struct ParsedEvent {

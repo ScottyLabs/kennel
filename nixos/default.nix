@@ -16,38 +16,6 @@ in
       description = "The Kennel package to use";
     };
 
-    database = {
-      host = mkOption {
-        type = types.str;
-        default = "/run/postgresql";
-        description = "PostgreSQL host (Unix socket path or hostname)";
-      };
-
-      port = mkOption {
-        type = types.port;
-        default = 5432;
-        description = "PostgreSQL port";
-      };
-
-      name = mkOption {
-        type = types.str;
-        default = "kennel";
-        description = "Database name";
-      };
-
-      user = mkOption {
-        type = types.str;
-        default = "kennel";
-        description = "Database user";
-      };
-
-      createLocally = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to create database locally";
-      };
-    };
-
     api = {
       host = mkOption {
         type = types.str;
@@ -67,19 +35,17 @@ in
         options = {
           repoUrl = mkOption {
             type = types.str;
-            example = "https://codeberg.org/ScottyLabs/kennel";
             description = "Git repository URL";
           };
 
           repoType = mkOption {
             type = types.enum [ "forgejo" "github" ];
             default = "forgejo";
-            description = "Repository type (forgejo or github)";
+            description = "Repository type";
           };
 
           webhookSecretFile = mkOption {
             type = types.path;
-            example = "/run/secrets/kennel-webhook-secret";
             description = "Path to file containing webhook secret";
           };
 
@@ -91,46 +57,35 @@ in
         };
       });
       default = { };
-      example = {
-        kennel = {
-          repoUrl = "https://codeberg.org/ScottyLabs/kennel";
-          repoType = "forgejo";
-          webhookSecretFile = "/run/secrets/kennel-webhook";
-          defaultBranch = "main";
-        };
-      };
       description = "Projects to deploy with Kennel";
     };
 
-    router = {
-      address = mkOption {
+    domains = {
+      ephemeral = mkOption {
         type = types.str;
-        default = "0.0.0.0:80";
-        description = "Router bind address";
+        default = "scottylabs.net";
+        description = "Base domain for auto-generated deployment URLs";
       };
 
-      baseDomain = mkOption {
-        type = types.str;
-        example = "scottylabs.org";
-        description = "Base domain for auto-generated subdomains";
-      };
-
-      tls = {
-        enable = mkEnableOption "TLS/ACME support";
-
-        email = mkOption {
-          type = types.str;
-          default = "";
-          example = "admin@scottylabs.org";
-          description = "Email for Let's Encrypt account";
+      cloudflare = {
+        zones = mkOption {
+          type = types.attrsOf types.str;
+          default = { };
+          description = "Map of domain names to Cloudflare zone IDs for custom domain DNS";
         };
 
-        staging = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Use Let's Encrypt staging environment";
+        apiTokenFile = mkOption {
+          type = types.nullOr types.path;
+          default = null;
+          description = "Path to file containing Cloudflare API token";
         };
       };
+    };
+
+    caddy.adminUrl = mkOption {
+      type = types.str;
+      default = "http://localhost:2019";
+      description = "Caddy admin API URL";
     };
 
     builder = {
@@ -152,79 +107,84 @@ in
         cacheName = mkOption {
           type = types.nullOr types.str;
           default = null;
-          example = "kennel";
           description = "Cachix cache name";
         };
       };
     };
 
-    dns = {
-      enable = mkEnableOption "Automatic DNS management";
-
-      cloudflare = {
-        zones = mkOption {
-          type = types.attrsOf types.str;
-          default = { };
-          example = {
-            "scottylabs.org" = "abc123def456";
-            "example.com" = "xyz789ghi012";
-          };
-          description = "Map of domain names to Cloudflare zone IDs";
+    resources = {
+      postgres = {
+        enable = mkEnableOption "PostgreSQL resource provisioning";
+        socketDir = mkOption {
+          type = types.path;
+          default = "/run/postgresql";
+          description = "PostgreSQL Unix socket directory";
         };
       };
 
-      serverIpv4 = mkOption {
-        type = types.str;
-        example = "1.2.3.4";
-        description = "Server IPv4 address for DNS records";
+      valkey = {
+        enable = mkEnableOption "Valkey resource provisioning";
+        socketPath = mkOption {
+          type = types.path;
+          default = "/run/valkey/valkey.sock";
+          description = "Valkey Unix socket path";
+        };
       };
 
-      serverIpv6 = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = "2001:db8::1";
-        description = "Server IPv6 address for DNS records";
+      garage = {
+        enable = mkEnableOption "Garage S3 resource provisioning";
+        adminEndpoint = mkOption {
+          type = types.str;
+          default = "http://localhost:3903";
+          description = "Garage admin API endpoint";
+        };
+        s3Endpoint = mkOption {
+          type = types.str;
+          default = "http://localhost:3900";
+          description = "Garage S3 API endpoint";
+        };
+      };
+    };
+
+    secrets = {
+      enable = mkEnableOption "secretspec/OpenBao secret resolution";
+      vaultEndpoint = mkOption {
+        type = types.str;
+        default = "https://secrets2.scottylabs.org";
+        description = "OpenBao/Vault endpoint";
       };
     };
 
     user = mkOption {
       type = types.str;
       default = "kennel";
-      description = "User to run Kennel service as";
+      description = "User to run Kennel as";
     };
 
     group = mkOption {
       type = types.str;
       default = "kennel";
-      description = "Group to run Kennel service as";
+      description = "Group to run Kennel as";
     };
 
     environmentFile = mkOption {
       type = types.nullOr types.path;
       default = null;
-      example = "/run/agenix/kennel";
-      description = "Path to environment file with secrets (CACHIX_AUTH_TOKEN, DNS_CLOUDFLARE_API_TOKEN, etc.)";
+      description = "Path to environment file with secrets";
     };
   };
 
   config = mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.router.tls.enable -> cfg.router.tls.email != "";
-        message = "services.kennel.router.tls.email must be set when TLS is enabled";
-      }
-      {
         assertion = cfg.builder.cachix.enable -> cfg.builder.cachix.cacheName != null;
         message = "services.kennel.builder.cachix.cacheName must be set when Cachix is enabled";
       }
       {
-        assertion = cfg.dns.enable -> cfg.dns.cloudflare.zones != { };
-        message = "services.kennel.dns.cloudflare.zones must be configured when DNS is enabled";
+        assertion = cfg.resources.garage.enable -> cfg.environmentFile != null;
+        message = "An environmentFile containing GARAGE_ADMIN_TOKEN is required when Garage is enabled";
       }
     ];
-
-    warnings = optional cfg.router.tls.staging
-      "Kennel TLS is using Let's Encrypt staging environment. Certificates will not be trusted by browsers.";
 
     users.users.${cfg.user} = mkIf (cfg.user == "kennel") {
       isSystemUser = true;
@@ -234,18 +194,25 @@ in
 
     users.groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
 
-    services.postgresql = mkIf cfg.database.createLocally {
-      enable = true;
-      ensureDatabases = [ cfg.database.name ];
-      ensureUsers = [{
-        name = cfg.database.user;
-        ensureDBOwnership = true;
-      }];
+    # Polkit rule allowing kennel to manage transient systemd units via D-Bus
+    security.polkit.extraConfig = ''
+      polkit.addRule(function(action, subject) {
+        if (action.id == "org.freedesktop.systemd1.manage-units" &&
+            subject.user == "${cfg.user}") {
+          return polkit.Result.YES;
+        }
+      });
+    '';
+
+    # Kennel manages processes in its own cgroup slice
+    systemd.slices.kennel = {
+      description = "Kennel managed deployments";
     };
 
     systemd.services.kennel = {
       description = "Kennel deployment platform";
-      after = [ "network.target" ] ++ optional cfg.database.createLocally "postgresql.service";
+      after = [ "network.target" "caddy.service" ];
+      wants = [ "caddy.service" ];
       wantedBy = [ "multi-user.target" ];
       restartTriggers = optional (cfg.projects != { }) (builtins.hashString "sha256" (builtins.toJSON cfg.projects));
 
@@ -254,29 +221,27 @@ in
       environment = {
         HOME = "/var/lib/kennel";
         RUST_LOG = "info";
-        DATABASE_URL = "postgresql://${cfg.database.user}@localhost:${toString cfg.database.port}/${cfg.database.name}?host=${cfg.database.host}";
+        DATABASE_PATH = "/var/lib/kennel/kennel.db";
         API_HOST = cfg.api.host;
         API_PORT = toString cfg.api.port;
-        ROUTER_ADDR = cfg.router.address;
-        BASE_DOMAIN = cfg.router.baseDomain;
+        EPHEMERAL_DOMAIN = cfg.domains.ephemeral;
+        CADDY_ADMIN_URL = cfg.caddy.adminUrl;
         MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
         WORK_DIR = cfg.builder.workDir;
-      } // optionalAttrs cfg.router.tls.enable {
-        TLS_ENABLED = "true";
-        ACME_EMAIL = cfg.router.tls.email;
-        ACME_STAGING = if cfg.router.tls.staging then "true" else "false";
       } // optionalAttrs cfg.builder.cachix.enable {
         CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
-      } // optionalAttrs cfg.dns.enable {
-        DNS_ENABLED = "true";
-        DNS_CLOUDFLARE_ZONES = builtins.toJSON (mapAttrs (domain: zoneId: zoneId) cfg.dns.cloudflare.zones);
-        DNS_SERVER_IPV4 = cfg.dns.serverIpv4;
-      } // optionalAttrs (cfg.dns.serverIpv6 != null) {
-        DNS_SERVER_IPV6 = cfg.dns.serverIpv6;
+      } // optionalAttrs cfg.resources.postgres.enable {
+        POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
+      } // optionalAttrs cfg.resources.valkey.enable {
+        VALKEY_SOCKET_PATH = cfg.resources.valkey.socketPath;
+      } // optionalAttrs cfg.resources.garage.enable {
+        GARAGE_ADMIN_ENDPOINT = cfg.resources.garage.adminEndpoint;
+        GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
+      } // optionalAttrs cfg.secrets.enable {
+        VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
       };
 
       serviceConfig = {
-        Type = "notify";
         User = cfg.user;
         Group = cfg.group;
         ExecStart = "${cfg.package}/bin/kennel";
@@ -292,18 +257,12 @@ in
           "/run/kennel"
         ];
 
-        # cgroup v2 delegation for per-process resource isolation
         Delegate = "yes";
 
         EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
-
-        # User switching (setuid/setgid) for per-deployment process isolation
-        AmbientCapabilities = [ "CAP_SETUID" "CAP_SETGID" "CAP_NET_BIND_SERVICE" ];
-        CapabilityBoundingSet = [ "CAP_SETUID" "CAP_SETGID" "CAP_NET_BIND_SERVICE" ];
       };
     };
 
-    # Create projects configuration file for Kennel to read on startup
     environment.etc."kennel/projects.json" = mkIf (cfg.projects != { }) {
       text = builtins.toJSON (mapAttrsToList
         (name: proj: {
@@ -324,16 +283,11 @@ in
       "d /var/lib/kennel/builds 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/services 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/acme 0700 ${cfg.user} ${cfg.group} -"
       "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
-      "d /run/kennel/secrets 0700 ${cfg.user} ${cfg.group} -"
     ];
 
     networking.firewall = {
-      allowedTCPPorts = [ cfg.api.port ]
-        ++ optional cfg.router.tls.enable 443
-        ++ optional (!cfg.router.tls.enable) 80;
+      allowedTCPPorts = [ cfg.api.port 443 80 ];
     };
 
     nix.settings = {
