@@ -10,6 +10,10 @@ impl<'a> ProjectRepository<'a> {
         Self { db }
     }
 
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<projects::Model>, DbErr> {
+        Projects::find_by_id(id).one(self.db).await
+    }
+
     pub async fn find_by_name(&self, name: &str) -> Result<Option<projects::Model>, DbErr> {
         Projects::find()
             .filter(projects::Column::Name.eq(name))

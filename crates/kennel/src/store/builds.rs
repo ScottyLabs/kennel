@@ -44,6 +44,25 @@ impl<'a> BuildRepository<'a> {
         Ok(result.rows_affected)
     }
 
+    pub async fn set_result(
+        &self,
+        id: &str,
+        store_paths: &str,
+        kennel_config: &str,
+    ) -> Result<(), DbErr> {
+        let mut model: builds::ActiveModel = Builds::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or(DbErr::RecordNotFound(id.to_string()))?
+            .into();
+
+        model.status = Set("built".to_string());
+        model.store_paths = Set(Some(serde_json::from_str(store_paths).unwrap_or_default()));
+        model.kennel_config = Set(Some(serde_json::from_str(kennel_config).unwrap_or_default()));
+        model.update(self.db).await?;
+        Ok(())
+    }
+
     pub async fn cancel_stale(
         &self,
         project_id: &str,
