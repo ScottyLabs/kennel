@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use entity::sea_orm_active_enums::{DeploymentStatus, ServiceType};
-use entity::{deployments, services};
+use entity::deployments;
+use entity::sea_orm_active_enums::DeploymentStatus;
 use kennel_config::KennelConfig;
 use kennel_store::Store;
 use kennel_supervisor::SupervisorEvent;
@@ -58,45 +58,12 @@ pub async fn deploy_site(
 
     tokio::fs::rename(&temp_link, &site_link).await?;
 
-    let site_config = kennel_config.static_sites.get(&build_result.service_name);
-
-    let service = match store
+    let service_id = store
         .services()
         .find_by_project_and_name(build.project_id, &build_result.service_name)
         .await
         .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-    {
-        Some(existing) => {
-            let mut model: services::ActiveModel = existing.into();
-            model.custom_domain =
-                sea_orm::ActiveValue::Set(site_config.and_then(|s| s.custom_domain.clone()));
-            model.spa = sea_orm::ActiveValue::Set(site_config.map(|s| s.spa).unwrap_or(false));
-            model.package = sea_orm::ActiveValue::Set(build_result.service_name.clone());
-            sea_orm::ActiveModelTrait::update(model, store.db())
-                .await
-                .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-        }
-        None => {
-            let model = services::ActiveModel {
-                project_id: sea_orm::ActiveValue::Set(build.project_id),
-                project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
-                name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
-                r#type: sea_orm::ActiveValue::Set(ServiceType::Static),
-                package: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
-                health_check: sea_orm::ActiveValue::Set(None),
-                custom_domain: sea_orm::ActiveValue::Set(
-                    site_config.and_then(|s| s.custom_domain.clone()),
-                ),
-                spa: sea_orm::ActiveValue::Set(site_config.map(|s| s.spa).unwrap_or(false)),
-                ..Default::default()
-            };
-            store
-                .services()
-                .upsert(model)
-                .await
-                .map_err(|e| crate::DeployerError::Other(anyhow::anyhow!(e)))?
-        }
-    };
+        .map(|s| s.id);
 
     let domain = utils::generate_deployment_domain(
         &build_result.service_name,
@@ -110,7 +77,7 @@ pub async fn deploy_site(
         project_name: sea_orm::ActiveValue::Set(build.project_name.clone()),
         git_ref: sea_orm::ActiveValue::Set(build.git_ref.clone()),
         service_name: sea_orm::ActiveValue::Set(build_result.service_name.clone()),
-        service_id: sea_orm::ActiveValue::Set(Some(service.id)),
+        service_id: sea_orm::ActiveValue::Set(service_id),
         branch: sea_orm::ActiveValue::Set(build.branch.clone()),
         branch_slug: sea_orm::ActiveValue::Set(branch_sanitized.clone()),
         environment: sea_orm::ActiveValue::Set(crate::service::determine_environment(
@@ -135,6 +102,7 @@ pub async fn deploy_site(
         site_link.display()
     );
 
+    let site_config = kennel_config.static_sites.get(&build_result.service_name);
     if let Some(dns_manager) = &config.dns_manager
         && let Some(custom_domain) = site_config.and_then(|s| s.custom_domain.as_ref())
     {

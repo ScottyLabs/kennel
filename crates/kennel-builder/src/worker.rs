@@ -1,10 +1,11 @@
 use crate::error::Result;
 use crate::{BuilderConfig, cachix, git, nix};
 use entity::build_results;
-use entity::sea_orm_active_enums::{BuildResultStatus, BuildStatus};
+use entity::sea_orm_active_enums::{BuildResultStatus, BuildStatus, ServiceType};
+use entity::services;
 use kennel_config::parse_kennel_toml;
 use kennel_store::Store;
-use sea_orm::{ActiveValue::Set, IntoActiveModel};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, IntoActiveModel};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info, warn};
@@ -395,11 +396,12 @@ async fn finalize_build(
     required_resources: Vec<String>,
     kennel_config: &kennel_config::KennelConfig,
 ) -> Result<()> {
-    let mut build_active = build.into_active_model();
+    let mut build_active = build.clone().into_active_model();
     let now = chrono::Utc::now().naive_utc();
 
     if all_succeeded {
-        // Store build outputs on the record so the deployer can read them.
+        sync_services(&config.store, &build, kennel_config).await?;
+
         build_active.process_configs = Set(Some(
             serde_json::to_value(&process_configs).map_err(|e| anyhow::anyhow!(e))?,
         ));
@@ -435,4 +437,57 @@ async fn finalize_build(
             "One or more builds failed"
         )))
     }
+}
+
+async fn sync_services(
+    store: &Store,
+    build: &entity::builds::Model,
+    kennel_config: &kennel_config::KennelConfig,
+) -> Result<()> {
+    for (name, site_config) in &kennel_config.static_sites {
+        let existing = store
+            .services()
+            .find_by_project_and_name(build.project_id, name)
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        match existing {
+            Some(existing) => {
+                let mut model: services::ActiveModel = existing.into();
+                model.custom_domain = Set(site_config.custom_domain.clone());
+                model.spa = Set(site_config.spa);
+                model.package = Set(name.clone());
+                model
+                    .update(store.db())
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+            }
+            None => {
+                let model = services::ActiveModel {
+                    project_id: Set(build.project_id),
+                    project_name: Set(build.project_name.clone()),
+                    name: Set(name.clone()),
+                    r#type: Set(ServiceType::Static),
+                    package: Set(name.clone()),
+                    health_check: Set(None),
+                    custom_domain: Set(site_config.custom_domain.clone()),
+                    spa: Set(site_config.spa),
+                    ..Default::default()
+                };
+                store
+                    .services()
+                    .upsert(model)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+            }
+        }
+    }
+
+    info!(
+        "Synced {} services for project {}",
+        kennel_config.static_sites.len(),
+        build.project_name
+    );
+
+    Ok(())
 }
