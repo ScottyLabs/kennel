@@ -2,36 +2,64 @@ pub mod garage;
 pub mod postgres;
 pub mod valkey;
 
+use kennel_config::Environment;
 use std::collections::HashMap;
-
-use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 pub struct ResourceRequest {
     pub project_name: String,
     pub service_name: String,
-    pub branch: String,
     pub branch_slug: String,
-    pub environment: String,
-    pub system_user: String,
+    pub environment: Environment,
 }
 
-#[derive(Debug, Default)]
-pub struct ReconciliationSummary {
-    pub orphaned_resources_removed: usize,
-}
-
-#[async_trait]
-pub trait ResourceProvider: Send + Sync {
+pub trait ResourceProvider {
     fn name(&self) -> &str;
-
     async fn provision(&self, request: &ResourceRequest)
     -> anyhow::Result<HashMap<String, String>>;
-
     async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()>;
+    async fn reconcile(&self, active: &[ResourceRequest]) -> anyhow::Result<()>;
+}
 
-    async fn reconcile(
+pub enum Provider {
+    Postgres(postgres::PostgresProvider),
+    Valkey(valkey::ValkeyProvider),
+    Garage(garage::GarageProvider),
+}
+
+impl ResourceProvider for Provider {
+    fn name(&self) -> &str {
+        match self {
+            Self::Postgres(p) => p.name(),
+            Self::Valkey(v) => v.name(),
+            Self::Garage(g) => g.name(),
+        }
+    }
+
+    async fn provision(
         &self,
-        active_deployments: &[ResourceRequest],
-    ) -> anyhow::Result<ReconciliationSummary>;
+        request: &ResourceRequest,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        match self {
+            Self::Postgres(p) => p.provision(request).await,
+            Self::Valkey(v) => v.provision(request).await,
+            Self::Garage(g) => g.provision(request).await,
+        }
+    }
+
+    async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()> {
+        match self {
+            Self::Postgres(p) => p.teardown(request).await,
+            Self::Valkey(v) => v.teardown(request).await,
+            Self::Garage(g) => g.teardown(request).await,
+        }
+    }
+
+    async fn reconcile(&self, active: &[ResourceRequest]) -> anyhow::Result<()> {
+        match self {
+            Self::Postgres(p) => p.reconcile(active).await,
+            Self::Valkey(v) => v.reconcile(active).await,
+            Self::Garage(g) => g.reconcile(active).await,
+        }
+    }
 }

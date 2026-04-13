@@ -2,10 +2,6 @@
 
 pub mod prelude;
 
-pub mod build_results;
 pub mod builds;
 pub mod deployments;
-pub mod dns_records;
 pub mod projects;
-pub mod sea_orm_active_enums;
-pub mod services;

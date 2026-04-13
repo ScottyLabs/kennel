@@ -1,234 +1,134 @@
-mod config;
-mod dns;
+mod build;
+mod caddy;
+mod deploy;
 mod reconcile;
 mod signal;
-mod signals;
+pub mod store;
+mod systemd;
+mod teardown;
+mod webhook;
 
-use kennel_config::constants;
-use kennel_store::Store;
-use kennel_supervisor::{SupervisorEvent, SupervisorHandle};
-use migration::MigratorTrait;
-use sea_orm::{ConnectionTrait, Database};
+use anyhow::Result;
+use sea_orm::Database;
+use sea_orm_migration::MigratorTrait as _;
 use std::sync::Arc;
-use tokio::net::TcpListener;
+use store::Store;
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+pub struct AppState {
+    pub store: Store,
+    pub signal: Arc<Notify>,
+    pub config: AppConfig,
+    pub providers: Vec<kennel_provision::Provider>,
+}
+
+pub struct AppConfig {
+    pub api_host: String,
+    pub api_port: u16,
+    pub ephemeral_domain: String,
+    pub work_dir: String,
+    pub caddy_admin_url: String,
+    pub max_concurrent_builds: usize,
+}
+
+impl AppConfig {
+    fn from_env() -> Self {
+        Self {
+            api_host: dotenvy::var("API_HOST")
+                .unwrap_or_else(|_| kennel_config::constants::DEFAULT_API_HOST.into()),
+            api_port: dotenvy::var("API_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(kennel_config::constants::DEFAULT_API_PORT),
+            ephemeral_domain: dotenvy::var("EPHEMERAL_DOMAIN")
+                .unwrap_or_else(|_| kennel_config::constants::DEFAULT_EPHEMERAL_DOMAIN.into()),
+            work_dir: dotenvy::var("WORK_DIR")
+                .unwrap_or_else(|_| kennel_config::constants::DEFAULT_WORK_DIR.into()),
+            caddy_admin_url: dotenvy::var("CADDY_ADMIN_URL")
+                .unwrap_or_else(|_| "http://localhost:2019".into()),
+            max_concurrent_builds: dotenvy::var("MAX_CONCURRENT_BUILDS")
+                .ok()
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
+        }
+    }
+}
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let _ = dotenvy::dotenv();
+async fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
 
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer().json())
-        .init();
+    tracing_subscriber::fmt().json().init();
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let config = AppConfig::from_env();
+    let db_path = dotenvy::var("DATABASE_PATH")
+        .unwrap_or_else(|_| kennel_config::constants::DEFAULT_DB_PATH.into());
+    let db_url = format!("sqlite://{}?mode=rwc", db_path);
 
-    let db = Database::connect(&database_url).await?;
-
-    // Prevent concurrent instances from running.
-    let lock_result: Vec<sea_orm::QueryResult> = db
-        .query_all(sea_orm::Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            "SELECT pg_try_advisory_lock(hashtext('kennel'))".to_string(),
-        ))
-        .await?;
-    let locked: bool = lock_result
-        .first()
-        .and_then(|r| r.try_get_by_index::<bool>(0).ok())
-        .unwrap_or(false);
-    if !locked {
-        anyhow::bail!("Another instance is already running (advisory lock held)");
-    }
-
+    let db = Database::connect(&db_url).await?;
     migration::Migrator::up(&db, None).await?;
 
-    let store = Arc::new(Store::new(db));
+    let store = Store::new(db);
+    let providers = build_providers();
+    let signal = Arc::new(Notify::new());
 
-    tracing::info!("Database migrations complete");
+    let state = Arc::new(AppState {
+        store,
+        signal: signal.clone(),
+        config,
+        providers,
+    });
 
-    // Reset builds that were in progress when the previous instance crashed.
-    let building_reset = store.builds().reset_building_to_queued().await?;
-    if building_reset > 0 {
-        tracing::info!("Reset {building_reset} stuck Building builds to Queued");
-    }
-    let deploying_reset = store.builds().reset_deploying_to_built().await?;
-    if deploying_reset > 0 {
-        tracing::info!("Reset {deploying_reset} stuck Deploying builds to Built");
-    }
-
-    if let Err(e) = reconcile::reconcile_projects(store.clone()).await {
-        tracing::error!("Project reconciliation failed: {}", e);
-        return Err(e);
-    }
-
-    // Initialize supervisor with event channel.
-    // Subscribe before reconciliation so events from restarted processes
-    // are captured by the router.
-    let (event_tx, _) =
-        tokio::sync::broadcast::channel::<SupervisorEvent>(constants::SUPERVISOR_EVENT_CAPACITY);
-    let supervisor = SupervisorHandle::spawn(event_tx.clone());
-    let event_rx = event_tx.subscribe();
-
-    if let Err(e) = reconcile::reconcile_deployments(store.clone(), supervisor.clone()).await {
-        tracing::error!("Startup reconciliation failed: {}", e);
-    }
-
-    let signals = signals::Signals::new();
     let cancel = CancellationToken::new();
 
-    let base_domain =
-        std::env::var("BASE_DOMAIN").unwrap_or_else(|_| constants::DEFAULT_BASE_DOMAIN.into());
+    reconcile::run_once(&state).await?;
 
-    // Signal systemd that startup is complete before DNS and network
-    // operations that may block.
-    let _ = sd_notify::notify(&[sd_notify::NotifyState::Ready]);
+    let build_handle = tokio::spawn(build::run_worker(state.clone(), cancel.clone()));
+    let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));
 
-    let dns_manager = dns::initialize_dns(store.clone(), &base_domain).await?;
+    signal.notify_one();
 
-    let mut resource_providers: Vec<Arc<dyn kennel_provision::ResourceProvider>> = vec![];
+    let app = webhook::router(state.clone());
+    let addr = format!("{}:{}", state.config.api_host, state.config.api_port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    tracing::info!(addr = %addr, "listening");
 
-    if let Ok(socket_dir) = std::env::var("POSTGRES_SOCKET_DIR") {
-        resource_providers.push(Arc::new(kennel_provision::postgres::PostgresProvider::new(
-            store.db().clone(),
-            socket_dir,
-        )));
-    }
-
-    if let Ok(socket_path) = std::env::var("VALKEY_SOCKET_PATH") {
-        resource_providers.push(Arc::new(kennel_provision::valkey::ValkeyProvider::new(
-            socket_path,
-        )));
-    }
-
-    if let Ok(admin_endpoint) = std::env::var("GARAGE_ADMIN_ENDPOINT") {
-        let s3_endpoint =
-            std::env::var("GARAGE_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:3900".into());
-        let admin_token = std::env::var("GARAGE_ADMIN_TOKEN")
-            .expect("GARAGE_ADMIN_TOKEN required when GARAGE_ADMIN_ENDPOINT is set");
-        resource_providers.push(Arc::new(kennel_provision::garage::GarageProvider::new(
-            admin_endpoint,
-            s3_endpoint,
-            admin_token,
-        )));
-    }
-
-    let deployer_config = kennel_deployer::DeployerConfig {
-        store: store.clone(),
-        supervisor: supervisor.clone(),
-
-        dns_manager,
-        resource_providers,
-        vault_endpoint: std::env::var("VAULT_ENDPOINT").ok(),
-        base_domain,
-    };
-
-    let builder_config = kennel_builder::BuilderConfig {
-        store: store.clone(),
-        build_signal: signals.build.clone(),
-        deploy_signal: signals.deploy.clone(),
-        cancel: cancel.clone(),
-        max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(constants::DEFAULT_MAX_CONCURRENT_BUILDS),
-        work_dir: std::env::var("WORK_DIR").unwrap_or_else(|_| constants::DEFAULT_WORK_DIR.into()),
-    };
-
-    let router_config = config::create_router_config(store.clone());
-
-    let webhook_config = kennel_webhook::WebhookConfig {
-        store: store.clone(),
-        build_signal: signals.build.clone(),
-        teardown_signal: signals.teardown.clone(),
-    };
-
-    let api_host = std::env::var("API_HOST").unwrap_or_else(|_| constants::DEFAULT_API_HOST.into());
-    let api_port = std::env::var("API_PORT").unwrap_or_else(|_| constants::DEFAULT_API_PORT.into());
-    let api_addr = format!("{api_host}:{api_port}");
-
-    let webhook_router = kennel_webhook::router(webhook_config);
-    let api_router = kennel_api::router(store.clone()).merge(webhook_router);
-
-    let builder_handle = tokio::spawn(kennel_builder::run_worker_pool(builder_config));
-
-    let deployer_handle = tokio::spawn(kennel_deployer::run_deployer(
-        deployer_config.clone(),
-        signals.deploy.clone(),
-        cancel.clone(),
-    ));
-
-    let teardown_handle = tokio::spawn(kennel_deployer::run_teardown_worker(
-        deployer_config.clone(),
-        signals.teardown.clone(),
-        cancel.clone(),
-    ));
-
-    let cleanup_handle = tokio::spawn(kennel_deployer::run_cleanup_job(
-        deployer_config.clone(),
-        signals.teardown.clone(),
-        cancel.clone(),
-    ));
-
-    let log_cleanup_cancel = cancel.clone();
-    let log_cleanup_handle = tokio::spawn(kennel_deployer::run_log_cleanup_job(
-        deployer_config.clone(),
-        log_cleanup_cancel,
-    ));
-
-    let router_handle = tokio::spawn(async move {
-        if let Err(e) = kennel_router::run_router(router_config, event_rx).await {
-            tracing::error!("Router failed: {}", e);
-        }
-    });
-
-    // Fire signals in case there are work items from before the crash.
-    signals.build.notify_one();
-    signals.deploy.notify_one();
-    signals.teardown.notify_one();
-
-    tracing::info!("Starting API server on {api_addr}");
-    let listener = TcpListener::bind(&api_addr).await?;
-    let server_handle = tokio::spawn(async move {
-        if let Err(e) = axum::serve(
-            listener,
-            api_router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-        )
+    axum::serve(listener, app.into_make_service())
         .with_graceful_shutdown(signal::shutdown_signal())
-        .await
-        {
-            tracing::error!("API server failed: {}", e);
-        }
-    });
+        .await?;
 
-    // Wait for the API server to shut down (triggered by signal), then
-    // cancel all workers and wait for them to finish.
-    let _ = server_handle.await;
-    tracing::info!("API server shut down, cancelling workers");
     cancel.cancel();
+    let _ = tokio::join!(build_handle, reconcile_handle);
 
-    tokio::select! {
-        _ = tokio::time::sleep(constants::SHUTDOWN_TIMEOUT) => {
-            tracing::warn!("Shutdown timeout reached, forcing exit");
-        }
-        _ = async {
-            let _ = tokio::join!(
-                builder_handle,
-                deployer_handle,
-                teardown_handle,
-                cleanup_handle,
-                log_cleanup_handle,
-                router_handle,
-            );
-        } => {
-            tracing::info!("All components shut down gracefully");
-        }
+    tracing::info!("shutdown complete");
+    Ok(())
+}
+
+fn build_providers() -> Vec<kennel_provision::Provider> {
+    let mut providers = Vec::new();
+
+    if let Ok(socket_dir) = dotenvy::var("POSTGRES_SOCKET_DIR") {
+        providers.push(kennel_provision::Provider::Postgres(
+            kennel_provision::postgres::PostgresProvider::new(socket_dir),
+        ));
     }
 
-    tracing::info!("Kennel shutdown complete");
+    if let Ok(socket_path) = dotenvy::var("VALKEY_SOCKET_PATH") {
+        providers.push(kennel_provision::Provider::Valkey(
+            kennel_provision::valkey::ValkeyProvider::new(socket_path),
+        ));
+    }
 
-    Ok(())
+    if let Ok(admin_endpoint) = dotenvy::var("GARAGE_ADMIN_ENDPOINT") {
+        let s3_endpoint =
+            dotenvy::var("GARAGE_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:3900".into());
+        let admin_token = dotenvy::var("GARAGE_ADMIN_TOKEN")
+            .expect("GARAGE_ADMIN_TOKEN required when GARAGE_ADMIN_ENDPOINT is set");
+        providers.push(kennel_provision::Provider::Garage(
+            kennel_provision::garage::GarageProvider::new(admin_endpoint, s3_endpoint, admin_token),
+        ));
+    }
+
+    providers
 }

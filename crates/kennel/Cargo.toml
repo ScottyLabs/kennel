@@ -5,27 +5,26 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow.workspace = true
+anyhow = "1.0.102"
 axum = "0.8.8"
+chrono = "0.4.44"
 dotenvy = "0.15.7"
 entity = { version = "0.1.0", path = "../entity" }
-kennel-api = { version = "0.1.0", path = "../kennel-api" }
-kennel-builder = { version = "0.1.0", path = "../kennel-builder" }
+hex = "0.4.3"
+hmac = "0.13.0"
 kennel-config = { version = "0.1.0", path = "../kennel-config" }
-kennel-deployer = { version = "0.1.0", path = "../kennel-deployer" }
-kennel-dns = { version = "0.1.0", path = "../kennel-dns" }
 kennel-provision = { version = "0.1.0", path = "../kennel-provision" }
-kennel-router = { version = "0.1.0", path = "../kennel-router" }
-kennel-store = { version = "0.1.0", path = "../kennel-store" }
-kennel-supervisor = { version = "0.1.0", path = "../kennel-supervisor" }
-kennel-webhook = { version = "0.1.0", path = "../kennel-webhook" }
 migration = { version = "0.1.0", path = "../migration" }
-sd-notify = "0.5.0"
-sea-orm.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-tokio.workspace = true
-tokio-util.workspace = true
-tracing.workspace = true
-tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
-uuid = "1.23.0"
+reqwest = { version = "0.13.2", features = ["json"] }
+sea-orm = { version = "1.1.20", features = ["sqlx-sqlite", "runtime-tokio-rustls", "with-json", "with-chrono", "with-uuid"] }
+sea-orm-migration = { version = "1.1.20", features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
+tokio = { version = "1.51.1", features = ["full"] }
+tokio-util = { version = "0.7.18", features = ["rt"] }
+toml = "1.1.2"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
+uuid = { version = "1.23.0", features = ["v7"] }
+zbus = "5.14.0"

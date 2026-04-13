@@ -1,0 +1,63 @@
+use ::entity::builds::{self, Entity as Builds};
+use sea_orm::prelude::Expr;
+use sea_orm::*;
+
+pub struct BuildRepository<'a> {
+    db: &'a DatabaseConnection,
+}
+
+impl<'a> BuildRepository<'a> {
+    pub fn new(db: &'a DatabaseConnection) -> Self {
+        Self { db }
+    }
+
+    pub async fn create(&self, model: builds::ActiveModel) -> Result<builds::Model, DbErr> {
+        model.insert(self.db).await
+    }
+
+    pub async fn find_by_status(&self, status: &str) -> Result<Vec<builds::Model>, DbErr> {
+        Builds::find()
+            .filter(builds::Column::Status.eq(status))
+            .order_by_asc(builds::Column::CreatedAt)
+            .all(self.db)
+            .await
+    }
+
+    pub async fn set_status(&self, id: &str, status: &str) -> Result<(), DbErr> {
+        let mut model: builds::ActiveModel = Builds::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or(DbErr::RecordNotFound(id.to_string()))?
+            .into();
+
+        model.status = Set(status.to_string());
+        model.update(self.db).await?;
+        Ok(())
+    }
+
+    pub async fn reset_stuck(&self) -> Result<u64, DbErr> {
+        let result = Builds::update_many()
+            .col_expr(builds::Column::Status, Expr::value("queued"))
+            .filter(builds::Column::Status.eq("building"))
+            .exec(self.db)
+            .await?;
+        Ok(result.rows_affected)
+    }
+
+    pub async fn cancel_stale(
+        &self,
+        project_id: &str,
+        branch: &str,
+        exclude_id: &str,
+    ) -> Result<u64, DbErr> {
+        let result = Builds::update_many()
+            .col_expr(builds::Column::Status, Expr::value("cancelled"))
+            .filter(builds::Column::ProjectId.eq(project_id))
+            .filter(builds::Column::Branch.eq(branch))
+            .filter(builds::Column::Status.is_in(["queued", "building"]))
+            .filter(builds::Column::Id.ne(exclude_id))
+            .exec(self.db)
+            .await?;
+        Ok(result.rows_affected)
+    }
+}
