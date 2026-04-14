@@ -44,7 +44,50 @@ Import it in your `devenv.nix`:
 }
 ```
 
-## 2. Declare what to deploy
+## 2. Set up direnv and .gitignore
+
+Create an `.envrc` to automatically activate the devenv environment when you enter the project directory:
+
+```bash
+eval "$(devenv direnvrc)"
+use devenv
+```
+
+Then allow it:
+
+```bash
+direnv allow
+```
+
+Add a `.gitignore` for generated and local-only files:
+
+```gitignore
+# Nix / devenv
+.devenv/
+.devenv.flake.nix
+.pre-commit-config.yaml
+result
+result-*
+
+# AI
+.mcp.json
+.claude
+
+# direnv
+.direnv/
+
+# Rust
+target/
+.cargo/
+
+# OS
+.DS_Store
+rustc-ice-*.txt
+```
+
+Add any project-specific entries as needed (e.g., `sites/docs/book/` for mdbook output, `node_modules/` for JS projects).
+
+## 3. Declare what to deploy
 
 Add kennel options to your `devenv.nix` to tell kennel what your project produces.
 
@@ -77,7 +120,7 @@ scottylabs.kennel.sites.docs = {
 };
 ```
 
-## 3. Enable infrastructure
+## 4. Enable infrastructure
 
 If your project needs a database:
 
@@ -87,11 +130,11 @@ scottylabs.postgres.enable = true;
 
 This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
 
-## 4. Enable kennel in governance
+## 5. Enable kennel in governance
 
 In the ScottyLabs governance repository, set the kennel flag for your project. Governance provisions the webhook that connects your repository to kennel.
 
-## 5. Push
+## 6. Push
 
 Push to any branch. Kennel receives the webhook, builds your project, and deploys it. Your deployment will be available at:
 

@@ -94,10 +94,7 @@ impl CaddyClient {
     }
 
     async fn add_route(&self, config: &serde_json::Value) -> anyhow::Result<()> {
-        let url = format!(
-            "{}/config/apps/http/servers/kennel/routes",
-            self.admin_url
-        );
+        let url = format!("{}/config/apps/http/servers/kennel/routes", self.admin_url);
         let resp = self.client.post(&url).json(config).send().await?;
 
         anyhow::ensure!(

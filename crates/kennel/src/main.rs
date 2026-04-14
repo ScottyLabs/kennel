@@ -36,10 +36,12 @@ pub struct AppConfig {
 
 impl AppConfig {
     fn from_env() -> Result<Self> {
-        let webhook_secret_file = dotenvy::var("WEBHOOK_SECRET_FILE")
-            .expect("WEBHOOK_SECRET_FILE must be set");
+        let webhook_secret_file =
+            dotenvy::var("WEBHOOK_SECRET_FILE").expect("WEBHOOK_SECRET_FILE must be set");
         let webhook_secret = std::fs::read_to_string(&webhook_secret_file)
-            .map_err(|e| anyhow::anyhow!("failed to read webhook secret from {webhook_secret_file}: {e}"))?
+            .map_err(|e| {
+                anyhow::anyhow!("failed to read webhook secret from {webhook_secret_file}: {e}")
+            })?
             .trim()
             .to_string();
 

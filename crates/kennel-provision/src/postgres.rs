@@ -79,7 +79,9 @@ impl ResourceProvider for PostgresProvider {
 
         let output = tokio::process::Command::new("psql")
             .args([
-                "-h", &self.socket_dir, "-tAc",
+                "-h",
+                &self.socket_dir,
+                "-tAc",
                 "SELECT datname FROM pg_database WHERE datname LIKE 'kennel_%'",
             ])
             .output()

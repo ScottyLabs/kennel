@@ -42,10 +42,7 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
     }
 }
 
-async fn process_build(
-    state: &AppState,
-    build: &::entity::builds::Model,
-) -> anyhow::Result<()> {
+async fn process_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
     let work_dir = PathBuf::from(&state.config.work_dir).join(&build.id);
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
@@ -56,7 +53,13 @@ async fn process_build(
         .await?
         .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
 
-    let repo_path = git_clone(&project.repo_url, &build.git_ref, &build.commit_sha, &work_dir).await?;
+    let repo_path = git_clone(
+        &project.repo_url,
+        &build.git_ref,
+        &build.commit_sha,
+        &work_dir,
+    )
+    .await?;
 
     let kennel_config = eval_kennel_config(&repo_path).await?;
 
@@ -72,10 +75,7 @@ async fn process_build(
     }
 
     for (name, site_config) in &kennel_config.static_sites {
-        let attr = site_config
-            .package_attr
-            .as_deref()
-            .unwrap_or(name.as_str());
+        let attr = site_config.package_attr.as_deref().unwrap_or(name.as_str());
         let store_path = nix_build(&repo_path, attr).await?;
         store_paths.insert(name.clone(), store_path);
     }
@@ -87,11 +87,15 @@ async fn process_build(
         }
     }
 
-    state.store.builds().set_result(
-        &build.id,
-        &serde_json::to_string(&store_paths)?,
-        &serde_json::to_string(&kennel_config)?,
-    ).await?;
+    state
+        .store
+        .builds()
+        .set_result(
+            &build.id,
+            &serde_json::to_string(&store_paths)?,
+            &serde_json::to_string(&kennel_config)?,
+        )
+        .await?;
 
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
@@ -199,10 +203,7 @@ async fn cachix_push(cache_name: &str, paths: &[&str]) -> anyhow::Result<()> {
     let mut args = vec!["push", cache_name];
     args.extend(paths);
 
-    let output = Command::new("cachix")
-        .args(&args)
-        .output()
-        .await?;
+    let output = Command::new("cachix").args(&args).output().await?;
 
     anyhow::ensure!(
         output.status.success(),

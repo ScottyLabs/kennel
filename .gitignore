@@ -8,8 +8,6 @@ result-*
 # AI
 .mcp.json
 .claude
-PLAN.md
-CODE_REVIEW.md
 
 # direnv
 .direnv/
@@ -22,10 +20,9 @@ target/
 node_modules/
 dist/
 
-# Environment
-.env
-
 # OS
 .DS_Store
 rustc-ice-*.txt
+
+# Build
 sites/docs/book/

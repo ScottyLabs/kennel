@@ -5,8 +5,8 @@ Every pull request gets its own isolated deployment with its own database, cache
 ## Lifecycle
 
 1. PR opened: kennel builds the PR branch, provisions resources, and deploys. The deployment is available at `{project}-pr-{number}.scottylabs.net`.
-2. Push to PR: kennel rebuilds. Unchanged services (same nix store path) are skipped. Changed services are redeployed.
-3. PR closed: kennel tears down all deployments for the branch, deprovisions resources (drops the database, flushes the cache, deletes the storage bucket), and removes the Caddy route.
+1. Push to PR: kennel rebuilds. Unchanged services (same nix store path) are skipped. Changed services are redeployed.
+1. PR closed: kennel tears down all deployments for the branch, deprovisions resources (drops the database, flushes the cache, deletes the storage bucket), and removes the Caddy route.
 
 ## Resource isolation
 

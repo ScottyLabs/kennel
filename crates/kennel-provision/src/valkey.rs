@@ -28,7 +28,15 @@ impl ResourceProvider for ValkeyProvider {
 
         // Check if already allocated by querying the allocation hash in DB 0
         let existing = tokio::process::Command::new("valkey-cli")
-            .args(["-s", &self.socket_path, "-n", "0", "HGET", "kennel:allocations", &key])
+            .args([
+                "-s",
+                &self.socket_path,
+                "-n",
+                "0",
+                "HGET",
+                "kennel:allocations",
+                &key,
+            ])
             .output()
             .await?;
 
@@ -39,7 +47,14 @@ impl ResourceProvider for ValkeyProvider {
             } else {
                 // Find the next available DB number (1-31, DB 0 is reserved for metadata)
                 let all = tokio::process::Command::new("valkey-cli")
-                    .args(["-s", &self.socket_path, "-n", "0", "HVALS", "kennel:allocations"])
+                    .args([
+                        "-s",
+                        &self.socket_path,
+                        "-n",
+                        "0",
+                        "HVALS",
+                        "kennel:allocations",
+                    ])
                     .output()
                     .await?;
                 let used: std::collections::HashSet<u32> = String::from_utf8_lossy(&all.stdout)
@@ -53,8 +68,14 @@ impl ResourceProvider for ValkeyProvider {
 
                 tokio::process::Command::new("valkey-cli")
                     .args([
-                        "-s", &self.socket_path, "-n", "0",
-                        "HSET", "kennel:allocations", &key, &next.to_string(),
+                        "-s",
+                        &self.socket_path,
+                        "-n",
+                        "0",
+                        "HSET",
+                        "kennel:allocations",
+                        &key,
+                        &next.to_string(),
                     ])
                     .output()
                     .await?;
@@ -78,7 +99,15 @@ impl ResourceProvider for ValkeyProvider {
         let key = Self::allocation_key(request);
 
         let existing = tokio::process::Command::new("valkey-cli")
-            .args(["-s", &self.socket_path, "-n", "0", "HGET", "kennel:allocations", &key])
+            .args([
+                "-s",
+                &self.socket_path,
+                "-n",
+                "0",
+                "HGET",
+                "kennel:allocations",
+                &key,
+            ])
             .output()
             .await?;
 
@@ -86,13 +115,27 @@ impl ResourceProvider for ValkeyProvider {
         if let Ok(db_num) = out.parse::<u32>() {
             // Flush the allocated DB
             tokio::process::Command::new("valkey-cli")
-                .args(["-s", &self.socket_path, "-n", &db_num.to_string(), "FLUSHDB"])
+                .args([
+                    "-s",
+                    &self.socket_path,
+                    "-n",
+                    &db_num.to_string(),
+                    "FLUSHDB",
+                ])
                 .output()
                 .await?;
 
             // Remove the allocation
             tokio::process::Command::new("valkey-cli")
-                .args(["-s", &self.socket_path, "-n", "0", "HDEL", "kennel:allocations", &key])
+                .args([
+                    "-s",
+                    &self.socket_path,
+                    "-n",
+                    "0",
+                    "HDEL",
+                    "kennel:allocations",
+                    &key,
+                ])
                 .output()
                 .await?;
 
@@ -107,7 +150,14 @@ impl ResourceProvider for ValkeyProvider {
             active.iter().map(Self::allocation_key).collect();
 
         let all = tokio::process::Command::new("valkey-cli")
-            .args(["-s", &self.socket_path, "-n", "0", "HKEYS", "kennel:allocations"])
+            .args([
+                "-s",
+                &self.socket_path,
+                "-n",
+                "0",
+                "HKEYS",
+                "kennel:allocations",
+            ])
             .output()
             .await?;
 
@@ -115,7 +165,15 @@ impl ResourceProvider for ValkeyProvider {
             if !active_keys.contains(key) {
                 tracing::info!(key = %key, "removing orphaned valkey allocation");
                 let _ = tokio::process::Command::new("valkey-cli")
-                    .args(["-s", &self.socket_path, "-n", "0", "HDEL", "kennel:allocations", key])
+                    .args([
+                        "-s",
+                        &self.socket_path,
+                        "-n",
+                        "0",
+                        "HDEL",
+                        "kennel:allocations",
+                        key,
+                    ])
                     .output()
                     .await;
             }

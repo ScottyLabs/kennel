@@ -9,10 +9,10 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 ```
 
 1. Forgejo sends a webhook to kennel's single `/webhook` endpoint.
-2. Kennel parses the repository name from the payload, verifies the HMAC signature, and creates a build record.
-3. The build worker clones the repo, evaluates the devenv kennel config, and runs `nix build` for each service and static site.
-4. The reconciler picks up the completed build, provisions resources (database, cache, storage), resolves secrets from OpenBao, starts a systemd transient unit for services, and adds a Caddy route for each deployment.
-5. Caddy serves traffic over HTTPS with on-demand TLS.
+1. Kennel parses the repository name from the payload, verifies the HMAC signature, and creates a build record.
+1. The build worker clones the repo, evaluates the devenv kennel config, and runs `nix build` for each service and static site.
+1. The reconciler picks up the completed build, provisions resources (database, cache, storage), resolves secrets from OpenBao, starts a systemd transient unit for services, and adds a Caddy route for each deployment.
+1. Caddy serves traffic over HTTPS with on-demand TLS.
 
 ## Delegation
 

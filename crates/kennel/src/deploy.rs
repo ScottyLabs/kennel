@@ -1,15 +1,12 @@
-use crate::caddy::CaddyClient;
 use crate::AppState;
+use crate::caddy::CaddyClient;
 use kennel_config::Environment;
 use kennel_provision::{ResourceProvider, ResourceRequest};
 use sea_orm::ActiveValue::Set;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub async fn deploy_build(
-    state: &AppState,
-    build: &::entity::builds::Model,
-) -> anyhow::Result<()> {
+pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
     let store_paths: HashMap<String, String> = build
         .store_paths
         .as_ref()
@@ -201,9 +198,7 @@ async fn deploy_service(
     let deployment_id = uuid::Uuid::now_v7().to_string();
     let route_id = format!("kennel-{deployment_id}");
 
-    caddy
-        .add_proxy_route(&route_id, &domain, port)
-        .await?;
+    caddy.add_proxy_route(&route_id, &domain, port).await?;
 
     if let Some(ref custom_domain) = svc_config.custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");

@@ -1,6 +1,6 @@
 use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
-use crate::{deploy, AppState};
+use crate::{AppState, deploy};
 use kennel_provision::ResourceProvider;
 use std::collections::HashSet;
 use std::sync::Arc;

@@ -75,17 +75,13 @@ impl ResourceProvider for GarageProvider {
 
         // Check if bucket exists
         let buckets = self.api_get("/v1/bucket?list").await?;
-        let bucket_exists = buckets
-            .as_array()
-            .unwrap_or(&vec![])
-            .iter()
-            .any(|b| {
-                b["globalAliases"]
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .any(|a| a.as_str() == Some(&bucket_name))
-            });
+        let bucket_exists = buckets.as_array().unwrap_or(&vec![]).iter().any(|b| {
+            b["globalAliases"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .any(|a| a.as_str() == Some(&bucket_name))
+        });
 
         if !bucket_exists {
             self.api_post(
@@ -150,20 +146,16 @@ impl ResourceProvider for GarageProvider {
 
         // Delete bucket (must be empty first)
         let buckets = self.api_get("/v1/bucket?list").await?;
-        if let Some(bucket) = buckets
-            .as_array()
-            .unwrap_or(&vec![])
-            .iter()
-            .find(|b| {
-                b["globalAliases"]
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .any(|a| a.as_str() == Some(&bucket_name))
-            })
-        {
+        if let Some(bucket) = buckets.as_array().unwrap_or(&vec![]).iter().find(|b| {
+            b["globalAliases"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .any(|a| a.as_str() == Some(&bucket_name))
+        }) {
             if let Some(bucket_id) = bucket["id"].as_str() {
-                self.api_delete(&format!("/v1/bucket?id={bucket_id}")).await?;
+                self.api_delete(&format!("/v1/bucket?id={bucket_id}"))
+                    .await?;
                 tracing::info!(bucket = %bucket_name, "deleted garage bucket");
             }
         }

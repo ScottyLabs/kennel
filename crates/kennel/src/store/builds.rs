@@ -58,7 +58,9 @@ impl<'a> BuildRepository<'a> {
 
         model.status = Set("built".to_string());
         model.store_paths = Set(Some(serde_json::from_str(store_paths).unwrap_or_default()));
-        model.kennel_config = Set(Some(serde_json::from_str(kennel_config).unwrap_or_default()));
+        model.kennel_config = Set(Some(
+            serde_json::from_str(kennel_config).unwrap_or_default(),
+        ));
         model.update(self.db).await?;
         Ok(())
     }
