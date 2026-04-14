@@ -56,6 +56,14 @@ PostgreSQL extensions as a function of the extensions set.
 
 Type: `function`, default: `e: [ e.pg_uuidv7 ]`
 
+## `scottylabs.sqlite`
+
+### `scottylabs.sqlite.enable`
+
+Enable SQLite for local development. Adds the `sqlite` package and exports `DATABASE_PATH` pointing to a database file in the devenv state directory.
+
+Type: `bool`, default: `false`
+
 ## `scottylabs.secrets`
 
 ### `scottylabs.secrets.enable`
