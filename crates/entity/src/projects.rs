@@ -12,7 +12,6 @@ pub struct Model {
     pub name: String,
     pub repo_url: String,
     pub repo_type: String,
-    pub webhook_secret: String,
     pub default_branch: String,
     pub created_at: DateTimeUtc,
 }

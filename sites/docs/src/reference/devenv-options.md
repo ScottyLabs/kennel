@@ -1,0 +1,115 @@
+# devenv Options
+
+These options are provided by the [shared ScottyLabs devenv module](https://codeberg.org/ScottyLabs/devenv). Import it in your `devenv.nix`:
+
+```nix
+imports = [ inputs.scottylabs.devenvModules.default ];
+```
+
+## `scottylabs`
+
+### `scottylabs.enable`
+
+Enable the shared ScottyLabs development configuration. Required for all other `scottylabs.*` options to take effect.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.project.name`
+
+Project name. Used for database naming, log filtering, and secrets path resolution.
+
+Type: `str`, required when `scottylabs.enable = true`
+
+## `scottylabs.rust`
+
+### `scottylabs.rust.enable`
+
+Enable the Rust development toolchain. Configures nightly Rust with cranelift, clippy, rustfmt, the cargo-nix-update pre-commit hook, and crate2nix integration.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.rust.cranelift.excludePackages`
+
+Crate names forced to the LLVM backend instead of cranelift. Some crates use features that cranelift does not support (FFI symbol emission, linker sections).
+
+Type: `listOf str`, default: `[ "aws-lc-sys" "aws-lc-rs" "rustls" ]`
+
+## `scottylabs.bun`
+
+### `scottylabs.bun.enable`
+
+Enable the Bun/JavaScript development toolchain. Adds bun, oxfmt for formatting, and oxlint for linting.
+
+Type: `bool`, default: `false`
+
+## `scottylabs.postgres`
+
+### `scottylabs.postgres.enable`
+
+Enable a local PostgreSQL 18 instance with Unix socket access. Creates an initial database named after `scottylabs.project.name` and exports `DATABASE_URL` into the shell environment.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.postgres.extensions`
+
+PostgreSQL extensions as a function of the extensions set.
+
+Type: `function`, default: `e: [ e.pg_uuidv7 ]`
+
+## `scottylabs.secrets`
+
+### `scottylabs.secrets.enable`
+
+Enable secretspec integration for local secret resolution. Configures devenv's native secretspec support with the ScottyLabs OpenBao server as the provider. Adds the `bao` CLI for authentication.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.secrets.host`
+
+OpenBao server hostname. Used to derive both `BAO_ADDR` (for the bao CLI) and `SECRETSPEC_PROVIDER` (for secretspec).
+
+Type: `str`, default: `"secrets2.scottylabs.org"`
+
+### `scottylabs.secrets.profile`
+
+secretspec profile for local development.
+
+Type: `str`, default: `"dev"`
+
+## `scottylabs.kennel`
+
+### `scottylabs.kennel.services`
+
+Backend services deployed by kennel. Each key must match a devenv process name. Kennel builds the corresponding flake package and deploys it as a systemd transient unit.
+
+Type: `attrsOf submodule`
+
+Each service accepts:
+
+- `customDomain` (`nullOr str`, default: `null`) -- custom domain for this service
+
+### `scottylabs.kennel.sites`
+
+Static sites deployed by kennel. Each key names a site. Kennel builds the corresponding flake package and serves it via Caddy's file server.
+
+Type: `attrsOf submodule`
+
+Each site accepts:
+
+- `package` (`package`, required) -- Nix derivation producing the static site files
+- `spa` (`bool`, default: `false`) -- serve index.html for all routes
+- `customDomain` (`nullOr str`, default: `null`) -- custom domain for this site
+
+### `scottylabs.kennel.config`
+
+Read-only. The generated `kennel.json` derivation that the kennel builder evaluates at build time. You do not set this directly.
+
+Type: `package`
+
+## `scottylabs.claude`
+
+### `scottylabs.claude.enable`
+
+Enable Claude Code integration. Generates the `.mcp.json` configuration with the devenv MCP server.
+
+Type: `bool`, default: `true`

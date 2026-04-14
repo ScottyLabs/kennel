@@ -15,7 +15,6 @@ impl MigrationTrait for Migration {
                     .col(string_uniq(Projects::Name))
                     .col(string(Projects::RepoUrl))
                     .col(string(Projects::RepoType))
-                    .col(string(Projects::WebhookSecret))
                     .col(string(Projects::DefaultBranch).default("main"))
                     .col(timestamp(Projects::CreatedAt).default(Expr::current_timestamp()))
                     .to_owned(),
@@ -148,7 +147,6 @@ enum Projects {
     Name,
     RepoUrl,
     RepoType,
-    WebhookSecret,
     DefaultBranch,
     CreatedAt,
 }

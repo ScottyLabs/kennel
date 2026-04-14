@@ -27,23 +27,22 @@ async fn handle_webhook(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<StatusCode, StatusCode> {
+    verify_signature(&headers, &body, &state.config.webhook_secret).map_err(|_| {
+        tracing::warn!("webhook signature verification failed");
+        StatusCode::UNAUTHORIZED
+    })?;
+
     let event = parse_event(&headers, &body).map_err(|e| {
         tracing::warn!(error = %e, "failed to parse webhook event");
         StatusCode::BAD_REQUEST
     })?;
 
-    let project = state
-        .store
-        .projects()
-        .find_by_name(&event.repo_name)
+    let project = find_or_create_project(&state, &event.repo_name, &event.repo_url)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
-
-    verify_signature(&headers, &body, &project.webhook_secret).map_err(|_| {
-        tracing::warn!(project = %event.repo_name, "signature verification failed");
-        StatusCode::UNAUTHORIZED
-    })?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "failed to find or create project");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     match event.kind {
         EventKind::Push {
@@ -114,6 +113,30 @@ async fn handle_webhook(
             }
         }
     }
+}
+
+async fn find_or_create_project(
+    state: &AppState,
+    repo_name: &str,
+    repo_url: &str,
+) -> anyhow::Result<::entity::projects::Model> {
+    if let Some(project) = state.store.projects().find_by_name(repo_name).await? {
+        return Ok(project);
+    }
+
+    let id = uuid::Uuid::now_v7().to_string();
+    let model = ::entity::projects::ActiveModel {
+        id: Set(id),
+        name: Set(repo_name.to_string()),
+        repo_url: Set(repo_url.to_string()),
+        repo_type: Set("forgejo".to_string()),
+        default_branch: Set("main".to_string()),
+        ..Default::default()
+    };
+
+    let project = state.store.projects().upsert(model).await?;
+    tracing::info!(project = %repo_name, "auto-registered project");
+    Ok(project)
 }
 
 async fn create_build(

@@ -16,6 +16,11 @@ in
       description = "The Kennel package to use";
     };
 
+    webhookSecretFile = mkOption {
+      type = types.path;
+      description = "Path to file containing the webhook HMAC secret shared across all projects";
+    };
+
     api = {
       host = mkOption {
         type = types.str;
@@ -28,36 +33,6 @@ in
         default = 3000;
         description = "API server port";
       };
-    };
-
-    projects = mkOption {
-      type = types.attrsOf (types.submodule {
-        options = {
-          repoUrl = mkOption {
-            type = types.str;
-            description = "Git repository URL";
-          };
-
-          repoType = mkOption {
-            type = types.enum [ "forgejo" "github" ];
-            default = "forgejo";
-            description = "Repository type";
-          };
-
-          webhookSecretFile = mkOption {
-            type = types.path;
-            description = "Path to file containing webhook secret";
-          };
-
-          defaultBranch = mkOption {
-            type = types.str;
-            default = "main";
-            description = "Default branch name";
-          };
-        };
-      });
-      default = { };
-      description = "Projects to deploy with Kennel";
     };
 
     domains = {
@@ -194,7 +169,6 @@ in
 
     users.groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
 
-    # Polkit rule allowing kennel to manage transient systemd units via D-Bus
     security.polkit.extraConfig = ''
       polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.systemd1.manage-units" &&
@@ -204,7 +178,6 @@ in
       });
     '';
 
-    # Kennel manages processes in its own cgroup slice
     systemd.slices.kennel = {
       description = "Kennel managed deployments";
     };
@@ -214,7 +187,6 @@ in
       after = [ "network.target" "caddy.service" ];
       wants = [ "caddy.service" ];
       wantedBy = [ "multi-user.target" ];
-      restartTriggers = optional (cfg.projects != { }) (builtins.hashString "sha256" (builtins.toJSON cfg.projects));
 
       path = with pkgs; [ git nix cachix ];
 
@@ -228,6 +200,7 @@ in
         CADDY_ADMIN_URL = cfg.caddy.adminUrl;
         MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
         WORK_DIR = cfg.builder.workDir;
+        WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
       } // optionalAttrs cfg.builder.cachix.enable {
         CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
       } // optionalAttrs cfg.resources.postgres.enable {
@@ -261,21 +234,6 @@ in
 
         EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
       };
-    };
-
-    environment.etc."kennel/projects.json" = mkIf (cfg.projects != { }) {
-      text = builtins.toJSON (mapAttrsToList
-        (name: proj: {
-          inherit name;
-          repo_url = proj.repoUrl;
-          repo_type = proj.repoType;
-          webhook_secret_file = proj.webhookSecretFile;
-          default_branch = proj.defaultBranch;
-        })
-        cfg.projects);
-      mode = "0440";
-      user = cfg.user;
-      group = cfg.group;
     };
 
     systemd.tmpfiles.rules = [

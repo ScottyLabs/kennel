@@ -31,11 +31,19 @@ pub struct AppConfig {
     pub work_dir: String,
     pub caddy_admin_url: String,
     pub max_concurrent_builds: usize,
+    pub webhook_secret: String,
 }
 
 impl AppConfig {
-    fn from_env() -> Self {
-        Self {
+    fn from_env() -> Result<Self> {
+        let webhook_secret_file = dotenvy::var("WEBHOOK_SECRET_FILE")
+            .expect("WEBHOOK_SECRET_FILE must be set");
+        let webhook_secret = std::fs::read_to_string(&webhook_secret_file)
+            .map_err(|e| anyhow::anyhow!("failed to read webhook secret from {webhook_secret_file}: {e}"))?
+            .trim()
+            .to_string();
+
+        Ok(Self {
             api_host: dotenvy::var("API_HOST")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_API_HOST.into()),
             api_port: dotenvy::var("API_PORT")
@@ -52,7 +60,8 @@ impl AppConfig {
                 .ok()
                 .and_then(|n| n.parse().ok())
                 .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
-        }
+            webhook_secret,
+        })
     }
 }
 
@@ -62,7 +71,7 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt().json().init();
 
-    let config = AppConfig::from_env();
+    let config = AppConfig::from_env()?;
     let db_path = dotenvy::var("DATABASE_PATH")
         .unwrap_or_else(|_| kennel_config::constants::DEFAULT_DB_PATH.into());
     let db_url = format!("sqlite://{}?mode=rwc", db_path);

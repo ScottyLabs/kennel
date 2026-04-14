@@ -1,16 +1,15 @@
 # Summary
 
-# Architecture
-
-- [Overview](./architecture/overview.md)
+[Overview](./overview.md)
 
 # Guides
 
-- [Usage](./guides/usage.md)
-- [Webhooks](./guides/webhooks.md)
-- [NixOS Deployment](./guides/nixos-deployment.md)
-- [Troubleshooting](./guides/troubleshooting.md)
+- [Deploying a Project](./guides/deploying.md)
+- [Secrets](./guides/secrets.md)
+- [PR Deployments](./guides/pr-deployments.md)
 
 # Reference
 
-- [kennel.toml](./reference/kennel-toml.md)
+- [Architecture](./reference/architecture.md)
+- [devenv Options](./reference/devenv-options.md)
+- [NixOS Module](./reference/nixos-module.md)
