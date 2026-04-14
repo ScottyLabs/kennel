@@ -1,7 +1,0 @@
-[static_sites.docs]
-custom_domain = "docs.kennel.scottylabs.org"
-spa = false
-
-[static_sites.web]
-custom_domain = "kennel.scottylabs.org"
-spa = true
