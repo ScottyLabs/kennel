@@ -32,9 +32,18 @@
             };
           };
           kennel = cargoNix.workspaceMembers.kennel.build;
+
+          docs = pkgs.stdenv.mkDerivation {
+            pname = "kennel-docs";
+            version = "0.1.0";
+            src = ./sites/docs;
+            nativeBuildInputs = [ pkgs.mdbook ];
+            buildPhase = "mdbook build";
+            installPhase = "mkdir -p $out && cp -r book/* $out/";
+          };
         in
         {
-          inherit kennel;
+          inherit kennel docs;
           default = kennel;
           devenv = devenv.packages.${system}.devenv;
         }

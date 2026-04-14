@@ -14,6 +14,7 @@ in
       enable = true;
       cranelift.excludePackages = [ "aws-lc-sys" "aws-lc-rs" "rustls" "linkme" ];
     };
+    sqlite.enable = true;
     secrets.enable = true;
   };
 
