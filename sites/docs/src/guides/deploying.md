@@ -108,17 +108,11 @@ For a static site:
 
 ```nix
 scottylabs.kennel.sites.docs = {
-  package = pkgs.stdenv.mkDerivation {
-    pname = "my-project-docs";
-    version = "0.1.0";
-    src = ./sites/docs;
-    nativeBuildInputs = [ pkgs.mdbook ];
-    buildPhase = "mdbook build";
-    installPhase = "mkdir -p $out && cp -r book/* $out/";
-  };
   spa = false;
 };
 ```
+
+The site name (`docs`) must match a package in your `flake.nix` outputs. Kennel builds it with `nix build .#packages.{system}.docs`.
 
 ## 4. Enable infrastructure
 

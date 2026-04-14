@@ -104,7 +104,6 @@ Type: `attrsOf submodule`
 
 Each site accepts:
 
-- `package` (`package`, required) -- Nix derivation producing the static site files
 - `spa` (`bool`, default: `false`) -- serve index.html for all routes
 - `customDomain` (`nullOr str`, default: `null`) -- custom domain for this site
 

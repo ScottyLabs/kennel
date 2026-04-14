@@ -16,6 +16,9 @@ in
     };
     sqlite.enable = true;
     secrets.enable = true;
+    kennel.sites.docs = {
+      customDomain = "docs.kennel.scottylabs.org";
+    };
   };
 
   packages = [
