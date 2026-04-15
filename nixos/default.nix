@@ -16,6 +16,11 @@ in
       description = "The Kennel package to use";
     };
 
+    devenvPackage = mkOption {
+      type = types.package;
+      description = "The devenv package for evaluating project configs";
+    };
+
     webhookSecretFile = mkOption {
       type = types.path;
       description = "Path to file containing the webhook HMAC secret shared across all projects";
@@ -194,7 +199,7 @@ in
       wants = [ "caddy.service" ];
       wantedBy = [ "multi-user.target" ];
 
-      path = with pkgs; [ git nix cachix ];
+      path = [ cfg.devenvPackage ] ++ (with pkgs; [ git nix cachix ]);
 
       environment = {
         HOME = "/var/lib/kennel";
@@ -252,6 +257,11 @@ in
 
     services.caddy = {
       enable = true;
+      globalConfig = ''
+        on_demand_tls {
+          ask http://localhost:${toString cfg.api.port}/internal/caddy/check-domain
+        }
+      '';
       virtualHosts.${cfg.domain}.extraConfig = ''
         reverse_proxy localhost:${toString cfg.api.port}
       '';

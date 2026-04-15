@@ -136,13 +136,8 @@ async fn git_clone(
 }
 
 async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<KennelConfig> {
-    let output = Command::new("nix")
-        .args([
-            "build",
-            ".#devenv.shells.default.config.kennel.config",
-            "--no-link",
-            "--print-out-paths",
-        ])
+    let output = Command::new("devenv")
+        .args(["build", "scottylabs.kennel.config"])
         .current_dir(repo_path)
         .output()
         .await?;
@@ -152,8 +147,15 @@ async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<KennelConfig> {
         return Ok(KennelConfig::default());
     }
 
-    let store_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let json_path = PathBuf::from(&store_path).join("kennel.json");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let build_result: serde_json::Value = serde_json::from_str(stdout.trim())?;
+    let store_path = build_result["scottylabs.kennel.config"]
+        .as_str()
+        .ok_or_else(|| {
+            anyhow::anyhow!("missing scottylabs.kennel.config in devenv build output")
+        })?;
+
+    let json_path = PathBuf::from(store_path).join("kennel.json");
     let content = tokio::fs::read_to_string(&json_path).await?;
     Ok(serde_json::from_str(&content)?)
 }

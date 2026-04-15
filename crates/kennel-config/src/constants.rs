@@ -3,6 +3,7 @@ use std::time::Duration;
 pub const DEFAULT_API_HOST: &str = "0.0.0.0";
 pub const DEFAULT_API_PORT: u16 = 3000;
 pub const DEFAULT_EPHEMERAL_DOMAIN: &str = "scottylabs.net";
+pub const CADDY_SERVER_NAME: &str = "srv0";
 
 pub const DEFAULT_MAX_CONCURRENT_BUILDS: usize = 2;
 pub const DEFAULT_WORK_DIR: &str = "/var/lib/kennel/builds";

@@ -1,7 +1,7 @@
 use crate::AppState;
 use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
-use kennel_provision::{Provider, ResourceProvider, ResourceRequest};
+use kennel_provision::{ResourceProvider, ResourceRequest};
 
 /// Tear down a single deployment: stop unit, remove route, deprovision resources, delete record.
 pub async fn teardown_deployment(
@@ -13,12 +13,11 @@ pub async fn teardown_deployment(
     let route_id = format!("kennel-{}", deployment.id);
 
     // Stop systemd unit if this is a service deployment
-    if let Some(ref unit_name) = deployment.unit_name {
-        if systemd.is_active(unit_name).await {
-            if let Err(e) = systemd.stop_unit(unit_name).await {
-                tracing::warn!(unit = %unit_name, error = %e, "failed to stop unit");
-            }
-        }
+    if let Some(ref unit_name) = deployment.unit_name
+        && systemd.is_active(unit_name).await
+        && let Err(e) = systemd.stop_unit(unit_name).await
+    {
+        tracing::warn!(unit = %unit_name, error = %e, "failed to stop unit");
     }
 
     // Remove static site symlink

@@ -1,6 +1,8 @@
 use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
+use crate::teardown::teardown_deployment;
 use crate::{AppState, deploy};
+use chrono::Utc;
 use kennel_provision::ResourceProvider;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -25,6 +27,29 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             Err(e) => {
                 tracing::error!(build_id = %build.id, error = %e, "deploy failed during reconciliation");
                 let _ = state.store.builds().set_status(&build.id, "failed").await;
+            }
+        }
+    }
+
+    // Expire non-production deployments older than the expiry threshold
+    let all_deployments = state.store.deployments().list_all().await?;
+    let expiry_cutoff =
+        Utc::now() - chrono::Duration::days(kennel_config::constants::DEPLOYMENT_EXPIRY_DAYS);
+    for deployment in &all_deployments {
+        let env = kennel_config::Environment::from_branch(&deployment.branch);
+        if matches!(
+            env,
+            kennel_config::Environment::Preview | kennel_config::Environment::Dev
+        ) && deployment.updated_at < expiry_cutoff
+        {
+            tracing::info!(
+                deployment = %deployment.id,
+                domain = %deployment.domain,
+                branch = %deployment.branch,
+                "expiring stale deployment"
+            );
+            if let Err(e) = teardown_deployment(state, deployment, &systemd, &caddy).await {
+                tracing::error!(deployment = %deployment.id, error = %e, "expiry teardown failed");
             }
         }
     }
@@ -88,13 +113,12 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             }
 
             let exec = deploy::find_executable(&deployment.store_path).await;
-            if let Ok(exec_start) = exec {
-                if let Err(e) = systemd
+            if let Ok(exec_start) = exec
+                && let Err(e) = systemd
                     .start_transient_unit(unit_name, &exec_start, Some(unit_name), &env_vars)
                     .await
-                {
-                    tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
-                }
+            {
+                tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
             }
         }
     }

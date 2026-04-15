@@ -10,6 +10,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
   services.kennel = {
     enable = true;
     package = kennel.packages.x86_64-linux.kennel;
+    devenvPackage = kennel.packages.x86_64-linux.devenv;
     webhookSecretFile = config.age.secrets.kennel-webhook.path;
     environmentFile = config.age.secrets.kennel.path;
 
@@ -42,6 +43,12 @@ Type: `bool`, default: `false`
 ### `services.kennel.package`
 
 The kennel package to use.
+
+Type: `package`
+
+### `services.kennel.devenvPackage`
+
+The devenv package. The build worker uses `devenv build` to evaluate project kennel configs from their `devenv.nix`.
 
 Type: `package`
 

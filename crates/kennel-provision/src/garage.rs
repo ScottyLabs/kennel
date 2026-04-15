@@ -137,11 +137,10 @@ impl ResourceProvider for GarageProvider {
             .unwrap_or(&vec![])
             .iter()
             .find(|k| k["name"].as_str() == Some(&key_name))
+            && let Some(key_id) = key["accessKeyId"].as_str()
         {
-            if let Some(key_id) = key["accessKeyId"].as_str() {
-                self.api_delete(&format!("/v1/key?id={key_id}")).await?;
-                tracing::info!(key = %key_name, "deleted garage API key");
-            }
+            self.api_delete(&format!("/v1/key?id={key_id}")).await?;
+            tracing::info!(key = %key_name, "deleted garage API key");
         }
 
         // Delete bucket (must be empty first)
@@ -152,12 +151,11 @@ impl ResourceProvider for GarageProvider {
                 .unwrap_or(&vec![])
                 .iter()
                 .any(|a| a.as_str() == Some(&bucket_name))
-        }) {
-            if let Some(bucket_id) = bucket["id"].as_str() {
-                self.api_delete(&format!("/v1/bucket?id={bucket_id}"))
-                    .await?;
-                tracing::info!(bucket = %bucket_name, "deleted garage bucket");
-            }
+        }) && let Some(bucket_id) = bucket["id"].as_str()
+        {
+            self.api_delete(&format!("/v1/bucket?id={bucket_id}"))
+                .await?;
+            tracing::info!(bucket = %bucket_name, "deleted garage bucket");
         }
 
         Ok(())
@@ -172,12 +170,13 @@ impl ResourceProvider for GarageProvider {
             let empty = vec![];
             let aliases = bucket["globalAliases"].as_array().unwrap_or(&empty);
             for alias in aliases {
-                if let Some(name) = alias.as_str() {
-                    if name.starts_with("kennel-") && !active_buckets.contains(name) {
-                        tracing::info!(bucket = %name, "deleting orphaned garage bucket");
-                        if let Some(id) = bucket["id"].as_str() {
-                            let _ = self.api_delete(&format!("/v1/bucket?id={id}")).await;
-                        }
+                if let Some(name) = alias.as_str()
+                    && name.starts_with("kennel-")
+                    && !active_buckets.contains(name)
+                {
+                    tracing::info!(bucket = %name, "deleting orphaned garage bucket");
+                    if let Some(id) = bucket["id"].as_str() {
+                        let _ = self.api_delete(&format!("/v1/bucket?id={id}")).await;
                     }
                 }
             }

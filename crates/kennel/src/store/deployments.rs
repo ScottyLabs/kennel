@@ -32,6 +32,18 @@ impl<'a> DeploymentRepository<'a> {
             .await
     }
 
+    pub async fn find_by_project_branch(
+        &self,
+        project_id: &str,
+        branch: &str,
+    ) -> Result<Vec<deployments::Model>, DbErr> {
+        Deployments::find()
+            .filter(deployments::Column::ProjectId.eq(project_id))
+            .filter(deployments::Column::Branch.eq(branch))
+            .all(self.db)
+            .await
+    }
+
     pub async fn find_by_project_service_branch(
         &self,
         project_id: &str,
@@ -48,23 +60,5 @@ impl<'a> DeploymentRepository<'a> {
 
     pub async fn delete(&self, id: &str) -> Result<DeleteResult, DbErr> {
         Deployments::delete_by_id(id).exec(self.db).await
-    }
-
-    pub async fn delete_by_project_branch(
-        &self,
-        project_id: &str,
-        branch: &str,
-    ) -> Result<Vec<deployments::Model>, DbErr> {
-        let deployments = Deployments::find()
-            .filter(deployments::Column::ProjectId.eq(project_id))
-            .filter(deployments::Column::Branch.eq(branch))
-            .all(self.db)
-            .await?;
-
-        for d in &deployments {
-            Deployments::delete_by_id(&d.id).exec(self.db).await?;
-        }
-
-        Ok(deployments)
     }
 }

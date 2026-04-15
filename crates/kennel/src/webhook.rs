@@ -11,6 +11,9 @@ use sha2::Sha256;
 use std::sync::Arc;
 
 use crate::AppState;
+use crate::caddy::CaddyClient;
+use crate::systemd::SystemdClient;
+use crate::teardown::teardown_deployment;
 
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
@@ -51,21 +54,9 @@ async fn handle_webhook(
             deleted,
         } => {
             if deleted {
-                let deleted = state
-                    .store
-                    .deployments()
-                    .delete_by_project_branch(&project.id, &branch)
+                teardown_branch(&state, &project, &branch)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                if !deleted.is_empty() {
-                    tracing::info!(
-                        project = %project.name,
-                        branch = %branch,
-                        count = deleted.len(),
-                        "marked deployments for teardown"
-                    );
-                    state.signal.notify_one();
-                }
                 return Ok(StatusCode::ACCEPTED);
             }
 
@@ -98,21 +89,49 @@ async fn handle_webhook(
                     Ok(StatusCode::OK)
                 }
                 "closed" => {
-                    let deleted = state
-                        .store
-                        .deployments()
-                        .delete_by_project_branch(&project.id, &branch)
+                    teardown_branch(&state, &project, &branch)
                         .await
                         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                    if !deleted.is_empty() {
-                        state.signal.notify_one();
-                    }
                     Ok(StatusCode::ACCEPTED)
                 }
                 _ => Ok(StatusCode::ACCEPTED),
             }
         }
     }
+}
+
+async fn teardown_branch(
+    state: &AppState,
+    project: &::entity::projects::Model,
+    branch: &str,
+) -> anyhow::Result<()> {
+    let deployments = state
+        .store
+        .deployments()
+        .find_by_project_branch(&project.id, branch)
+        .await?;
+
+    if deployments.is_empty() {
+        return Ok(());
+    }
+
+    let systemd = SystemdClient::connect().await?;
+    let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
+
+    for deployment in &deployments {
+        if let Err(e) = teardown_deployment(state, deployment, &systemd, &caddy).await {
+            tracing::error!(deployment = %deployment.id, error = %e, "teardown failed");
+        }
+    }
+
+    tracing::info!(
+        project = %project.name,
+        branch = %branch,
+        count = deployments.len(),
+        "torn down branch deployments"
+    );
+
+    Ok(())
 }
 
 async fn find_or_create_project(
