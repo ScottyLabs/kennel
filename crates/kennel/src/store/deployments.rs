@@ -14,7 +14,20 @@ impl<'a> DeploymentRepository<'a> {
         &self,
         model: deployments::ActiveModel,
     ) -> Result<deployments::Model, DbErr> {
-        model.insert(self.db).await
+        let project_id = model.project_id.clone().unwrap();
+        let service_name = model.service_name.clone().unwrap();
+        let branch = model.branch.clone().unwrap();
+
+        if let Some(existing) = self
+            .find_by_project_service_branch(&project_id, &service_name, &branch)
+            .await?
+        {
+            let mut update = model;
+            update.id = Set(existing.id);
+            update.update(self.db).await
+        } else {
+            model.insert(self.db).await
+        }
     }
 
     pub async fn list_all(&self) -> Result<Vec<deployments::Model>, DbErr> {
