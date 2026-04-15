@@ -7,6 +7,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
+    let project = state
+        .store
+        .projects()
+        .find_by_id(&build.project_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
+
     let store_paths: HashMap<String, String> = build
         .store_paths
         .as_ref()
@@ -32,6 +39,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         deploy_static_site(
             state,
             &caddy,
+            &project.name,
             build,
             name,
             store_path,
@@ -51,6 +59,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         deploy_service(
             state,
             &caddy,
+            &project.name,
             build,
             name,
             store_path,
@@ -67,6 +76,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
 async fn deploy_static_site(
     state: &AppState,
     caddy: &CaddyClient,
+    project_name: &str,
     build: &::entity::builds::Model,
     name: &str,
     store_path: &str,
@@ -75,7 +85,7 @@ async fn deploy_static_site(
     site_config: &kennel_config::StaticSiteConfig,
 ) -> anyhow::Result<()> {
     let domain = generate_domain(
-        &build.project_id,
+        project_name,
         name,
         branch_slug,
         &state.config.ephemeral_domain,
@@ -137,6 +147,7 @@ async fn deploy_static_site(
 async fn deploy_service(
     state: &AppState,
     caddy: &CaddyClient,
+    project_name: &str,
     build: &::entity::builds::Model,
     name: &str,
     store_path: &str,
@@ -145,14 +156,14 @@ async fn deploy_service(
     svc_config: &kennel_config::ServiceConfig,
 ) -> anyhow::Result<()> {
     let domain = generate_domain(
-        &build.project_id,
+        project_name,
         name,
         branch_slug,
         &state.config.ephemeral_domain,
     );
     let unit_name = format!(
         "kennel-{}-{}-{}",
-        sanitize(&build.project_id),
+        sanitize(project_name),
         branch_slug,
         sanitize(name)
     );
