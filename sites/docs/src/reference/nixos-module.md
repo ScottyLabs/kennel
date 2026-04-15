@@ -75,6 +75,12 @@ Map of domain names to Cloudflare zone IDs. Used for creating DNS records for cu
 
 Type: `attrsOf str`, default: `{}`
 
+### `services.kennel.domain`
+
+Public domain for the kennel API and webhook endpoint. The module configures a Caddy virtualhost with automatic TLS for this domain, reverse-proxying to the API server.
+
+Type: `str`, default: `"kennel.scottylabs.org"`
+
 ### `services.kennel.caddy.adminUrl`
 
 Caddy admin API URL.
@@ -131,8 +137,7 @@ Enable secretspec/OpenBao secret resolution at deploy time.
 - A systemd service for kennel with `Delegate=yes` for cgroup v2 access
 - A polkit rule allowing the kennel user to create transient systemd units via D-Bus
 - A `kennel.slice` for all managed deployment units
-- A Caddy service with the admin API enabled and on-demand TLS
-- `/etc/kennel/projects.json` generated from the `projects` option
+- A Caddy virtualhost for the kennel domain with automatic TLS, plus the admin API for dynamic route management
 - tmpfiles rules for `/var/lib/kennel` subdirectories
-- Firewall rules for ports 80, 443, and the API port
+- Firewall rules for ports 80 and 443
 - Cachix binary cache substituter

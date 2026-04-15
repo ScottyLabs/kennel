@@ -57,6 +57,12 @@ in
       };
     };
 
+    domain = mkOption {
+      type = types.str;
+      default = "kennel.scottylabs.org";
+      description = "Public domain for the kennel API and webhook endpoint";
+    };
+
     caddy.adminUrl = mkOption {
       type = types.str;
       default = "http://localhost:2019";
@@ -244,8 +250,15 @@ in
       "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
     ];
 
+    services.caddy = {
+      enable = true;
+      virtualHosts.${cfg.domain}.extraConfig = ''
+        reverse_proxy localhost:${toString cfg.api.port}
+      '';
+    };
+
     networking.firewall = {
-      allowedTCPPorts = [ cfg.api.port 443 80 ];
+      allowedTCPPorts = [ 443 80 ];
     };
 
     nix.settings = {
