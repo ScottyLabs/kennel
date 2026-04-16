@@ -11,7 +11,10 @@ impl ValkeyProvider {
     }
 
     fn allocation_key(request: &ResourceRequest) -> String {
-        format!("{}/{}", request.project_name, request.branch_slug)
+        format!(
+            "{}/{}/{}",
+            request.project_name, request.service_name, request.branch_slug
+        )
     }
 }
 

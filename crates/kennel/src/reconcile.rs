@@ -161,6 +161,23 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         }
     }
 
+    // Reconcile provisioned resources against active deployments
+    let active_requests: Vec<kennel_provision::ResourceRequest> = deployments
+        .iter()
+        .map(|d| kennel_provision::ResourceRequest {
+            project_name: d.project_id.clone(),
+            service_name: d.service_name.clone(),
+            branch_slug: d.branch_slug.clone(),
+            environment: kennel_config::Environment::from_branch(&d.branch),
+        })
+        .collect();
+
+    for provider in &state.providers {
+        if let Err(e) = provider.reconcile(&active_requests).await {
+            tracing::warn!(provider = provider.name(), error = %e, "resource reconcile failed");
+        }
+    }
+
     tracing::info!(deployments = deployments.len(), "reconciliation complete");
 
     Ok(())
