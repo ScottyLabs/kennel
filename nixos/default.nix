@@ -239,7 +239,8 @@ in
         ReadWritePaths = [
           "/var/lib/kennel"
           "/run/kennel"
-        ];
+        ] ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
+        ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
 
         Delegate = "yes";
 
