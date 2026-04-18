@@ -51,7 +51,7 @@ impl SystemdClient {
             vec![(exec_start.to_string(), vec![exec_start.to_string()], false)];
         properties.push(("ExecStart", exec_start_value.into()));
 
-        let _: () = proxy
+        let _: zbus::zvariant::OwnedObjectPath = proxy
             .call(
                 "StartTransientUnit",
                 &(
