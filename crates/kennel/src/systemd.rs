@@ -35,7 +35,7 @@ impl SystemdClient {
             ("Description", format!("Kennel: {unit_name}").into()),
             ("Slice", "kennel.slice".into()),
             ("Restart", "on-failure".into()),
-            ("RestartSec", 5u32.into()),
+            ("RestartUSec", 5_000_000u64.into()),
         ];
 
         let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
