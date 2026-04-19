@@ -26,7 +26,6 @@ impl SystemdClient {
         &self,
         unit_name: &str,
         exec_start: &str,
-        user: Option<&str>,
         env: &HashMap<String, String>,
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
@@ -36,15 +35,12 @@ impl SystemdClient {
             ("Slice", "kennel.slice".into()),
             ("Restart", "on-failure".into()),
             ("RestartUSec", 5_000_000u64.into()),
+            ("DynamicUser", true.into()),
         ];
 
         let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
         if !env_strings.is_empty() {
             properties.push(("Environment", env_strings.into()));
-        }
-
-        if let Some(u) = user {
-            properties.push(("User", u.into()));
         }
 
         let exec_start_value: Vec<(String, Vec<String>, bool)> =

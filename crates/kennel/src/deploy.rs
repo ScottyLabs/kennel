@@ -203,7 +203,7 @@ async fn deploy_service(
 
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
-        .start_transient_unit(&unit_name, &exec_start, Some(&unit_name), &env_vars)
+        .start_transient_unit(&unit_name, &exec_start, &env_vars)
         .await?;
 
     let deployment_id = uuid::Uuid::now_v7().to_string();
