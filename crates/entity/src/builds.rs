@@ -18,6 +18,7 @@ pub struct Model {
     pub started_at: Option<DateTimeUtc>,
     pub finished_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
+    pub config_store_path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

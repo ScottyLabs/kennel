@@ -61,7 +61,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
     )
     .await?;
 
-    let kennel_config = eval_kennel_config(&repo_path).await?;
+    let (kennel_config, config_store_path) = eval_kennel_config(&repo_path).await?;
 
     if kennel_config.services.is_empty() && kennel_config.static_sites.is_empty() {
         anyhow::bail!("no services or static sites defined");
@@ -87,6 +87,12 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
         }
     }
 
+    let config_path = if config_store_path.is_empty() {
+        None
+    } else {
+        Some(config_store_path.as_str())
+    };
+
     state
         .store
         .builds()
@@ -94,6 +100,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
             &build.id,
             &serde_json::to_string(&store_paths)?,
             &serde_json::to_string(&kennel_config)?,
+            config_path,
         )
         .await?;
 
@@ -135,7 +142,7 @@ async fn git_clone(
     Ok(repo_path)
 }
 
-async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<KennelConfig> {
+async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<(KennelConfig, String)> {
     let output = Command::new("devenv")
         .args(["build", "scottylabs.kennel.config"])
         .current_dir(repo_path)
@@ -144,7 +151,7 @@ async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<KennelConfig> {
 
     if !output.status.success() {
         tracing::info!("no devenv kennel config found, using empty config");
-        return Ok(KennelConfig::default());
+        return Ok((KennelConfig::default(), String::new()));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -157,7 +164,7 @@ async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<KennelConfig> {
 
     let json_path = PathBuf::from(store_path).join("kennel.json");
     let content = tokio::fs::read_to_string(&json_path).await?;
-    Ok(serde_json::from_str(&content)?)
+    Ok((serde_json::from_str(&content)?, store_path.to_string()))
 }
 
 async fn nix_build(repo_path: &Path, name: &str) -> anyhow::Result<String> {

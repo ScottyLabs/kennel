@@ -186,13 +186,19 @@ async fn deploy_service(
     }
 
     if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT") {
-        let env_str = environment.to_string();
-        match crate::secrets::resolve(std::path::Path::new(store_path), &env_str, &vault_endpoint) {
-            Ok(secrets) => env_vars.extend(secrets),
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "secret resolution failed for service '{name}': {e}"
-                ));
+        if let Some(ref config_store_path) = build.config_store_path {
+            let env_str = environment.to_string();
+            match crate::secrets::resolve(
+                std::path::Path::new(config_store_path),
+                &env_str,
+                &vault_endpoint,
+            ) {
+                Ok(secrets) => env_vars.extend(secrets),
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "secret resolution failed for service '{name}': {e}"
+                    ));
+                }
             }
         }
     }
@@ -233,6 +239,7 @@ async fn deploy_service(
         spa: Set(false),
         unit_name: Set(Some(unit_name)),
         port: Set(Some(port as i32)),
+        config_store_path: Set(build.config_store_path.clone()),
         ..Default::default()
     };
 

@@ -23,6 +23,7 @@ pub struct Model {
     pub port: Option<i32>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    pub config_store_path: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

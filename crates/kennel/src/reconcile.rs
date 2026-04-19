@@ -98,13 +98,15 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             }
 
             if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT") {
-                let env_str = request.environment.to_string();
-                if let Ok(secrets) = crate::secrets::resolve(
-                    std::path::Path::new(&deployment.store_path),
-                    &env_str,
-                    &vault_endpoint,
-                ) {
-                    env_vars.extend(secrets);
+                if let Some(ref config_store_path) = deployment.config_store_path {
+                    let env_str = request.environment.to_string();
+                    if let Ok(secrets) = crate::secrets::resolve(
+                        std::path::Path::new(config_store_path),
+                        &env_str,
+                        &vault_endpoint,
+                    ) {
+                        env_vars.extend(secrets);
+                    }
                 }
             }
 

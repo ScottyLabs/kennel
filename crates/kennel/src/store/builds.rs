@@ -49,6 +49,7 @@ impl<'a> BuildRepository<'a> {
         id: &str,
         store_paths: &str,
         kennel_config: &str,
+        config_store_path: Option<&str>,
     ) -> Result<(), DbErr> {
         let mut model: builds::ActiveModel = Builds::find_by_id(id)
             .one(self.db)
@@ -61,6 +62,7 @@ impl<'a> BuildRepository<'a> {
         model.kennel_config = Set(Some(
             serde_json::from_str(kennel_config).unwrap_or_default(),
         ));
+        model.config_store_path = Set(config_store_path.map(String::from));
         model.update(self.db).await?;
         Ok(())
     }
