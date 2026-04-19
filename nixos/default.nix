@@ -136,7 +136,7 @@ in
       enable = mkEnableOption "secretspec/OpenBao secret resolution";
       vaultEndpoint = mkOption {
         type = types.str;
-        default = "vault://secrets2.scottylabs.org/secret";
+        default = "vault://secrets2.scottylabs.org/secret?auth=approle";
         description = "secretspec provider URI for OpenBao/Vault";
       };
     };

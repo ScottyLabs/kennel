@@ -11033,8 +11033,8 @@ rec {
         workspace_member = null;
         src = pkgs.fetchgit {
           url = "https://github.com/ap-1/secretspec";
-          rev = "34ee790255d4eb72bec0864a44d343c1a2fe9fe1";
-          sha256 = "1x773hc07gmfwgf0387bz3kw4k07k0im6ri0dnp90jhyip98hak9";
+          rev = "fdf8caff6285351e97486d39751d76aafb2e4453";
+          sha256 = "11j7qvkgrig4y4yfmc78xv5hml3fl09z11pmphw8ww9dy65chbi7";
         };
         dependencies = [
           {

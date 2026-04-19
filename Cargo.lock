@@ -3274,7 +3274,7 @@ dependencies = [
 [[package]]
 name = "secretspec"
 version = "0.8.2"
-source = "git+https://github.com/ap-1/secretspec#34ee790255d4eb72bec0864a44d343c1a2fe9fe1"
+source = "git+https://github.com/ap-1/secretspec?branch=kennel-integration#fdf8caff6285351e97486d39751d76aafb2e4453"
 dependencies = [
  "clap",
  "colored",
