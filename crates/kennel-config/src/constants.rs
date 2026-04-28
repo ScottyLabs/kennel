@@ -10,6 +10,7 @@ pub const DEFAULT_WORK_DIR: &str = "/var/lib/kennel/builds";
 pub const DEFAULT_DB_PATH: &str = "/var/lib/kennel/kennel.db";
 
 pub const SITES_BASE_DIR: &str = "/var/lib/kennel/sites";
+pub const GC_ROOTS_DIR: &str = "/var/lib/kennel/gcroots";
 pub const LOGS_DIR: &str = "/var/lib/kennel/logs";
 
 pub const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);

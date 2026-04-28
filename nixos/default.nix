@@ -252,8 +252,10 @@ in
       "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/builds 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
+      "d /var/lib/kennel/gcroots 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
       "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
+      "L /nix/var/nix/gcroots/kennel - - - - /var/lib/kennel/gcroots"
     ];
 
     services.caddy = {

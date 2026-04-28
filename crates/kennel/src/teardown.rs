@@ -29,10 +29,19 @@ pub async fn teardown_deployment(
         let _ = tokio::fs::remove_file(&link).await;
     }
 
-    // Remove caddy route
+    // Remove caddy routes
     if let Err(e) = caddy.remove_route(&route_id).await {
         tracing::warn!(route = %route_id, error = %e, "failed to remove caddy route");
     }
+    if deployment.custom_domain.is_some() {
+        let custom_route_id = format!("kennel-{}-custom", deployment.id);
+        if let Err(e) = caddy.remove_route(&custom_route_id).await {
+            tracing::warn!(route = %custom_route_id, error = %e, "failed to remove custom caddy route");
+        }
+    }
+
+    // Remove GC roots
+    crate::deploy::remove_gc_roots(&deployment.id).await;
 
     // Deprovision resources
     let request = ResourceRequest {

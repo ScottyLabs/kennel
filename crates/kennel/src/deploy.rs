@@ -108,7 +108,15 @@ async fn deploy_static_site(
     }
     tokio::fs::rename(&temp, &link).await?;
 
-    let deployment_id = uuid::Uuid::now_v7().to_string();
+    let deployment_id = match state
+        .store
+        .deployments()
+        .find_by_project_service_branch(&build.project_id, name, &build.branch)
+        .await?
+    {
+        Some(existing) => existing.id,
+        None => uuid::Uuid::now_v7().to_string(),
+    };
     let route_id = format!("kennel-{deployment_id}");
 
     caddy
@@ -123,7 +131,7 @@ async fn deploy_static_site(
     }
 
     let model = ::entity::deployments::ActiveModel {
-        id: Set(deployment_id),
+        id: Set(deployment_id.clone()),
         project_id: Set(build.project_id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("static".to_string()),
@@ -139,6 +147,8 @@ async fn deploy_static_site(
     };
 
     state.store.deployments().upsert(model).await?;
+
+    add_gc_root(&deployment_id, store_path).await?;
 
     tracing::info!(site = %name, domain = %domain, "deployed static site");
     Ok(())
@@ -212,7 +222,15 @@ async fn deploy_service(
         .start_transient_unit(&unit_name, &exec_start, &env_vars)
         .await?;
 
-    let deployment_id = uuid::Uuid::now_v7().to_string();
+    let deployment_id = match state
+        .store
+        .deployments()
+        .find_by_project_service_branch(&build.project_id, name, &build.branch)
+        .await?
+    {
+        Some(existing) => existing.id,
+        None => uuid::Uuid::now_v7().to_string(),
+    };
     let route_id = format!("kennel-{deployment_id}");
 
     caddy.add_proxy_route(&route_id, &domain, port).await?;
@@ -225,7 +243,7 @@ async fn deploy_service(
     }
 
     let model = ::entity::deployments::ActiveModel {
-        id: Set(deployment_id),
+        id: Set(deployment_id.clone()),
         project_id: Set(build.project_id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("service".to_string()),
@@ -245,8 +263,27 @@ async fn deploy_service(
 
     state.store.deployments().upsert(model).await?;
 
+    add_gc_root(&deployment_id, store_path).await?;
+    if let Some(ref config_store_path) = build.config_store_path {
+        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
+    }
+
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");
     Ok(())
+}
+
+async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {
+    let gc_root = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR).join(name);
+    let _ = tokio::fs::remove_file(&gc_root).await;
+    #[cfg(unix)]
+    tokio::fs::symlink(store_path, &gc_root).await?;
+    Ok(())
+}
+
+pub async fn remove_gc_roots(deployment_id: &str) {
+    let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
+    let _ = tokio::fs::remove_file(dir.join(deployment_id)).await;
+    let _ = tokio::fs::remove_file(dir.join(format!("{deployment_id}-config"))).await;
 }
 
 fn generate_domain(project: &str, service: &str, branch_slug: &str, base_domain: &str) -> String {

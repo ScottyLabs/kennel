@@ -94,6 +94,10 @@ impl CaddyClient {
     }
 
     async fn add_route(&self, config: &serde_json::Value) -> anyhow::Result<()> {
+        if let Some(id) = config["@id"].as_str() {
+            let _ = self.remove_route(id).await;
+        }
+
         let url = format!(
             "{}/config/apps/http/servers/{}/routes",
             self.admin_url,
