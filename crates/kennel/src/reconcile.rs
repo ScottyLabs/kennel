@@ -180,7 +180,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         }
     }
 
-    tracing::info!(deployments = deployments.len(), "reconciliation complete");
+    tracing::debug!(deployments = deployments.len(), "reconciliation complete");
 
     Ok(())
 }

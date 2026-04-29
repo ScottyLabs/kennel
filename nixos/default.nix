@@ -216,11 +216,12 @@ in
       wants = [ "caddy.service" ];
       wantedBy = [ "multi-user.target" ];
 
-      path = [ cfg.devenvPackage ] ++ (with pkgs; [ git nix cachix ]);
+      path = [ cfg.devenvPackage ] ++ (with pkgs; [ git nix cachix ])
+        ++ optional cfg.resources.postgres.enable pkgs.postgresql;
 
       environment = {
         HOME = "/var/lib/kennel";
-        RUST_LOG = "info";
+        RUST_LOG = "info,sqlx=warn";
         DATABASE_PATH = "/var/lib/kennel/kennel.db";
         API_HOST = cfg.api.host;
         API_PORT = toString cfg.api.port;
