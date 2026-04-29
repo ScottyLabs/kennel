@@ -139,6 +139,13 @@ Enable secretspec/OpenBao secret resolution at deploy time.
 - `enable` (`bool`, default: `false`)
 - `vaultEndpoint` (`str`, default: `"https://secrets2.scottylabs.org"`)
 
+### `services.kennel.forgejo`
+
+Forgejo API access for posting deployment status comments on pull requests. Required.
+
+- `apiUrl` (`str`, default: `"https://codeberg.org/api/v1"`) -- Forgejo API base URL
+- `apiTokenFile` (`path`, required) -- path to a file containing an API token with the `write:issue` scope. Kennel uses this to post and update a sticky comment on each PR listing its deployment URLs, and to mark the comment torn down when the PR is closed.
+
 ## What the module configures
 
 - A systemd service for kennel with `Delegate=yes` for cgroup v2 access

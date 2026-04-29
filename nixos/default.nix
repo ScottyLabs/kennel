@@ -141,6 +141,23 @@ in
       };
     };
 
+    forgejo = {
+      apiUrl = mkOption {
+        type = types.str;
+        default = "https://codeberg.org/api/v1";
+        description = "Forgejo API base URL used to post PR deployment comments";
+      };
+
+      apiTokenFile = mkOption {
+        type = types.path;
+        description = ''
+          Path to file containing a Forgejo API token. The token requires
+          the `write:issue` scope so kennel can post and update deployment
+          comments on pull requests. Required.
+        '';
+      };
+    };
+
     user = mkOption {
       type = types.str;
       default = "kennel";
@@ -212,6 +229,8 @@ in
         MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
         WORK_DIR = cfg.builder.workDir;
         WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
+        FORGEJO_API_URL = cfg.forgejo.apiUrl;
+        FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
       } // optionalAttrs cfg.builder.cachix.enable {
         CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
       } // optionalAttrs cfg.resources.postgres.enable {

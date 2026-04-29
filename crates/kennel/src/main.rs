@@ -1,6 +1,7 @@
 mod build;
 mod caddy;
 mod deploy;
+mod forgejo;
 mod reconcile;
 mod secrets;
 mod signal;
@@ -10,6 +11,7 @@ mod teardown;
 mod webhook;
 
 use anyhow::Result;
+use forgejo::ForgejoClient;
 use sea_orm::Database;
 use sea_orm_migration::MigratorTrait as _;
 use std::sync::Arc;
@@ -22,6 +24,7 @@ pub struct AppState {
     pub signal: Arc<Notify>,
     pub config: AppConfig,
     pub providers: Vec<kennel_provision::Provider>,
+    pub forgejo: ForgejoClient,
 }
 
 pub struct AppConfig {
@@ -83,6 +86,7 @@ async fn main() -> Result<()> {
 
     let store = Store::new(db);
     let providers = build_providers();
+    let forgejo = build_forgejo_client()?;
     let signal = Arc::new(Notify::new());
 
     let state = Arc::new(AppState {
@@ -90,6 +94,7 @@ async fn main() -> Result<()> {
         signal: signal.clone(),
         config,
         providers,
+        forgejo,
     });
 
     let cancel = CancellationToken::new();
@@ -115,6 +120,18 @@ async fn main() -> Result<()> {
 
     tracing::info!("shutdown complete");
     Ok(())
+}
+
+fn build_forgejo_client() -> Result<ForgejoClient> {
+    let token_file = dotenvy::var("FORGEJO_API_TOKEN_FILE")
+        .map_err(|_| anyhow::anyhow!("FORGEJO_API_TOKEN_FILE must be set"))?;
+    let token = std::fs::read_to_string(&token_file)
+        .map_err(|e| anyhow::anyhow!("failed to read forgejo token from {token_file}: {e}"))?
+        .trim()
+        .to_string();
+    let api_base =
+        dotenvy::var("FORGEJO_API_URL").unwrap_or_else(|_| "https://codeberg.org/api/v1".into());
+    Ok(ForgejoClient::new(api_base, token))
 }
 
 fn build_providers() -> Vec<kennel_provision::Provider> {

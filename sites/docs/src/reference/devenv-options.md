@@ -20,6 +20,12 @@ Project name. Used for database naming, log filtering, and secrets path resoluti
 
 Type: `str`, required when `scottylabs.enable = true`
 
+### `scottylabs.conventionalCommits.enable`
+
+Enforce [Conventional Commits](https://www.conventionalcommits.org/) on `git commit` via the commitizen git hook. Commit messages that do not match the conventional format are rejected at commit time.
+
+Type: `bool`, default: `true`
+
 ## `scottylabs.rust`
 
 ### `scottylabs.rust.enable`

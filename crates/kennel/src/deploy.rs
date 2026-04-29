@@ -70,7 +70,54 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         .await?;
     }
 
+    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch) {
+        if let Err(e) = post_pr_deployment_comment(state, &project, build, pr_number).await {
+            tracing::warn!(pr = pr_number, error = %e, "failed to post PR deployment comment");
+        }
+    }
+
     Ok(())
+}
+
+async fn post_pr_deployment_comment(
+    state: &AppState,
+    project: &::entity::projects::Model,
+    build: &::entity::builds::Model,
+    pr_number: u64,
+) -> anyhow::Result<()> {
+    let Some((owner, repo)) = crate::forgejo::parse_owner_repo(&project.repo_url) else {
+        anyhow::bail!("could not parse owner/repo from {}", project.repo_url);
+    };
+
+    let deployments = state
+        .store
+        .deployments()
+        .find_by_project_branch(&project.id, &build.branch)
+        .await?;
+
+    if deployments.is_empty() {
+        return Ok(());
+    }
+
+    let mut body = String::from("### Kennel Deployments\n\n| Service | URL |\n| --- | --- |\n");
+    for d in &deployments {
+        body.push_str(&format!("| {} | https://{} |\n", d.service_name, d.domain));
+        if let Some(ref custom) = d.custom_domain {
+            body.push_str(&format!(
+                "| {} (custom) | https://{} |\n",
+                d.service_name, custom
+            ));
+        }
+    }
+    body.push_str(&format!(
+        "\nLast updated for commit `{}`.\n",
+        &build.commit_sha[..build.commit_sha.len().min(7)]
+    ));
+
+    state
+        .forgejo
+        .upsert_pr_comment(&owner, &repo, pr_number, &body)
+        .await
 }
 
 async fn deploy_static_site(

@@ -131,6 +131,22 @@ async fn teardown_branch(
         "torn down branch deployments"
     );
 
+    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(branch)
+        && let Some((owner, repo)) = crate::forgejo::parse_owner_repo(&project.repo_url)
+    {
+        let body = format!(
+            "### Kennel Deployments\n\nTorn down at {}.\n",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        );
+        if let Err(e) = state
+            .forgejo
+            .upsert_pr_comment(&owner, &repo, pr_number, &body)
+            .await
+        {
+            tracing::warn!(pr = pr_number, error = %e, "failed to post teardown comment");
+        }
+    }
+
     Ok(())
 }
 
