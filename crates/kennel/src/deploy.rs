@@ -175,6 +175,7 @@ async fn deploy_static_site(
         caddy
             .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
             .await?;
+        ensure_dns_record(state, custom_domain).await;
     }
 
     let model = ::entity::deployments::ActiveModel {
@@ -287,6 +288,7 @@ async fn deploy_service(
         caddy
             .add_proxy_route(&custom_route_id, custom_domain, port)
             .await?;
+        ensure_dns_record(state, custom_domain).await;
     }
 
     let model = ::entity::deployments::ActiveModel {
@@ -317,6 +319,25 @@ async fn deploy_service(
 
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");
     Ok(())
+}
+
+/// Best-effort upsert of a Cloudflare A record for a custom domain. Failures
+/// are logged but never fail the deploy; DNS automation is opportunistic when
+/// a matching zone is configured, and external records (manual, tofu-managed,
+/// etc.) remain valid.
+pub async fn ensure_dns_record(state: &AppState, fqdn: &str) {
+    let Some(cf) = &state.cloudflare else {
+        return;
+    };
+    match cf.upsert_a_record(fqdn).await {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::debug!(fqdn = %fqdn, "no cloudflare zone configured for domain");
+        }
+        Err(e) => {
+            tracing::warn!(fqdn = %fqdn, error = %e, "failed to upsert cloudflare A record");
+        }
+    }
 }
 
 async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {

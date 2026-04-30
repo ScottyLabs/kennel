@@ -78,9 +78,25 @@ Type: `str`, default: `"scottylabs.net"`
 
 ### `services.kennel.domains.cloudflare.zones`
 
-Map of domain names to Cloudflare zone IDs. Used for creating DNS records for custom domains.
+Map of domain names to Cloudflare zone IDs. When this is non-empty, `publicIp` is set, and the `CLOUDFLARE_API_TOKEN` env var is provided (typically via the `environmentFile` secret), kennel automatically manages A records for any custom domain whose suffix matches one of the configured zones. The most specific zone wins for nested domains.
+
+The token must have `Zone:DNS:Edit` permission on the zones listed.
+
+Records are upserted on deploy and on each reconciliation pass (so they self-heal if pruned externally). Records are deleted only when kennel tears the deployment down, which happens in three cases:
+
+1. The branch backing the deployment is deleted from the source repo (push event with deleted=true on that ref).
+1. The deployment is associated with a pull request and that pull request is closed.
+1. The deployment is on a `dev` or `preview` branch and exceeds `DEPLOYMENT_EXPIRY_DAYS` since its last update during a reconciliation pass.
+
+Production deployments are not subject to expiry, so a record for a production custom domain stays in place until the project's main branch is deleted or the deployment row is removed manually.
 
 Type: `attrsOf str`, default: `{}`
+
+### `services.kennel.domains.cloudflare.publicIp`
+
+Public IPv4 used as the content of the A records that kennel creates for custom domains. Required to enable DNS automation.
+
+Type: `nullOr str`, default: `null`
 
 ### `services.kennel.domain`
 

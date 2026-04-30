@@ -1,5 +1,6 @@
 mod build;
 mod caddy;
+mod cloudflare;
 mod deploy;
 mod forgejo;
 mod reconcile;
@@ -11,6 +12,7 @@ mod teardown;
 mod webhook;
 
 use anyhow::Result;
+use cloudflare::CloudflareClient;
 use forgejo::ForgejoClient;
 use sea_orm::Database;
 use sea_orm_migration::MigratorTrait as _;
@@ -25,6 +27,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub providers: Vec<kennel_provision::Provider>,
     pub forgejo: ForgejoClient,
+    pub cloudflare: Option<CloudflareClient>,
 }
 
 pub struct AppConfig {
@@ -87,6 +90,7 @@ async fn main() -> Result<()> {
     let store = Store::new(db);
     let providers = build_providers();
     let forgejo = build_forgejo_client()?;
+    let cloudflare = build_cloudflare_client()?;
     let signal = Arc::new(Notify::new());
 
     let state = Arc::new(AppState {
@@ -95,6 +99,7 @@ async fn main() -> Result<()> {
         config,
         providers,
         forgejo,
+        cloudflare,
     });
 
     let cancel = CancellationToken::new();
@@ -120,6 +125,32 @@ async fn main() -> Result<()> {
 
     tracing::info!("shutdown complete");
     Ok(())
+}
+
+fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
+    let Ok(token) = dotenvy::var("CLOUDFLARE_API_TOKEN") else {
+        return Ok(None);
+    };
+    let Ok(zones_json) = dotenvy::var("CLOUDFLARE_ZONES_JSON") else {
+        return Ok(None);
+    };
+    let Ok(public_ip) = dotenvy::var("KENNEL_PUBLIC_IP") else {
+        return Ok(None);
+    };
+
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Ok(None);
+    }
+
+    let zones: std::collections::HashMap<String, String> = serde_json::from_str(&zones_json)
+        .map_err(|e| anyhow::anyhow!("CLOUDFLARE_ZONES_JSON is not a valid JSON object: {e}"))?;
+    if zones.is_empty() {
+        return Ok(None);
+    }
+
+    tracing::info!(zones = zones.len(), public_ip = %public_ip, "cloudflare DNS automation enabled");
+    Ok(Some(CloudflareClient::new(token, zones, public_ip)))
 }
 
 fn build_forgejo_client() -> Result<ForgejoClient> {

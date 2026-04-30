@@ -3,7 +3,8 @@ use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
 use kennel_provision::{ResourceProvider, ResourceRequest};
 
-/// Tear down a single deployment: stop unit, remove route, deprovision resources, delete record.
+/// Tear down a single deployment by stopping its unit, removing its caddy
+/// route and DNS record, deprovisioning resources, and deleting the row.
 pub async fn teardown_deployment(
     state: &AppState,
     deployment: &::entity::deployments::Model,
@@ -33,10 +34,15 @@ pub async fn teardown_deployment(
     if let Err(e) = caddy.remove_route(&route_id).await {
         tracing::warn!(route = %route_id, error = %e, "failed to remove caddy route");
     }
-    if deployment.custom_domain.is_some() {
+    if let Some(ref custom_domain) = deployment.custom_domain {
         let custom_route_id = format!("kennel-{}-custom", deployment.id);
         if let Err(e) = caddy.remove_route(&custom_route_id).await {
             tracing::warn!(route = %custom_route_id, error = %e, "failed to remove custom caddy route");
+        }
+        if let Some(cf) = &state.cloudflare
+            && let Err(e) = cf.delete_a_record(custom_domain).await
+        {
+            tracing::warn!(fqdn = %custom_domain, error = %e, "failed to delete cloudflare A record");
         }
     }
 

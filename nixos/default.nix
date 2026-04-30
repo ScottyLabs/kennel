@@ -54,10 +54,10 @@ in
           description = "Map of domain names to Cloudflare zone IDs for custom domain DNS";
         };
 
-        apiTokenFile = mkOption {
-          type = types.nullOr types.path;
+        publicIp = mkOption {
+          type = types.nullOr types.str;
           default = null;
-          description = "Path to file containing Cloudflare API token";
+          description = "Public IPv4 to use as the A record content for managed custom domains";
         };
       };
     };
@@ -243,7 +243,13 @@ in
         GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
       } // optionalAttrs cfg.secrets.enable {
         VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
-      };
+      } // optionalAttrs
+        (cfg.domains.cloudflare.publicIp != null
+          && cfg.domains.cloudflare.zones != { })
+        {
+          CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
+          KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
+        };
 
       serviceConfig = {
         User = cfg.user;
