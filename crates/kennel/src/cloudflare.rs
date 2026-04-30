@@ -78,7 +78,7 @@ impl CloudflareClient {
             kind: "A",
             name: fqdn,
             content: &self.public_ip,
-            ttl: 60,
+            ttl: 1,
             proxied: false,
             comment: &comment,
         };
