@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
-const RECORD_COMMENT: &str = "Custom domain - managed by Kennel";
+
+fn record_comment(project_name: &str) -> String {
+    format!("{project_name} - managed by Kennel")
+}
 
 pub struct CloudflareClient {
     client: Client,
@@ -64,19 +67,20 @@ impl CloudflareClient {
     /// Upsert an A record for the given fqdn pointing at the configured public IP.
     /// Returns Ok(true) if a record was created or updated, Ok(false) if no
     /// configured zone covers the fqdn (caller treats as a non-managed domain).
-    pub async fn upsert_a_record(&self, fqdn: &str) -> Result<bool> {
+    pub async fn upsert_a_record(&self, project_name: &str, fqdn: &str) -> Result<bool> {
         let Some((zone_name, zone_id)) = self.match_zone(fqdn) else {
             return Ok(false);
         };
 
         let existing = self.find_record(&zone_id, fqdn).await?;
+        let comment = record_comment(project_name);
         let body = UpsertBody {
             kind: "A",
             name: fqdn,
             content: &self.public_ip,
             ttl: 60,
             proxied: false,
-            comment: RECORD_COMMENT,
+            comment: &comment,
         };
 
         let resp = match existing {

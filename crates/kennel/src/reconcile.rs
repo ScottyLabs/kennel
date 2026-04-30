@@ -160,7 +160,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                     .add_proxy_route(&custom_route_id, custom_domain, port as u16)
                     .await;
             }
-            deploy::ensure_dns_record(state, custom_domain).await;
+            let project_name = state
+                .store
+                .projects()
+                .find_by_id(&deployment.project_id)
+                .await
+                .ok()
+                .flatten()
+                .map(|p| p.name)
+                .unwrap_or_else(|| deployment.project_id.clone());
+            deploy::ensure_dns_record(state, &project_name, custom_domain).await;
         }
     }
 

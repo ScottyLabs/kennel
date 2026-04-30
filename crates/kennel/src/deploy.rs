@@ -175,7 +175,7 @@ async fn deploy_static_site(
         caddy
             .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
             .await?;
-        ensure_dns_record(state, custom_domain).await;
+        ensure_dns_record(state, project_name, custom_domain).await;
     }
 
     let model = ::entity::deployments::ActiveModel {
@@ -288,7 +288,7 @@ async fn deploy_service(
         caddy
             .add_proxy_route(&custom_route_id, custom_domain, port)
             .await?;
-        ensure_dns_record(state, custom_domain).await;
+        ensure_dns_record(state, project_name, custom_domain).await;
     }
 
     let model = ::entity::deployments::ActiveModel {
@@ -325,11 +325,11 @@ async fn deploy_service(
 /// are logged but never fail the deploy; DNS automation is opportunistic when
 /// a matching zone is configured, and external records (manual, tofu-managed,
 /// etc.) remain valid.
-pub async fn ensure_dns_record(state: &AppState, fqdn: &str) {
+pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str) {
     let Some(cf) = &state.cloudflare else {
         return;
     };
-    match cf.upsert_a_record(fqdn).await {
+    match cf.upsert_a_record(project_name, fqdn).await {
         Ok(true) => {}
         Ok(false) => {
             tracing::debug!(fqdn = %fqdn, "no cloudflare zone configured for domain");
