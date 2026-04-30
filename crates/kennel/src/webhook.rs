@@ -54,9 +54,10 @@ async fn handle_webhook(
             deleted,
         } => {
             if deleted {
-                teardown_branch(&state, &project, &branch)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                teardown_branch(&state, &project, &branch).await.map_err(|e| {
+                    tracing::error!(project = %project.name, branch = %branch, error = %e, "teardown_branch failed");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
                 return Ok(StatusCode::ACCEPTED);
             }
 
@@ -67,9 +68,10 @@ async fn handle_webhook(
                 format!("refs/heads/{branch}")
             };
 
-            create_build(&state, &project, &branch, &git_ref, &commit_sha)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            create_build(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+                tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "create_build failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
             Ok(StatusCode::OK)
         }
@@ -83,15 +85,17 @@ async fn handle_webhook(
 
             match action.as_str() {
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
-                    create_build(&state, &project, &branch, &git_ref, &commit_sha)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                    create_build(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+                        tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "create_build failed");
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    })?;
                     Ok(StatusCode::OK)
                 }
                 "closed" => {
-                    teardown_branch(&state, &project, &branch)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                    teardown_branch(&state, &project, &branch).await.map_err(|e| {
+                        tracing::error!(project = %project.name, branch = %branch, error = %e, "teardown_branch failed");
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    })?;
                     Ok(StatusCode::ACCEPTED)
                 }
                 _ => Ok(StatusCode::ACCEPTED),
