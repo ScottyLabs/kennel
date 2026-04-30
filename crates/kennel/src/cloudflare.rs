@@ -37,6 +37,10 @@ struct UpsertBody<'a> {
     content: &'a str,
     ttl: u32,
     proxied: bool,
+}
+
+#[derive(Serialize)]
+struct CommentBody<'a> {
     comment: &'a str,
 }
 
@@ -73,28 +77,26 @@ impl CloudflareClient {
         };
 
         let existing = self.find_record(&zone_id, fqdn).await?;
-        let comment = record_comment(project_name);
         let body = UpsertBody {
             kind: "A",
             name: fqdn,
             content: &self.public_ip,
             ttl: 1,
             proxied: false,
-            comment: &comment,
         };
 
-        let resp = match existing {
+        let (resp, record_id) = match existing {
             Some(record) => {
                 if record.kind == "A" && record.content == self.public_ip {
                     tracing::debug!(fqdn = %fqdn, zone = %zone_name, "dns record already current");
                     return Ok(true);
                 }
                 let url = format!("{API_BASE}/zones/{zone_id}/dns_records/{}", record.id);
-                self.client.put(&url)
+                (self.client.put(&url), record.id)
             }
             None => {
                 let url = format!("{API_BASE}/zones/{zone_id}/dns_records");
-                self.client.post(&url)
+                (self.client.post(&url), String::new())
             }
         };
 
@@ -105,7 +107,40 @@ impl CloudflareClient {
             anyhow::bail!("cloudflare {status} when upserting {fqdn}, response: {text}");
         }
 
+        // Cloudflare returns the created/updated record's id in the result.
+        let created_id = if record_id.is_empty() {
+            #[derive(Deserialize)]
+            struct CreateResponse {
+                result: CreatedRecord,
+            }
+            #[derive(Deserialize)]
+            struct CreatedRecord {
+                id: String,
+            }
+            response
+                .json::<CreateResponse>()
+                .await
+                .ok()
+                .map(|r| r.result.id)
+                .unwrap_or_default()
+        } else {
+            record_id
+        };
+
         tracing::info!(fqdn = %fqdn, zone = %zone_name, ip = %self.public_ip, http = %status, "dns record upserted");
+
+        // Best-effort PATCH to set our comment so the record is identifiable.
+        if !created_id.is_empty() {
+            let comment_url = format!("{API_BASE}/zones/{zone_id}/dns_records/{created_id}");
+            let comment = record_comment(project_name);
+            let _ = self
+                .client
+                .patch(&comment_url)
+                .bearer_auth(&self.token)
+                .json(&CommentBody { comment: &comment })
+                .send()
+                .await;
+        }
         Ok(true)
     }
 
