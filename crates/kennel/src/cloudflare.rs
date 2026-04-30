@@ -94,13 +94,12 @@ impl CloudflareClient {
             }
         };
 
-        let status = resp
-            .bearer_auth(&self.token)
-            .json(&body)
-            .send()
-            .await?
-            .error_for_status()?
-            .status();
+        let response = resp.bearer_auth(&self.token).json(&body).send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_default();
+            anyhow::bail!("cloudflare {status} when upserting {fqdn}, response: {text}");
+        }
 
         tracing::info!(fqdn = %fqdn, zone = %zone_name, ip = %self.public_ip, http = %status, "dns record upserted");
         Ok(true)
@@ -122,12 +121,17 @@ impl CloudflareClient {
         }
 
         let url = format!("{API_BASE}/zones/{zone_id}/dns_records/{}", record.id);
-        self.client
+        let response = self
+            .client
             .delete(&url)
             .bearer_auth(&self.token)
             .send()
-            .await?
-            .error_for_status()?;
+            .await?;
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_default();
+            anyhow::bail!("cloudflare {status} when deleting {fqdn}, response: {text}");
+        }
 
         tracing::info!(fqdn = %fqdn, zone = %zone_name, "dns record deleted");
         Ok(())
