@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
-const RECORD_COMMENT: &str = "kennel-managed custom domain";
+const RECORD_COMMENT: &str = "Custom domain - managed by Kennel";
 
 pub struct CloudflareClient {
     client: Client,
