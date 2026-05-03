@@ -70,6 +70,14 @@ Enable SQLite for local development. Adds the `sqlite` package and exports `DATA
 
 Type: `bool`, default: `false`
 
+## `scottylabs.valkey`
+
+### `scottylabs.valkey.enable`
+
+Enable a local [Valkey](https://valkey.io/) instance for development. Layers `services.redis.package = pkgs.valkey` under the hood, so the upstream `services.redis` devenv module drives the process while the binary is the wire-compatible Valkey fork. Adds `pkgs.valkey` to the shell so `valkey-cli` is on the path.
+
+Type: `bool`, default: `false`
+
 ## `scottylabs.secrets`
 
 ### `scottylabs.secrets.enable`
