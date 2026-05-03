@@ -104,6 +104,25 @@ processes.api = {
 };
 ```
 
+If your service needs OIDC, declare the redirect paths and kennel will provision and reconcile a Keycloak client for you on every deploy:
+
+```nix
+scottylabs.kennel.services.api = {
+  customDomain = "api.my-project.scottylabs.org";
+  oidc.redirectPaths = [ "/oauth2/callback" ];
+};
+```
+
+Kennel creates a confidential `my-project` client with redirect URIs covering both the kennel-default URL (`my-project-main.scottylabs.net`) and the custom domain, plus a `my-project-staging` client for staging deployments. PR previews are added to the staging client on PR open and removed on PR close.
+
+Your service receives the credentials via `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` env vars, declared in your `secretspec.toml`:
+
+```toml
+[profiles.prod]
+OIDC_CLIENT_ID = { description = "Keycloak OIDC client ID" }
+OIDC_CLIENT_SECRET = { description = "Keycloak OIDC client secret" }
+```
+
 For a static site:
 
 ```nix

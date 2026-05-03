@@ -44,9 +44,17 @@ Kennel stores state in SQLite with three tables:
 
 Runtime process state (running, stopped, failed) is owned by systemd and queried via D-Bus. Routing state is owned by Caddy and queried via the admin API. Kennel's database only tracks intent.
 
+## OIDC client reconciliation
+
+For services declaring `oidc.redirectPaths`, kennel keeps a pair of Keycloak confidential clients in sync per project: `{slug}` for prod and `{slug}-staging` for staging. On each deploy of a service with OIDC, kennel calls Keycloak's admin API to ensure the client exists with the correct `valid_redirect_uris` (kennel-default URL + `customDomain` if set for prod; kennel-default URL for staging). PR-preview URLs are added to the staging client on PR open and removed on PR close.
+
+Kennel authenticates as a service-account client (`services.kennel.keycloak.adminClientId`) holding the `realm-management/manage-clients` role. The client itself is provisioned in tofu under `infrastructure/tofu/identity/kennel.tf`; its secret is stored at `secret/data/infra/kennel-keycloak-admin` and rendered to disk by bao-agent.
+
+Reconciliation is fire-and-forget: a failure logs a warning but does not block the deploy. The next deploy retries.
+
 ## Crate structure
 
-- `kennel` -- main binary with webhook, build, deploy, reconcile, caddy client, systemd client, store, secrets
+- `kennel` -- main binary with webhook, build, deploy, reconcile, caddy client, systemd client, keycloak client, store, secrets
 - `kennel-config` -- shared types, constants, environment enum
 - `kennel-provision` -- resource provisioning trait and implementations (PostgreSQL, Valkey, Garage)
 - `entity` -- SeaORM generated entities

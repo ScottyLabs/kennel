@@ -56,6 +56,12 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
             continue;
         };
 
+        if let Err(e) =
+            crate::keycloak::reconcile(state, &project.name, &build.branch, svc_config).await
+        {
+            tracing::warn!(service = %name, error = %e, "keycloak reconcile failed");
+        }
+
         deploy_service(
             state,
             &caddy,

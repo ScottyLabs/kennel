@@ -17,6 +17,14 @@ pub struct KennelConfig {
 pub struct ServiceConfig {
     #[serde(default)]
     pub custom_domain: Option<String>,
+
+    #[serde(default)]
+    pub oidc: Option<OidcConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OidcConfig {
+    pub redirect_paths: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

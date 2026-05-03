@@ -98,6 +98,26 @@ secretspec profile for local development.
 
 Type: `str`, default: `"dev"`
 
+## `scottylabs.keycloak`
+
+### `scottylabs.keycloak.enable`
+
+Enable a local Keycloak instance for development. Bootstraps the `scottylabs` realm with a confidential OIDC client matching `scottylabs.project.name`. The client secret is read from `[profiles.dev].OIDC_CLIENT_SECRET.default` in the project's `secretspec.toml` so the dev realm and the secretspec contract stay in sync.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.keycloak.port`
+
+HTTP port the local Keycloak listens on (bound to `127.0.0.1`).
+
+Type: `port`, default: `8088`
+
+### `scottylabs.keycloak.devClient.redirectUris`
+
+Permitted redirect URIs for the dev OIDC client.
+
+Type: `listOf str`, default: `[ "http://localhost:*/*" "http://127.0.0.1:*/*" ]`
+
 ## `scottylabs.kennel`
 
 ### `scottylabs.kennel.services`
@@ -109,6 +129,8 @@ Type: `attrsOf submodule`
 Each service accepts:
 
 - `customDomain` (`nullOr str`, default: `null`) -- custom domain for this service
+- `oidc` (`nullOr submodule`, default: `null`) -- when set, kennel reconciles a Keycloak prod and staging client for the project on every deploy. Accepts:
+  - `redirectPaths` (`listOf str`) -- redirect URI paths (e.g. `"/oauth2/callback"`). Hosts are derived from kennel's URL pattern: `https://{slug}-main.scottylabs.net{path}` for prod (plus `customDomain` if set) and `https://{slug}-staging.scottylabs.net{path}` for staging. PR-preview URLs (`{slug}-pr-{N}.scottylabs.net`) are added to the staging client on PR open and removed on PR close
 
 ### `scottylabs.kennel.sites`
 

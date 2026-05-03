@@ -162,6 +162,15 @@ Forgejo API access for posting deployment status comments on pull requests. Requ
 - `apiUrl` (`str`, default: `"https://codeberg.org/api/v1"`) -- Forgejo API base URL
 - `apiTokenFile` (`path`, required) -- path to a file containing an API token with the `write:issue` scope. Kennel uses this to post and update a sticky comment on each PR listing its deployment URLs, and to mark the comment torn down when the PR is closed.
 
+### `services.kennel.keycloak`
+
+Keycloak admin access for OIDC client reconciliation. When `url` is set, kennel manages a confidential client per project (named after the project slug) plus a `{slug}-staging` client, keeping their `valid_redirect_uris` in sync with each service's `oidc.redirectPaths` declared in `scottylabs.kennel.services.<name>.oidc`. PR-preview URLs are added on PR open and removed on PR close.
+
+- `url` (`nullOr str`, default: `null`) -- Keycloak server URL. Setting this enables reconciliation
+- `realm` (`str`, default: `"scottylabs"`) -- realm to manage clients in
+- `adminClientId` (`nullOr str`, required when `url` is set) -- `client_id` of the service-account client kennel authenticates as (typically `"kennel"`, provisioned in tofu with the `realm-management/manage-clients` role)
+- `adminClientSecretFile` (`nullOr path`, required when `url` is set) -- path to a file containing the admin client secret. Typically populated by bao-agent from `secret/data/infra/kennel-keycloak-admin`
+
 ## What the module configures
 
 - A systemd service for kennel with `Delegate=yes` for cgroup v2 access
