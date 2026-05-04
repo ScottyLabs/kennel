@@ -30,9 +30,7 @@ Type: `bool`, default: `true`
 
 ### `scottylabs.cachix.push`
 
-Push successful builds to the `scottylabs` cachix cache. Each developer must run `cachix authtoken <token>` once before this works; ask a ScottyLabs lead for the token. Cachix dedupes by content hash, so re-pushing identical artifacts is a no-op.
-
-The `scottylabs` cache is always pulled when `scottylabs.enable = true`, regardless of this option.
+Push builds to the `scottylabs` cachix cache. The auth token is read from OpenBao at `secret/shared/cachix` on shell entry; any project member can read it after `bao login -oidc`. If the read fails, shell entry warns and continues without push. Implies `scottylabs.secrets.enable = true`. The cache is always pulled when `scottylabs.enable = true`, regardless of this option.
 
 Type: `bool`, default: `true`
 
