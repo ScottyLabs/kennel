@@ -45,7 +45,7 @@ struct ClientRepresentation {
     standard_flow_enabled: bool,
     #[serde(rename = "directAccessGrantsEnabled")]
     direct_access_grants_enabled: bool,
-    #[serde(rename = "validRedirectUris")]
+    #[serde(rename = "redirectUris")]
     valid_redirect_uris: Vec<String>,
     #[serde(rename = "webOrigins")]
     web_origins: Vec<String>,
