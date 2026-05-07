@@ -155,7 +155,15 @@ async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<(KennelConfig, S
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let build_result: serde_json::Value = serde_json::from_str(stdout.trim())?;
+    // Cachix daemon (spawned by devenv when CACHIX_AUTH_TOKEN is set) writes
+    // bracketed timestamp logs to stdout; the JSON object starts at the last
+    // line that begins with `{`.
+    let lines: Vec<&str> = stdout.lines().collect();
+    let json_start = lines
+        .iter()
+        .rposition(|line| line.starts_with('{'))
+        .ok_or_else(|| anyhow::anyhow!("no JSON object in devenv build output"))?;
+    let build_result: serde_json::Value = serde_json::from_str(&lines[json_start..].join("\n"))?;
     let store_path = build_result["scottylabs.kennel.config"]
         .as_str()
         .ok_or_else(|| {
