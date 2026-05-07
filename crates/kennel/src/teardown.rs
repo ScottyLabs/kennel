@@ -56,6 +56,7 @@ pub async fn teardown_deployment(
             && let Err(e) = crate::keycloak::teardown_preview(
                 state,
                 &deployment.project_id,
+                &deployment.service_name,
                 &deployment.branch,
                 svc_config,
             )

@@ -50,11 +50,11 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         .await?;
     }
 
-    for svc_config in kennel_config.services.values() {
+    for (name, svc_config) in &kennel_config.services {
         if let Err(e) =
-            crate::keycloak::reconcile(state, &project.name, &build.branch, svc_config).await
+            crate::keycloak::reconcile(state, &project.name, name, &build.branch, svc_config).await
         {
-            tracing::warn!(error = %e, "keycloak reconcile failed");
+            tracing::warn!(service = %name, error = %e, "keycloak reconcile failed");
         }
     }
 

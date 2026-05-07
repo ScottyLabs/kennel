@@ -287,6 +287,7 @@ impl KeycloakClient {
 pub async fn reconcile(
     state: &AppState,
     project_slug: &str,
+    service_name: &str,
     branch: &str,
     svc_config: &ServiceConfig,
 ) -> Result<()> {
@@ -297,8 +298,8 @@ pub async fn reconcile(
         return Ok(());
     };
 
-    let prod_host = format!("{project_slug}-main.scottylabs.net");
-    let staging_host = format!("{project_slug}-staging.scottylabs.net");
+    let prod_host = format!("{project_slug}-{service_name}-main.scottylabs.net");
+    let staging_host = format!("{project_slug}-{service_name}-staging.scottylabs.net");
 
     let mut prod_uris: Vec<String> = oidc
         .redirect_paths
@@ -321,7 +322,7 @@ pub async fn reconcile(
     kc.ensure_client(&staging_client_id, &staging_uris).await?;
 
     if let Some(pr) = crate::forgejo::pr_number_from_branch(branch) {
-        let preview_host = format!("{project_slug}-pr-{pr}.scottylabs.net");
+        let preview_host = format!("{project_slug}-{service_name}-pr-{pr}.scottylabs.net");
         for path in &oidc.redirect_paths {
             let uri = format!("https://{preview_host}{path}");
             kc.add_redirect_uri(&staging_client_id, &uri).await?;
@@ -375,6 +376,7 @@ async fn write_oidc_secrets(
 pub async fn teardown_preview(
     state: &AppState,
     project_slug: &str,
+    service_name: &str,
     branch: &str,
     svc_config: &ServiceConfig,
 ) -> Result<()> {
@@ -389,7 +391,7 @@ pub async fn teardown_preview(
     };
 
     let staging_client_id = format!("{project_slug}-staging");
-    let preview_host = format!("{project_slug}-pr-{pr}.scottylabs.net");
+    let preview_host = format!("{project_slug}-{service_name}-pr-{pr}.scottylabs.net");
     for path in &oidc.redirect_paths {
         let uri = format!("https://{preview_host}{path}");
         kc.remove_redirect_uri(&staging_client_id, &uri).await?;
