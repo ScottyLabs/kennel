@@ -3376,29 +3376,6 @@ rec {
         ];
 
       };
-      "envy" = rec {
-        crateName = "envy";
-        version = "0.4.2";
-        edition = "2018";
-        sha256 = "0rar459p7pl19v6pbx98q3hi2hxfl8q1ndxxw5d4zd9cgway0irz";
-        authors = [
-          "softprops <d.tangren@gmail.com>"
-        ];
-        dependencies = [
-          {
-            name = "serde";
-            packageId = "serde";
-          }
-        ];
-        devDependencies = [
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-        ];
-
-      };
       "equivalent" = rec {
         crateName = "equivalent";
         version = "1.0.2";
@@ -11031,15 +11008,10 @@ rec {
       };
       "secretspec" = rec {
         crateName = "secretspec";
-        version = "0.8.2";
+        version = "0.9.1";
         edition = "2024";
         crateBin = [];
-        workspace_member = null;
-        src = pkgs.fetchgit {
-          url = "https://github.com/ap-1/secretspec";
-          rev = "9fa71c3a6e7bb97abe822368330d607aae8f1d19";
-          sha256 = "02zwxfyh7x7b5nbkn4205vbfmzc6ck3nlvkjh7c695xs4r4v3b1j";
-        };
+        sha256 = "1qi5r5229lk8y2kwcximzswsy92qhadzdyjk39b8lsp6b4k7qin1";
         dependencies = [
           {
             name = "clap";
@@ -11105,10 +11077,6 @@ rec {
             name = "serde";
             packageId = "serde";
             features = [ "derive" ];
-          }
-          {
-            name = "serde-envfile";
-            packageId = "serde-envfile";
           }
           {
             name = "serde_json";
@@ -11264,43 +11232,6 @@ rec {
           "unstable" = [ "serde_core/unstable" ];
         };
         resolvedDefaultFeatures = [ "alloc" "default" "derive" "rc" "serde_derive" "std" ];
-      };
-      "serde-envfile" = rec {
-        crateName = "serde-envfile";
-        version = "0.3.0";
-        edition = "2024";
-        sha256 = "0vdxc176hbj91hj518rd3kg7gc01j2npn77606ri2clvhb5345c9";
-        libName = "serde_envfile";
-        authors = [
-          "Luca Goslar <git@lucagoslar.de>"
-        ];
-        dependencies = [
-          {
-            name = "cfg-if";
-            packageId = "cfg-if";
-          }
-          {
-            name = "dotenvy";
-            packageId = "dotenvy";
-          }
-          {
-            name = "envy";
-            packageId = "envy";
-          }
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "thiserror";
-            packageId = "thiserror 2.0.18";
-          }
-        ];
-        features = {
-          "debug" = [ "dep:log" ];
-          "preserve_order" = [ "dep:indexmap" ];
-        };
       };
       "serde_core" = rec {
         crateName = "serde_core";

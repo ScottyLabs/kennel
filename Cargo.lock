@@ -1081,15 +1081,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "envy"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3274,8 +3265,9 @@ dependencies = [
 
 [[package]]
 name = "secretspec"
-version = "0.8.2"
-source = "git+https://github.com/ap-1/secretspec?branch=kennel-integration#9fa71c3a6e7bb97abe822368330d607aae8f1d19"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1467c2659e66a8a561a53faf69b825824afb9fe3576c6a7f068d22444c925e2"
 dependencies = [
  "clap",
  "colored",
@@ -3291,7 +3283,6 @@ dependencies = [
  "rsa",
  "secrecy",
  "serde",
- "serde-envfile",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
@@ -3338,19 +3329,6 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
-]
-
-[[package]]
-name = "serde-envfile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891532ca829b3211b301e61c7bad9001b077de1c2da350240c492e684e60bd6d"
-dependencies = [
- "cfg-if",
- "dotenvy",
- "envy",
- "serde",
- "thiserror 2.0.18",
 ]
 
 [[package]]
