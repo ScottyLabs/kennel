@@ -185,6 +185,36 @@ async fn create_build(
     git_ref: &str,
     commit_sha: &str,
 ) -> anyhow::Result<()> {
+    if let Some(existing) = state
+        .store
+        .builds()
+        .find_by_project_commit(&project.id, commit_sha)
+        .await?
+    {
+        match existing.status.as_str() {
+            "queued" | "building" | "built" => {
+                tracing::debug!(
+                    project = %project.name,
+                    commit = %commit_sha,
+                    status = %existing.status,
+                    "build already in flight, skipping"
+                );
+                return Ok(());
+            }
+            _ => {
+                state.store.builds().requeue(&existing.id).await?;
+                tracing::info!(
+                    project = %project.name,
+                    commit = %commit_sha,
+                    previous_status = %existing.status,
+                    "requeued build for redelivery"
+                );
+                state.signal.notify_one();
+                return Ok(());
+            }
+        }
+    }
+
     let build_id = uuid::Uuid::now_v7().to_string();
 
     let model = ::entity::builds::ActiveModel {
@@ -197,30 +227,23 @@ async fn create_build(
         ..Default::default()
     };
 
-    match state.store.builds().create(model).await {
-        Ok(_) => {
-            let cancelled = state
-                .store
-                .builds()
-                .cancel_stale(&project.id, branch, &build_id)
-                .await?;
-            if cancelled > 0 {
-                tracing::info!(
-                    project = %project.name,
-                    branch = %branch,
-                    cancelled = cancelled,
-                    "cancelled stale builds"
-                );
-            }
-            state.signal.notify_one();
-            Ok(())
-        }
-        Err(e) if e.to_string().contains("UNIQUE constraint failed") => {
-            tracing::debug!(project = %project.name, commit = %commit_sha, "build already exists");
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
+    state.store.builds().create(model).await?;
+
+    let cancelled = state
+        .store
+        .builds()
+        .cancel_stale(&project.id, branch, &build_id)
+        .await?;
+    if cancelled > 0 {
+        tracing::info!(
+            project = %project.name,
+            branch = %branch,
+            cancelled = cancelled,
+            "cancelled stale builds"
+        );
     }
+    state.signal.notify_one();
+    Ok(())
 }
 
 async fn check_domain(

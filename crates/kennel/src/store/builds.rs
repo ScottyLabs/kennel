@@ -67,6 +67,35 @@ impl<'a> BuildRepository<'a> {
         Ok(())
     }
 
+    pub async fn find_by_project_commit(
+        &self,
+        project_id: &str,
+        commit_sha: &str,
+    ) -> Result<Option<builds::Model>, DbErr> {
+        Builds::find()
+            .filter(builds::Column::ProjectId.eq(project_id))
+            .filter(builds::Column::CommitSha.eq(commit_sha))
+            .one(self.db)
+            .await
+    }
+
+    pub async fn requeue(&self, id: &str) -> Result<(), DbErr> {
+        let mut model: builds::ActiveModel = Builds::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or(DbErr::RecordNotFound(id.to_string()))?
+            .into();
+
+        model.status = Set("queued".to_string());
+        model.store_paths = Set(None);
+        model.kennel_config = Set(None);
+        model.config_store_path = Set(None);
+        model.started_at = Set(None);
+        model.finished_at = Set(None);
+        model.update(self.db).await?;
+        Ok(())
+    }
+
     pub async fn cancel_stale(
         &self,
         project_id: &str,
