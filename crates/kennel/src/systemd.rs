@@ -30,6 +30,13 @@ impl SystemdClient {
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
+        // StartTransientUnit fails with UnitExists if a prior fragment is still loaded.
+        let service_unit = format!("{unit_name}.service");
+        let _: Result<zbus::zvariant::OwnedObjectPath, _> = proxy
+            .call("StopUnit", &(service_unit.clone(), "replace"))
+            .await;
+        let _: Result<(), _> = proxy.call("ResetFailedUnit", &(service_unit,)).await;
+
         let mut properties: Vec<(&str, zbus::zvariant::Value)> = vec![
             ("Description", format!("Kennel: {unit_name}").into()),
             ("Slice", "kennel.slice".into()),
