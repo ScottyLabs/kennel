@@ -30,6 +30,40 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
     let branch_slug = sanitize(&build.branch);
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
+    let existing = state
+        .store
+        .deployments()
+        .find_by_project_branch(&build.project_id, &build.branch)
+        .await?;
+    let systemd = crate::systemd::SystemdClient::connect().await?;
+    for deployment in &existing {
+        let still_present = match deployment.service_type.as_str() {
+            "static" => kennel_config
+                .static_sites
+                .contains_key(&deployment.service_name),
+            _ => kennel_config
+                .services
+                .contains_key(&deployment.service_name),
+        };
+        if still_present {
+            continue;
+        }
+        if let Err(e) =
+            crate::teardown::teardown_deployment(state, deployment, &systemd, &caddy).await
+        {
+            tracing::warn!(
+                service = %deployment.service_name,
+                error = %e,
+                "orphan teardown failed",
+            );
+        } else {
+            tracing::info!(
+                service = %deployment.service_name,
+                "torn down orphan deployment removed from kennel config",
+            );
+        }
+    }
+
     for (name, site_config) in &kennel_config.static_sites {
         let Some(store_path) = store_paths.get(name) else {
             tracing::warn!(site = %name, "no store path, skipping");
@@ -76,40 +110,6 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
             svc_config,
         )
         .await?;
-    }
-
-    let existing = state
-        .store
-        .deployments()
-        .find_by_project_branch(&build.project_id, &build.branch)
-        .await?;
-    let systemd = crate::systemd::SystemdClient::connect().await?;
-    for deployment in &existing {
-        let still_present = match deployment.service_type.as_str() {
-            "static" => kennel_config
-                .static_sites
-                .contains_key(&deployment.service_name),
-            _ => kennel_config
-                .services
-                .contains_key(&deployment.service_name),
-        };
-        if still_present {
-            continue;
-        }
-        if let Err(e) =
-            crate::teardown::teardown_deployment(state, deployment, &systemd, &caddy).await
-        {
-            tracing::warn!(
-                service = %deployment.service_name,
-                error = %e,
-                "orphan teardown failed",
-            );
-        } else {
-            tracing::info!(
-                service = %deployment.service_name,
-                "torn down orphan deployment removed from kennel config",
-            );
-        }
     }
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch) {
