@@ -3,6 +3,8 @@ mod caddy;
 mod cloudflare;
 mod deploy;
 mod forgejo;
+mod handlers;
+mod http;
 mod keycloak;
 mod reconcile;
 mod secrets;
@@ -11,7 +13,6 @@ pub mod store;
 mod systemd;
 mod teardown;
 mod vault;
-mod webhook;
 
 use anyhow::Result;
 use cloudflare::CloudflareClient;
@@ -121,7 +122,7 @@ async fn main() -> Result<()> {
 
     signal.notify_one();
 
-    let app = webhook::router(state.clone());
+    let app = http::router(state.clone());
     let addr = format!("{}:{}", state.config.api_host, state.config.api_port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!(addr = %addr, "listening");

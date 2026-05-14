@@ -1,9 +1,7 @@
 use axum::{
-    Router,
     body::Bytes,
     extract::State,
     http::{HeaderMap, StatusCode},
-    routing::post,
 };
 use hmac::{Hmac, Mac, digest::KeyInit};
 use sea_orm::ActiveValue::Set;
@@ -15,17 +13,7 @@ use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
 use crate::teardown::teardown_deployment;
 
-pub fn router(state: Arc<AppState>) -> Router {
-    Router::new()
-        .route("/webhook", post(handle_webhook))
-        .route(
-            "/internal/caddy/check-domain",
-            axum::routing::get(check_domain),
-        )
-        .with_state(state)
-}
-
-async fn handle_webhook(
+pub async fn handle(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     body: Bytes,
@@ -244,20 +232,6 @@ async fn create_build(
     }
     state.signal.notify_one();
     Ok(())
-}
-
-async fn check_domain(
-    State(state): State<Arc<AppState>>,
-    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
-) -> StatusCode {
-    let Some(domain) = params.get("domain") else {
-        return StatusCode::BAD_REQUEST;
-    };
-
-    match state.store.deployments().find_by_domain(domain).await {
-        Ok(Some(_)) => StatusCode::OK,
-        _ => StatusCode::NOT_FOUND,
-    }
 }
 
 struct ParsedEvent {
