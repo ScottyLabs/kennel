@@ -19,6 +19,8 @@ pub struct Model {
     pub finished_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub config_store_path: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub log: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

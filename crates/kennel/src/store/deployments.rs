@@ -34,6 +34,14 @@ impl<'a> DeploymentRepository<'a> {
         Deployments::find().all(self.db).await
     }
 
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<deployments::Model>, DbErr> {
+        Deployments::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn count(&self) -> Result<u64, DbErr> {
+        Deployments::find().count(self.db).await
+    }
+
     pub async fn find_by_domain(&self, domain: &str) -> Result<Option<deployments::Model>, DbErr> {
         Deployments::find()
             .filter(

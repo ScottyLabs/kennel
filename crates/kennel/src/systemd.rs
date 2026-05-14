@@ -2,6 +2,15 @@ use std::collections::HashMap;
 use zbus::Connection;
 use zbus::proxy::Proxy;
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct UnitHealth {
+    pub active: bool,
+    pub active_state: String,
+    pub sub_state: String,
+    pub active_enter_usec: u64,
+    pub n_restarts: u32,
+}
+
 pub struct SystemdClient {
     conn: Connection,
 }
@@ -43,6 +52,10 @@ impl SystemdClient {
             ("Restart", "on-failure".into()),
             ("RestartUSec", 5_000_000u64.into()),
             ("DynamicUser", true.into()),
+            ("CPUAccounting", true.into()),
+            ("MemoryAccounting", true.into()),
+            ("IOAccounting", true.into()),
+            ("TasksAccounting", true.into()),
         ];
 
         let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
@@ -111,6 +124,43 @@ impl SystemdClient {
             .unwrap_or_default();
 
         state == "active"
+    }
+
+    pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<UnitHealth> {
+        let proxy = self.manager_proxy().await?;
+        let unit_path: zbus::zvariant::OwnedObjectPath = proxy
+            .call("GetUnit", &(format!("{unit_name}.service"),))
+            .await?;
+
+        let unit_proxy = Proxy::new(
+            &self.conn,
+            "org.freedesktop.systemd1",
+            unit_path,
+            "org.freedesktop.systemd1.Unit",
+        )
+        .await?;
+
+        let active_state: String = unit_proxy
+            .get_property("ActiveState")
+            .await
+            .unwrap_or_default();
+        let sub_state: String = unit_proxy
+            .get_property("SubState")
+            .await
+            .unwrap_or_default();
+        let active_enter_usec: u64 = unit_proxy
+            .get_property("ActiveEnterTimestamp")
+            .await
+            .unwrap_or(0);
+        let n_restarts: u32 = unit_proxy.get_property("NRestarts").await.unwrap_or(0);
+
+        Ok(UnitHealth {
+            active: active_state == "active",
+            active_state,
+            sub_state,
+            active_enter_usec,
+            n_restarts,
+        })
     }
 
     pub async fn list_kennel_units(&self) -> anyhow::Result<Vec<String>> {

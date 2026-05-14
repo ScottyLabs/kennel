@@ -1,8 +1,11 @@
 use crate::AppState;
 use kennel_config::KennelConfig;
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
 
@@ -30,7 +33,14 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
 
         tracing::info!(build_id = %build.id, project = %build.project_id, "processing build");
 
-        match process_build(&state, &build).await {
+        let mut log = String::new();
+        let result = process_build(&state, &build, &mut log).await;
+
+        if let Err(e) = state.store.builds().set_log(&build.id, &log).await {
+            tracing::warn!(build_id = %build.id, error = %e, "failed to persist build log");
+        }
+
+        match result {
             Ok(()) => {
                 state.signal.notify_one();
             }
@@ -42,7 +52,11 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
     }
 }
 
-async fn process_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
+async fn process_build(
+    state: &AppState,
+    build: &::entity::builds::Model,
+    log: &mut String,
+) -> anyhow::Result<()> {
     let work_dir = PathBuf::from(&state.config.work_dir).join(&build.id);
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
 
@@ -54,6 +68,8 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
         .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
 
     let repo_path = git_clone(
+        &build.id,
+        log,
         &project.repo_url,
         &build.git_ref,
         &build.commit_sha,
@@ -61,7 +77,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
     )
     .await?;
 
-    let (kennel_config, config_store_path) = eval_kennel_config(&repo_path).await?;
+    let (kennel_config, config_store_path) = eval_kennel_config(&build.id, log, &repo_path).await?;
 
     if kennel_config.services.is_empty() && kennel_config.static_sites.is_empty() {
         anyhow::bail!("no services or static sites defined");
@@ -70,19 +86,19 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
     let mut store_paths: HashMap<String, String> = HashMap::new();
 
     for name in kennel_config.services.keys() {
-        let store_path = nix_build(&repo_path, name).await?;
+        let store_path = nix_build(&build.id, log, &repo_path, name).await?;
         store_paths.insert(name.clone(), store_path);
     }
 
     for (name, site_config) in &kennel_config.static_sites {
         let attr = site_config.package_attr.as_deref().unwrap_or(name.as_str());
-        let store_path = nix_build(&repo_path, attr).await?;
+        let store_path = nix_build(&build.id, log, &repo_path, attr).await?;
         store_paths.insert(name.clone(), store_path);
     }
 
     if let Ok(cache_name) = dotenvy::var("CACHIX_CACHE_NAME") {
         let paths: Vec<&str> = store_paths.values().map(String::as_str).collect();
-        if let Err(e) = cachix_push(&cache_name, &paths).await {
+        if let Err(e) = cachix_push(&build.id, log, &cache_name, &paths).await {
             tracing::warn!(error = %e, "cachix push failed");
         }
     }
@@ -110,6 +126,8 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
 }
 
 async fn git_clone(
+    build_id: &str,
+    log: &mut String,
     repo_url: &str,
     git_ref: &str,
     expected_sha: &str,
@@ -118,22 +136,47 @@ async fn git_clone(
     tokio::fs::create_dir_all(work_dir).await?;
     let repo_path = work_dir.join("repo");
 
-    run_cmd("git", &["init", "repo"], work_dir).await?;
-    run_cmd("git", &["remote", "add", "origin", repo_url], &repo_path).await?;
     run_cmd(
+        build_id,
+        "git-init",
+        log,
+        "git",
+        &["init", "repo"],
+        work_dir,
+    )
+    .await?;
+    run_cmd(
+        build_id,
+        "git-remote",
+        log,
+        "git",
+        &["remote", "add", "origin", repo_url],
+        &repo_path,
+    )
+    .await?;
+    run_cmd(
+        build_id,
+        "git-fetch",
+        log,
         "git",
         &["fetch", "--depth", "1", "origin", "--", git_ref],
         &repo_path,
     )
     .await?;
-    run_cmd("git", &["checkout", "FETCH_HEAD"], &repo_path).await?;
+    run_cmd(
+        build_id,
+        "git-checkout",
+        log,
+        "git",
+        &["checkout", "FETCH_HEAD"],
+        &repo_path,
+    )
+    .await?;
 
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .current_dir(&repo_path)
-        .output()
-        .await?;
-    let head = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let mut cmd = Command::new("git");
+    cmd.args(["rev-parse", "HEAD"]).current_dir(&repo_path);
+    let phase = run_streamed(build_id, "git-rev-parse", log, &mut cmd).await?;
+    let head = phase.stdout.trim().to_string();
     anyhow::ensure!(
         head.starts_with(expected_sha) || expected_sha.starts_with(&head),
         "SHA mismatch: expected {expected_sha}, got {head}"
@@ -142,23 +185,22 @@ async fn git_clone(
     Ok(repo_path)
 }
 
-async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<(KennelConfig, String)> {
-    let output = Command::new("devenv")
-        .args(["build", "scottylabs.kennel.config"])
-        .current_dir(repo_path)
-        .output()
-        .await?;
+async fn eval_kennel_config(
+    build_id: &str,
+    log: &mut String,
+    repo_path: &Path,
+) -> anyhow::Result<(KennelConfig, String)> {
+    let mut cmd = Command::new("devenv");
+    cmd.args(["build", "scottylabs.kennel.config"])
+        .current_dir(repo_path);
+    let phase = run_streamed(build_id, "devenv-build", log, &mut cmd).await?;
 
-    if !output.status.success() {
+    if !phase.status.success() {
         tracing::info!("no devenv kennel config found, using empty config");
         return Ok((KennelConfig::default(), String::new()));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    // Cachix daemon (spawned by devenv when CACHIX_AUTH_TOKEN is set) writes
-    // bracketed timestamp logs to stdout; the JSON object starts at the last
-    // line that begins with `{`.
-    let lines: Vec<&str> = stdout.lines().collect();
+    let lines: Vec<&str> = phase.stdout.lines().collect();
     let json_start = lines
         .iter()
         .rposition(|line| line.starts_with('{'))
@@ -175,59 +217,130 @@ async fn eval_kennel_config(repo_path: &Path) -> anyhow::Result<(KennelConfig, S
     Ok((serde_json::from_str(&content)?, store_path.to_string()))
 }
 
-async fn nix_build(repo_path: &Path, name: &str) -> anyhow::Result<String> {
+async fn nix_build(
+    build_id: &str,
+    log: &mut String,
+    repo_path: &Path,
+    name: &str,
+) -> anyhow::Result<String> {
     let system = format!("{}-linux", std::env::consts::ARCH);
     let flake_ref = format!(".#packages.{system}.{name}");
 
-    tracing::info!(package = %name, "building");
+    tracing::info!(build_id, package = %name, "building");
 
-    let output = tokio::time::timeout(
+    let mut cmd = Command::new("nix");
+    cmd.args(["build", &flake_ref, "--no-link", "--print-out-paths"])
+        .current_dir(repo_path);
+
+    let phase = tokio::time::timeout(
         kennel_config::constants::BUILD_TIMEOUT,
-        Command::new("nix")
-            .args(["build", &flake_ref, "--no-link", "--print-out-paths"])
-            .current_dir(repo_path)
-            .output(),
+        run_streamed(build_id, &format!("nix-build:{name}"), log, &mut cmd),
     )
     .await
     .map_err(|_| anyhow::anyhow!("build timed out for {name}"))??;
 
-    anyhow::ensure!(
-        output.status.success(),
-        "nix build failed for {name}: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    anyhow::ensure!(phase.status.success(), "nix build failed for {name}");
+    Ok(phase.stdout.trim().to_string())
 }
 
-async fn run_cmd(program: &str, args: &[&str], cwd: &Path) -> anyhow::Result<()> {
-    let output = Command::new(program)
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .await?;
+async fn run_cmd(
+    build_id: &str,
+    phase: &str,
+    log: &mut String,
+    program: &str,
+    args: &[&str],
+    cwd: &Path,
+) -> anyhow::Result<()> {
+    let mut cmd = Command::new(program);
+    cmd.args(args).current_dir(cwd);
+    let result = run_streamed(build_id, phase, log, &mut cmd).await?;
     anyhow::ensure!(
-        output.status.success(),
-        "{} {} failed: {}",
-        program,
-        args.join(" "),
-        String::from_utf8_lossy(&output.stderr)
+        result.status.success(),
+        "{program} {} failed",
+        args.join(" ")
     );
     Ok(())
 }
 
-async fn cachix_push(cache_name: &str, paths: &[&str]) -> anyhow::Result<()> {
+async fn cachix_push(
+    build_id: &str,
+    log: &mut String,
+    cache_name: &str,
+    paths: &[&str],
+) -> anyhow::Result<()> {
     let mut args = vec!["push", cache_name];
     args.extend(paths);
 
-    let output = Command::new("cachix").args(&args).output().await?;
+    let mut cmd = Command::new("cachix");
+    cmd.args(&args);
+    let phase = run_streamed(build_id, "cachix-push", log, &mut cmd).await?;
+    anyhow::ensure!(phase.status.success(), "cachix push failed");
 
-    anyhow::ensure!(
-        output.status.success(),
-        "cachix push failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    tracing::info!(cache = %cache_name, count = paths.len(), "pushed to cachix");
+    tracing::info!(build_id, cache = %cache_name, count = paths.len(), "pushed to cachix");
     Ok(())
+}
+
+struct PhaseRun {
+    status: std::process::ExitStatus,
+    stdout: String,
+}
+
+async fn run_streamed(
+    build_id: &str,
+    phase: &str,
+    log: &mut String,
+    cmd: &mut Command,
+) -> anyhow::Result<PhaseRun> {
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+
+    writeln!(log, "=== phase: {phase} ===").ok();
+
+    let mut child = cmd.spawn()?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("no stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("no stderr"))?;
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    let mut stderr_reader = BufReader::new(stderr).lines();
+    let mut captured_stdout = String::new();
+
+    loop {
+        tokio::select! {
+            line = stdout_reader.next_line() => match line {
+                Ok(Some(line)) => {
+                    tracing::info!(build_id, phase, "{}", line);
+                    writeln!(log, "{}", line).ok();
+                    captured_stdout.push_str(&line);
+                    captured_stdout.push('\n');
+                }
+                Ok(None) => break,
+                Err(e) => return Err(e.into()),
+            },
+            line = stderr_reader.next_line() => match line {
+                Ok(Some(line)) => {
+                    tracing::warn!(build_id, phase, "{}", line);
+                    writeln!(log, "{}", line).ok();
+                }
+                Ok(None) => {}
+                Err(e) => return Err(e.into()),
+            },
+        }
+    }
+
+    while let Ok(Some(line)) = stderr_reader.next_line().await {
+        tracing::warn!(build_id, phase, "{}", line);
+        writeln!(log, "{}", line).ok();
+    }
+
+    let status = child.wait().await?;
+    Ok(PhaseRun {
+        status,
+        stdout: captured_stdout,
+    })
 }

@@ -23,6 +23,32 @@ impl<'a> BuildRepository<'a> {
             .await
     }
 
+    pub async fn count_by_status(&self) -> Result<Vec<(String, i64)>, DbErr> {
+        Builds::find()
+            .select_only()
+            .column(builds::Column::Status)
+            .column_as(builds::Column::Id.count(), "count")
+            .group_by(builds::Column::Status)
+            .into_tuple()
+            .all(self.db)
+            .await
+    }
+
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<builds::Model>, DbErr> {
+        Builds::find_by_id(id).one(self.db).await
+    }
+
+    pub async fn set_log(&self, id: &str, log: &str) -> Result<(), DbErr> {
+        let mut model: builds::ActiveModel = Builds::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or(DbErr::RecordNotFound(id.to_string()))?
+            .into();
+        model.log = Set(Some(log.to_string()));
+        model.update(self.db).await?;
+        Ok(())
+    }
+
     pub async fn set_status(&self, id: &str, status: &str) -> Result<(), DbErr> {
         let mut model: builds::ActiveModel = Builds::find_by_id(id)
             .one(self.db)

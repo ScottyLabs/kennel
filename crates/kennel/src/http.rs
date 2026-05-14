@@ -5,11 +5,15 @@ use axum::{
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::handlers::{caddy, webhook};
+use crate::handlers::{builds, caddy, deployments, metrics, webhook};
 
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/webhook", post(webhook::handle))
+        .route("/metrics", get(metrics::scrape))
+        .route("/builds/{id}/log", get(builds::log))
+        .route("/deployments/{id}/logs", get(deployments::logs))
+        .route("/deployments/{id}/health", get(deployments::health))
         .route("/internal/caddy/check-domain", get(caddy::check_domain))
         .with_state(state)
 }

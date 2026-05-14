@@ -35,4 +35,8 @@ impl<'a> ProjectRepository<'a> {
             .exec(self.db)
             .await
     }
+
+    pub async fn count(&self) -> Result<u64, DbErr> {
+        Projects::find().count(self.db).await
+    }
 }
