@@ -12,6 +12,7 @@ in
     packages = with pkgs; [ bun ];
 
     treefmt.config.programs.oxfmt.enable = true;
+    treefmt.config.programs.oxfmt.excludes = [ "*.md" ];
     treefmt.config.settings.formatter.oxfmt.options = [
       "--config"
       (toString (pkgs.writeText "oxfmtrc.json" (builtins.toJSON {
