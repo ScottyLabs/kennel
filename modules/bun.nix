@@ -15,6 +15,7 @@ in
     treefmt.config.settings.formatter.oxfmt.options = [
       "--config"
       (toString (pkgs.writeText "oxfmtrc.json" (builtins.toJSON {
+        ignorePatterns = [ "**/*.md" ];
         tabWidth = 4;
         useTabs = false;
         overrides = [{
