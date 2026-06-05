@@ -78,6 +78,10 @@ impl SystemdClient {
             properties.push(("Environment", env_strings.into()));
         }
 
+        if let Some(group) = valkey_supplementary_group(env) {
+            properties.push(("SupplementaryGroups", vec![group].into()));
+        }
+
         let exec_start_value: Vec<(String, Vec<String>, bool)> =
             vec![(exec_start.to_string(), vec![exec_start.to_string()], false)];
         properties.push(("ExecStart", exec_start_value.into()));
@@ -192,5 +196,42 @@ impl SystemdClient {
             .into_iter()
             .map(|(name, ..)| name.trim_end_matches(".service").to_string())
             .collect())
+    }
+}
+
+fn valkey_supplementary_group(env: &HashMap<String, String>) -> Option<String> {
+    env.get("VALKEY_URL")
+        .and_then(|url| unix_socket_group_from_valkey_url(url))
+}
+
+fn unix_socket_group_from_valkey_url(url: &str) -> Option<String> {
+    let path = url.strip_prefix("redis+unix://")?;
+    let path = path.split('?').next()?;
+    std::path::Path::new(path)
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|s| s.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derives_group_from_valkey_url() {
+        let env = HashMap::from([(
+            "VALKEY_URL".into(),
+            "redis+unix:///run/redis-kennel/redis.sock?db=8".into(),
+        )]);
+        assert_eq!(
+            valkey_supplementary_group(&env).as_deref(),
+            Some("redis-kennel")
+        );
+    }
+
+    #[test]
+    fn ignores_deployments_without_valkey() {
+        let env = HashMap::from([("PORT".into(), "3000".into())]);
+        assert_eq!(valkey_supplementary_group(&env), None);
     }
 }
