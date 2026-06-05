@@ -9,7 +9,7 @@ in
     ./claude.nix
     ./kennel.nix
     ./rust.nix
-    ./bun.nix
+    ./deno.nix
     ./keycloak.nix
     ./postgres.nix
     ./sqlite.nix
@@ -44,10 +44,7 @@ in
     treefmt = {
       enable = true;
       config.programs = {
-        nixpkgs-fmt = {
-          enable = true;
-          excludes = [ "Cargo.nix" "bun.nix" ];
-        };
+        nixpkgs-fmt.enable = true;
         mdformat.enable = true;
       };
     };
