@@ -247,7 +247,8 @@ in
       wantedBy = [ "multi-user.target" ];
 
       path = [ cfg.devenvPackage ] ++ (with pkgs; [ git nix cachix ])
-        ++ optional cfg.resources.postgres.enable pkgs.postgresql;
+        ++ optional cfg.resources.postgres.enable pkgs.postgresql
+        ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
       environment = {
         HOME = "/var/lib/kennel";
