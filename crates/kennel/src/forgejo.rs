@@ -93,7 +93,7 @@ impl ForgejoClient {
 
 pub fn parse_owner_repo(repo_url: &str) -> Option<(String, String)> {
     let trimmed = repo_url.trim_end_matches('/').trim_end_matches(".git");
-    let parts: Vec<&str> = trimmed.rsplitn(3, |c: char| c == '/' || c == ':').collect();
+    let parts: Vec<&str> = trimmed.rsplitn(3, ['/', ':']).collect();
     if parts.len() >= 2 && !parts[0].is_empty() && !parts[1].is_empty() {
         Some((parts[1].to_string(), parts[0].to_string()))
     } else {

@@ -90,10 +90,10 @@ impl KeycloakClient {
     async fn admin_token(&self) -> Result<String> {
         {
             let cached = self.token.lock().await;
-            if let Some((tok, expires_at)) = cached.as_ref() {
-                if Instant::now() + Duration::from_secs(30) < *expires_at {
-                    return Ok(tok.clone());
-                }
+            if let Some((tok, expires_at)) = cached.as_ref()
+                && Instant::now() + Duration::from_secs(30) < *expires_at
+            {
+                return Ok(tok.clone());
             }
         }
 

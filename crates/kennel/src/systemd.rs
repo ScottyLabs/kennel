@@ -2,6 +2,21 @@ use std::collections::HashMap;
 use zbus::Connection;
 use zbus::proxy::Proxy;
 
+// org.freedesktop.systemd1 ListUnits row:
+// (name, description, load, active, sub, followed, unit_path, job_id, job_type, job_path)
+type UnitListEntry = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    zbus::zvariant::OwnedObjectPath,
+    u32,
+    String,
+    zbus::zvariant::OwnedObjectPath,
+);
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct UnitHealth {
     pub active: bool,
@@ -166,18 +181,7 @@ impl SystemdClient {
     pub async fn list_kennel_units(&self) -> anyhow::Result<Vec<String>> {
         let proxy = self.manager_proxy().await?;
 
-        let units: Vec<(
-            String,
-            String,
-            String,
-            String,
-            String,
-            String,
-            zbus::zvariant::OwnedObjectPath,
-            u32,
-            String,
-            zbus::zvariant::OwnedObjectPath,
-        )> = proxy
+        let units: Vec<UnitListEntry> = proxy
             .call(
                 "ListUnitsByPatterns",
                 &(Vec::<String>::new(), vec!["kennel-*.service"]),

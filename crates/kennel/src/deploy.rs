@@ -6,6 +6,15 @@ use sea_orm::ActiveValue::Set;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+struct DeployCtx<'a> {
+    state: &'a AppState,
+    caddy: &'a CaddyClient,
+    project_name: &'a str,
+    build: &'a ::entity::builds::Model,
+    branch_slug: &'a str,
+    environment: &'a Environment,
+}
+
 pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
     let project = state
         .store
@@ -64,24 +73,22 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         }
     }
 
+    let ctx = DeployCtx {
+        state,
+        caddy: &caddy,
+        project_name: &project.name,
+        build,
+        branch_slug: &branch_slug,
+        environment: &environment,
+    };
+
     for (name, site_config) in &kennel_config.static_sites {
         let Some(store_path) = store_paths.get(name) else {
             tracing::warn!(site = %name, "no store path, skipping");
             continue;
         };
 
-        deploy_static_site(
-            state,
-            &caddy,
-            &project.name,
-            build,
-            name,
-            store_path,
-            &branch_slug,
-            &environment,
-            site_config,
-        )
-        .await?;
+        deploy_static_site(&ctx, name, store_path, site_config).await?;
     }
 
     for (name, svc_config) in &kennel_config.services {
@@ -98,24 +105,13 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
             continue;
         };
 
-        deploy_service(
-            state,
-            &caddy,
-            &project.name,
-            build,
-            name,
-            store_path,
-            &branch_slug,
-            &environment,
-            svc_config,
-        )
-        .await?;
+        deploy_service(&ctx, name, store_path, svc_config).await?;
     }
 
-    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch) {
-        if let Err(e) = post_pr_deployment_comment(state, &project, build, pr_number).await {
-            tracing::warn!(pr = pr_number, error = %e, "failed to post PR deployment comment");
-        }
+    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch)
+        && let Err(e) = post_pr_deployment_comment(state, &project, build, pr_number).await
+    {
+        tracing::warn!(pr = pr_number, error = %e, "failed to post PR deployment comment");
     }
 
     Ok(())
@@ -163,16 +159,19 @@ async fn post_pr_deployment_comment(
 }
 
 async fn deploy_static_site(
-    state: &AppState,
-    caddy: &CaddyClient,
-    project_name: &str,
-    build: &::entity::builds::Model,
+    ctx: &DeployCtx<'_>,
     name: &str,
     store_path: &str,
-    branch_slug: &str,
-    environment: &Environment,
     site_config: &kennel_config::StaticSiteConfig,
 ) -> anyhow::Result<()> {
+    let &DeployCtx {
+        state,
+        caddy,
+        project_name,
+        build,
+        branch_slug,
+        environment,
+    } = ctx;
     let domain = generate_domain(
         project_name,
         name,
@@ -245,16 +244,19 @@ async fn deploy_static_site(
 }
 
 async fn deploy_service(
-    state: &AppState,
-    caddy: &CaddyClient,
-    project_name: &str,
-    build: &::entity::builds::Model,
+    ctx: &DeployCtx<'_>,
     name: &str,
     store_path: &str,
-    branch_slug: &str,
-    environment: &Environment,
     svc_config: &kennel_config::ServiceConfig,
 ) -> anyhow::Result<()> {
+    let &DeployCtx {
+        state,
+        caddy,
+        project_name,
+        build,
+        branch_slug,
+        environment,
+    } = ctx;
     let domain = generate_domain(
         project_name,
         name,
@@ -285,20 +287,20 @@ async fn deploy_service(
         }
     }
 
-    if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT") {
-        if let Some(ref config_store_path) = build.config_store_path {
-            let env_str = environment.to_string();
-            match crate::secrets::resolve(
-                std::path::Path::new(config_store_path),
-                &env_str,
-                &vault_endpoint,
-            ) {
-                Ok(secrets) => env_vars.extend(secrets),
-                Err(e) => {
-                    return Err(anyhow::anyhow!(
-                        "secret resolution failed for service '{name}': {e}"
-                    ));
-                }
+    if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT")
+        && let Some(ref config_store_path) = build.config_store_path
+    {
+        let env_str = environment.to_string();
+        match crate::secrets::resolve(
+            std::path::Path::new(config_store_path),
+            &env_str,
+            &vault_endpoint,
+        ) {
+            Ok(secrets) => env_vars.extend(secrets),
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "secret resolution failed for service '{name}': {e}"
+                ));
             }
         }
     }
@@ -384,9 +386,18 @@ pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str)
 
 async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {
     let gc_root = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR).join(name);
-    let _ = tokio::fs::remove_file(&gc_root).await;
-    #[cfg(unix)]
-    tokio::fs::symlink(store_path, &gc_root).await?;
+    let output = tokio::process::Command::new("nix-store")
+        .args(["--realise", store_path, "--add-root"])
+        .arg(&gc_root)
+        .output()
+        .await?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "nix-store --add-root failed for {}: {}",
+        gc_root.display(),
+        String::from_utf8_lossy(&output.stderr)
+    );
     Ok(())
 }
 
