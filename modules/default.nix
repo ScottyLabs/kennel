@@ -30,12 +30,6 @@ in
       default = true;
       description = "Enforce Conventional Commits via the commitizen git hook";
     };
-
-    flakeLockHook.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Regenerate flake.lock from flake.nix when either file is committed";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -49,26 +43,21 @@ in
       };
     };
 
-    git-hooks.hooks =
-      {
-        treefmt.enable = true;
-        commitizen.enable = cfg.conventionalCommits.enable;
-      }
-      // lib.optionalAttrs cfg.flakeLockHook.enable {
-        flake-lock-update = {
-          enable = true;
-          name = "flake-lock-update";
-          entry = "${pkgs.writeShellScript "flake-lock-update" ''
-            set -euo pipefail
-            if git diff --cached --name-only | grep -qE '^flake\.(nix|lock)$'; then
-              ${lib.getExe pkgs.nix} flake lock
-              git add flake.lock
-            fi
-          ''}";
-          files = "^flake\\.(nix|lock)$";
-          language = "system";
-          pass_filenames = false;
-        };
+    git-hooks.hooks = {
+      treefmt.enable = true;
+      commitizen.enable = cfg.conventionalCommits.enable;
+      flake-lock-update = {
+        enable = true;
+        name = "flake-lock-update";
+        entry = "${pkgs.writeShellScript "flake-lock-update" ''
+          set -euo pipefail
+          ${lib.getExe pkgs.nix} flake lock
+          git add flake.lock
+        ''}";
+        files = "^flake\\.(nix|lock)$";
+        language = "system";
+        pass_filenames = false;
       };
+    };
   };
 }
