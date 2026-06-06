@@ -11,11 +11,12 @@
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     devenv.url = "github:cachix/devenv";
+    crane.url = "github:ipetkov/crane";
   };
 
-  outputs = { self, nixpkgs, devenv, ... }:
+  outputs = { self, nixpkgs, devenv, crane, ... }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: nixpkgs.legacyPackages.${system};
     in
@@ -23,15 +24,22 @@
       packages = forAllSystems (system:
         let
           pkgs = pkgsFor system;
-          cargoNix = pkgs.callPackage ./Cargo.nix {
-            defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-              libsqlite3-sys = attrs: {
-                nativeBuildInputs = [ pkgs.pkg-config ];
-                buildInputs = [ pkgs.sqlite ];
-              };
-            };
+          craneLib = crane.mkLib pkgs;
+
+          commonArgs = {
+            pname = "kennel";
+            version = "0.1.0";
+            src = craneLib.cleanCargoSource ./.;
+            strictDeps = true;
           };
-          kennel = cargoNix.workspaceMembers.kennel.build;
+
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+          kennel = craneLib.buildPackage (commonArgs // {
+            inherit cargoArtifacts;
+            cargoExtraArgs = "-p kennel";
+            doCheck = false;
+          });
 
           docs = pkgs.stdenv.mkDerivation {
             pname = "kennel-docs";

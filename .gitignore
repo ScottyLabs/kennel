@@ -16,10 +16,6 @@ result-*
 target/
 .cargo/
 
-# Bun / Node
-node_modules/
-dist/
-
 # OS
 .DS_Store
 rustc-ice-*.txt

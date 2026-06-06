@@ -29,11 +29,5 @@ jobs:
       - name: Test
         run: devenv shell cargo test
 
-      - name: Verify Cargo.nix is up to date
-        shell: devenv shell bash -- -e {0}
-        run: |
-          crate2nix generate
-          git diff --exit-code Cargo.nix
-
       - name: Build
         run: nix build

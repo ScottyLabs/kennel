@@ -157,17 +157,39 @@ Push to any branch. Kennel receives the webhook, builds your project, and deploy
 
 ## Flake packages
 
-Your `flake.nix` must expose packages that kennel can build. The package names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`:
+Your `flake.nix` must expose packages that kennel can build. The package names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. For Rust projects, the supported pattern is [crane](https://crane.dev):
 
 ```nix
-packages = forAllSystems (system:
-  let pkgs = pkgsFor system;
+inputs = {
+  nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+  crane.url = "github:ipetkov/crane";
+};
+
+outputs = { self, nixpkgs, crane, ... }:
+  let
+    forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
   in {
-    api = cargoNix.workspaceMembers.my-project.build;
-    docs = pkgs.stdenv.mkDerivation { ... };
-    default = self.packages.${system}.api;
-  }
-);
+    packages = forAllSystems (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        craneLib = crane.mkLib pkgs;
+        commonArgs = {
+          src = craneLib.cleanCargoSource ./.;
+          strictDeps = true;
+        };
+        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+      in {
+        api = craneLib.buildPackage (commonArgs // {
+          inherit cargoArtifacts;
+          pname = "api";
+          cargoExtraArgs = "-p my-project";
+          doCheck = false;
+        });
+        docs = pkgs.stdenv.mkDerivation { ... };
+        default = self.packages.${system}.api;
+      }
+    );
+  };
 ```
 
 Kennel builds each package with `nix build .#packages.{system}.{name}`.

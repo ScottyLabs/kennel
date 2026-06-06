@@ -1,9 +1,5 @@
 { pkgs, config, inputs, ... }:
 
-let
-  cargoNix = pkgs.callPackage ./Cargo.nix { };
-  kennel = cargoNix.workspaceMembers.kennel.build;
-in
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
 
@@ -21,12 +17,8 @@ in
     };
   };
 
-  packages = [
-    kennel
-  ] ++ (with pkgs; [
+  packages = with pkgs; [
     sea-orm-cli
     just
-  ]);
-
-  outputs = { inherit kennel; };
+  ];
 }

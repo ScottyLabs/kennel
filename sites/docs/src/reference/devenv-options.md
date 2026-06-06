@@ -44,7 +44,7 @@ Type: `bool`, default: `true`
 
 ### `scottylabs.rust.enable`
 
-Enable the Rust development toolchain. Configures nightly Rust with cranelift, clippy, rustfmt, the cargo-nix-update pre-commit hook, and crate2nix integration.
+Enable the Rust development toolchain. Configures nightly Rust with [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift) (fast debug-mode codegen), clippy, rustfmt, and the [wild](https://github.com/davidlattimore/wild)/lld linker.
 
 Type: `bool`, default: `false`
 
@@ -54,11 +54,23 @@ Crate names forced to the LLVM backend instead of cranelift. Some crates use fea
 
 Type: `listOf str`, default: `[ "aws-lc-sys" "aws-lc-rs" "rustls" ]`
 
-## `scottylabs.bun`
+## `scottylabs.deno`
 
-### `scottylabs.bun.enable`
+### `scottylabs.deno.enable`
 
-Enable the Bun/JavaScript development toolchain. Adds bun, oxfmt for formatting, and oxlint for linting.
+Enable the Deno/JavaScript development toolchain. Adds [Deno](https://deno.com), [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (with `--deny all`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for `oxlint --type-aware`.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.deno.react.enable`
+
+Add the [`react`](https://oxc.rs/docs/guide/usage/linter/plugins#react-plugin) and [`jsx-a11y`](https://oxc.rs/docs/guide/usage/linter/plugins#jsx-a11y-plugin) plugins to oxlint.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.deno.svelte.enable`
+
+Add the [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check) pre-commit hook.
 
 Type: `bool`, default: `false`
 
