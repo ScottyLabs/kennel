@@ -60,6 +60,11 @@ in
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
     packages = [ pkgs.openbao secretspec ];
 
-    env.BAO_ADDR = "https://secrets2.scottylabs.org";
+    # devenv resolves secretspec into config.secretspec.secrets, put them into the shell
+    # mkDefault lets explicit env vars (e.g. DATABASE_URL) win on name collisions
+    env = lib.mkMerge [
+      { BAO_ADDR = "https://secrets2.scottylabs.org"; }
+      (lib.mapAttrs (_: lib.mkDefault) config.secretspec.secrets)
+    ];
   };
 }
