@@ -113,6 +113,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             if let Some(port) = deployment.port {
                 env_vars.insert("PORT".to_string(), port.to_string());
             }
+            env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
 
             let exec = deploy::find_executable(&deployment.store_path).await;
             if let Ok(exec_start) = exec

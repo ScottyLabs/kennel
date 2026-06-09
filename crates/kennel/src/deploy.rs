@@ -308,6 +308,7 @@ async fn deploy_service(
     let exec_start = find_executable(store_path).await?;
     let port = allocate_port(&unit_name);
     env_vars.insert("PORT".to_string(), port.to_string());
+    env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
 
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
