@@ -20,6 +20,11 @@ jobs:
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
 
+      - name: Cache Rust
+        uses: https://github.com/Swatinem/rust-cache@v2
+        with:
+          cmd-format: "devenv shell {0}"
+
       - name: Check formatting
         run: devenv shell treefmt --fail-on-change
 
