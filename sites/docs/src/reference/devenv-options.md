@@ -106,23 +106,7 @@ Type: `bool`, default: `false`
 
 ## `scottylabs.secrets`
 
-### `scottylabs.secrets.enable`
-
-Enable secretspec integration for local secret resolution. Configures devenv's native secretspec support with the ScottyLabs OpenBao server as the provider. Adds the `bao` CLI for authentication.
-
-Type: `bool`, default: `false`
-
-### `scottylabs.secrets.host`
-
-OpenBao server hostname. Used to derive both `BAO_ADDR` (for the bao CLI) and `SECRETSPEC_PROVIDER` (for secretspec).
-
-Type: `str`, default: `"secrets2.scottylabs.org"`
-
-### `scottylabs.secrets.profile`
-
-secretspec profile for local development.
-
-Type: `str`, default: `"dev"`
+When `scottylabs.enable = true`, the `openbao` (`bao`) and `secretspec` CLIs are added to the shell, `BAO_ADDR` is set for OpenBao authentication, and every secret secretspec resolves is exported into the shell environment. Resolution is enabled per project through the `secretspec` block in `devenv.yaml` (see [Secrets](../guides/secrets.md)).
 
 ## `scottylabs.keycloak`
 

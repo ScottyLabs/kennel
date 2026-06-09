@@ -5,7 +5,7 @@ This guide walks through setting up a ScottyLabs project for deployment with ken
 ## Prerequisites
 
 - A repository in the ScottyLabs Forgejo organization
-- [devenv](https://devenv.sh) installed locally
+- [devenv](https://devenv.sh) and [direnv](https://direnv.net/) installed locally
 - A `flake.nix` and `devenv.nix` in your project root
 
 ## 1. Import the shared module
@@ -13,6 +13,11 @@ This guide walks through setting up a ScottyLabs project for deployment with ken
 Add the ScottyLabs devenv input to your `devenv.yaml`:
 
 ```yaml
+secretspec:
+  enable: true
+  provider: vault://secrets2.scottylabs.org/secret
+  profile: dev
+
 inputs:
   scottylabs:
     url: github:ScottyLabs/devenv
@@ -43,6 +48,8 @@ Import it in your `devenv.nix`:
   };
 }
 ```
+
+The `secretspec` block resolves your project's secrets from OpenBao into the shell. See the [Secrets](./secrets.md) guide to declare and manage them.
 
 ## 2. Set up direnv and .gitignore
 
@@ -79,6 +86,9 @@ result-*
 # Rust
 target/
 .cargo/
+
+# Secrets
+.env
 
 # OS
 .DS_Store
@@ -132,6 +142,15 @@ scottylabs.kennel.sites.docs = {
 ```
 
 The site name (`docs`) must match a package in your `flake.nix` outputs. Kennel builds it with `nix build .#packages.{system}.docs`.
+
+### Runtime environment
+
+Kennel injects these variables into every backend service it deploys:
+
+- `PORT`: the port your service must bind to. Kennel allocates it and routes the public domain to it through Caddy, so read it at startup instead of hardcoding a port.
+- `COMMIT_HASH`: the full Git commit SHA of the running build.
+
+Resolved secrets from your `secretspec.toml` are injected alongside these.
 
 ## 4. Enable infrastructure
 

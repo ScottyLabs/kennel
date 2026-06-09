@@ -11,7 +11,6 @@
       cranelift.excludePackages = [ "aws-lc-sys" "aws-lc-rs" "rustls" "linkme" ];
     };
     sqlite.enable = true;
-    secrets.enable = true;
     kennel.sites.docs = {
       customDomain = "docs.kennel.scottylabs.org";
     };
