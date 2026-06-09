@@ -185,60 +185,17 @@ async fn git_clone(
     Ok(repo_path)
 }
 
-/// `devenv build scottylabs.kennel.config` runs secretspec validation for the dev
-/// profile. Projects that source dev secrets from `dotenv://.env` need a file on
-/// disk even though kennel.config itself never consumes those values.
-async fn ensure_stub_env_for_kennel_config(repo_path: &Path) -> anyhow::Result<()> {
-    let env_path = repo_path.join(".env");
-    if env_path.exists() {
+/// `devenv build scottylabs.kennel.config` only needs the deploy manifest, which
+/// holds no secret values. We don't want them anyway since the dev profile can
+/// reference .env, which doesn't exist on the build host. Deploy-time secrets will
+/// be resolved separately by `secrets::resolve`.
+async fn disable_secretspec_for_kennel_config(repo_path: &Path) -> anyhow::Result<()> {
+    let local_yaml = repo_path.join("devenv.local.yaml");
+    if local_yaml.exists() {
         return Ok(());
     }
-
-    let secretspec_path = repo_path.join("secretspec.toml");
-    if !secretspec_path.exists() {
-        return Ok(());
-    }
-
-    let content = tokio::fs::read_to_string(&secretspec_path).await?;
-    let stub = local_dev_env_stub(&content);
-    if stub.is_empty() {
-        return Ok(());
-    }
-
-    tokio::fs::write(&env_path, stub).await?;
+    tokio::fs::write(&local_yaml, "secretspec:\n  enable: false\n").await?;
     Ok(())
-}
-
-fn local_dev_env_stub(secretspec: &str) -> String {
-    let mut in_dev = false;
-    let mut lines = Vec::new();
-
-    for line in secretspec.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_dev = trimmed == "[profiles.dev]";
-            continue;
-        }
-        if !in_dev || trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        if !trimmed.contains("local") {
-            continue;
-        }
-        let Some(key) = trimmed.split('=').next().map(str::trim) else {
-            continue;
-        };
-        if key.is_empty() || !key.chars().all(|c| c.is_ascii_uppercase() || c == '_') {
-            continue;
-        }
-        lines.push(format!("{key}=kennel-build-placeholder"));
-    }
-
-    if lines.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n", lines.join("\n"))
-    }
 }
 
 async fn eval_kennel_config(
@@ -246,7 +203,7 @@ async fn eval_kennel_config(
     log: &mut String,
     repo_path: &Path,
 ) -> anyhow::Result<(KennelConfig, String)> {
-    ensure_stub_env_for_kennel_config(repo_path).await?;
+    disable_secretspec_for_kennel_config(repo_path).await?;
 
     let mut cmd = Command::new("devenv");
     cmd.args(["build", "scottylabs.kennel.config"])
@@ -401,41 +358,4 @@ async fn run_streamed(
         status,
         stdout: captured_stdout,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::local_dev_env_stub;
-
-    #[test]
-    fn stub_env_includes_only_dev_secrets_using_local_provider() {
-        let secretspec = r#"
-[providers]
-local = "dotenv://.env"
-
-[profiles.dev]
-DISCORD_TOKEN = { providers = ["local"] }
-DISCORD_CLIENT_ID = { providers = ["local"] }
-GOOGLE_MAPS_API_KEY = { required = false, providers = ["vault", "local"] }
-
-[profiles.prod]
-DISCORD_TOKEN = { description = "prod" }
-"#;
-        let stub = local_dev_env_stub(secretspec);
-        assert!(stub.contains("DISCORD_TOKEN=kennel-build-placeholder"));
-        assert!(stub.contains("DISCORD_CLIENT_ID=kennel-build-placeholder"));
-        assert!(stub.contains("GOOGLE_MAPS_API_KEY=kennel-build-placeholder"));
-        assert!(!stub.contains("prod"));
-    }
-
-    #[test]
-    fn stub_env_empty_when_dev_profile_has_no_local_provider() {
-        let secretspec = r#"
-[profiles.dev]
-
-[profiles.prod]
-DISCORD_TOKEN = { description = "prod" }
-"#;
-        assert!(local_dev_env_stub(secretspec).is_empty());
-    }
 }
