@@ -20,7 +20,7 @@ secretspec:
 
 inputs:
   scottylabs:
-    url: github:ScottyLabs/devenv
+    url: git+https://codeberg.org/ScottyLabs/devenv
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:

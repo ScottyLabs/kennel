@@ -160,17 +160,17 @@
     },
     "scottylabs": {
       "locked": {
-        "lastModified": 1780664427,
-        "narHash": "sha256-IzdC1lrU3mXuJYYzkyLiFKuUj07OWWA3W1U6ijPuF7w=",
-        "owner": "ScottyLabs",
-        "repo": "devenv",
-        "rev": "1685e40e3124b34d878987c94e2f823cd7cc55c5",
-        "type": "github"
+        "lastModified": 1781032851,
+        "narHash": "sha256-C16EeGxrHMmMBRrdfes70iLfcXtZn9kcTIvU/GkY9js=",
+        "ref": "refs/heads/main",
+        "rev": "07bce73e4465e288f866e6d16816d061a02f4d37",
+        "revCount": 30,
+        "type": "git",
+        "url": "https://codeberg.org/ScottyLabs/devenv"
       },
       "original": {
-        "owner": "ScottyLabs",
-        "repo": "devenv",
-        "type": "github"
+        "type": "git",
+        "url": "https://codeberg.org/ScottyLabs/devenv"
       }
     },
     "treefmt-nix": {
