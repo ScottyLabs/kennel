@@ -33,19 +33,34 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
 
         tracing::info!(build_id = %build.id, project = %build.project_id, "processing build");
 
-        let mut log = String::new();
-        let result = process_build(&state, &build, &mut log).await;
+        // Run each build in a child task so a panic fails only that build rather
+        // than killing the worker loop or stranding its row in `building`.
+        let task_state = state.clone();
+        let task_build = build.clone();
+        let outcome = tokio::spawn(async move {
+            let mut log = String::new();
+            let result = process_build(&task_state, &task_build, &mut log).await;
+            (log, result)
+        })
+        .await;
 
-        if let Err(e) = state.store.builds().set_log(&build.id, &log).await {
-            tracing::warn!(build_id = %build.id, error = %e, "failed to persist build log");
-        }
-
-        match result {
-            Ok(()) => {
-                state.signal.notify_one();
+        match outcome {
+            Ok((log, result)) => {
+                if let Err(e) = state.store.builds().set_log(&build.id, &log).await {
+                    tracing::warn!(build_id = %build.id, error = %e, "failed to persist build log");
+                }
+                match result {
+                    Ok(()) => {
+                        state.signal.notify_one();
+                    }
+                    Err(e) => {
+                        tracing::error!(build_id = %build.id, error = %e, "build failed");
+                        let _ = state.store.builds().set_status(&build.id, "failed").await;
+                    }
+                }
             }
-            Err(e) => {
-                tracing::error!(build_id = %build.id, error = %e, "build failed");
+            Err(join_err) => {
+                tracing::error!(build_id = %build.id, error = %join_err, "build task panicked");
                 let _ = state.store.builds().set_status(&build.id, "failed").await;
             }
         }

@@ -12,11 +12,6 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     let systemd = SystemdClient::connect().await?;
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
-    let reset = state.store.builds().reset_stuck().await?;
-    if reset > 0 {
-        tracing::info!(count = reset, "reset stuck builds to queued");
-    }
-
     // Deploy completed builds that haven't been deployed yet
     let built = state.store.builds().find_by_status("built").await?;
     for build in &built {
