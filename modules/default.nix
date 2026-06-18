@@ -10,6 +10,7 @@ in
     ./kennel.nix
     ./rust.nix
     ./deno.nix
+    ./garage.nix
     ./keycloak.nix
     ./postgres.nix
     ./sqlite.nix
