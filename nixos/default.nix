@@ -158,32 +158,6 @@ in
       };
     };
 
-    keycloak = {
-      url = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "Keycloak server URL. When set, enables OIDC client reconciliation.";
-      };
-
-      realm = mkOption {
-        type = types.str;
-        default = "scottylabs";
-        description = "Keycloak realm to manage clients in";
-      };
-
-      adminClientId = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        description = "client_id of the service-account client kennel uses to authenticate";
-      };
-
-      adminClientSecretFile = mkOption {
-        type = types.nullOr types.path;
-        default = null;
-        description = "Path to file containing the admin client_secret";
-      };
-    };
-
     user = mkOption {
       type = types.str;
       default = "kennel";
@@ -212,10 +186,6 @@ in
       {
         assertion = cfg.resources.garage.enable -> cfg.environmentFile != null;
         message = "An environmentFile containing GARAGE_ADMIN_TOKEN is required when Garage is enabled";
-      }
-      {
-        assertion = (cfg.keycloak.url != null) -> (cfg.keycloak.adminClientId != null && cfg.keycloak.adminClientSecretFile != null);
-        message = "services.kennel.keycloak.{adminClientId, adminClientSecretFile} must be set when keycloak.url is set";
       }
     ];
 
@@ -280,13 +250,7 @@ in
         {
           CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
           KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
-        }
-      // optionalAttrs (cfg.keycloak.url != null) {
-        KEYCLOAK_URL = cfg.keycloak.url;
-        KEYCLOAK_REALM = cfg.keycloak.realm;
-        KEYCLOAK_ADMIN_CLIENT_ID = cfg.keycloak.adminClientId;
-        KEYCLOAK_ADMIN_CLIENT_SECRET_FILE = cfg.keycloak.adminClientSecretFile;
-      };
+        };
 
       serviceConfig = {
         User = cfg.user;
@@ -315,7 +279,7 @@ in
       "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/builds 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/gcroots 0755 ${cfg.user} ${cfg.group} -"
+      "d /nix/var/nix/gcroots/kennel 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
       "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
     ];

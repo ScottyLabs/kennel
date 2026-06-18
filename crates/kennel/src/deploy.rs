@@ -92,14 +92,6 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
     }
 
     for (name, svc_config) in &kennel_config.services {
-        if let Err(e) =
-            crate::keycloak::reconcile(state, &project.name, name, &build.branch, svc_config).await
-        {
-            tracing::warn!(service = %name, error = %e, "keycloak reconcile failed");
-        }
-    }
-
-    for (name, svc_config) in &kennel_config.services {
         let Some(store_path) = store_paths.get(name) else {
             tracing::warn!(service = %name, "no store path, skipping");
             continue;

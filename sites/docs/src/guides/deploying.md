@@ -114,16 +114,7 @@ processes.api = {
 };
 ```
 
-If your service needs OIDC, declare the redirect paths and kennel will provision and reconcile a Keycloak client for you on every deploy:
-
-```nix
-scottylabs.kennel.services.api = {
-  customDomain = "api.my-project.scottylabs.org";
-  oidc.redirectPaths = [ "/oauth2/callback" ];
-};
-```
-
-Kennel creates a confidential `my-project` client with redirect URIs covering both the kennel-default URL (`my-project-main.scottylabs.net`) and the custom domain, plus a `my-project-staging` client for staging deployments. PR previews are added to the staging client on PR open and removed on PR close.
+If your service needs OIDC, add `oidc_client` to its `features` in governance (and `admin_client` if it needs a privileged service-account client). Governance provisions the Keycloak clients and writes the credentials to Vault.
 
 Your service receives the credentials via `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` env vars, declared in your `secretspec.toml`:
 
@@ -162,9 +153,18 @@ scottylabs.postgres.enable = true;
 
 This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
 
-## 5. Enable kennel in governance
+## 5. Register your repository in governance
 
-In the ScottyLabs governance repository, set the kennel flag for your project. Governance provisions the webhook that connects your repository to kennel.
+In the ScottyLabs governance repository, add your repo to its team's TOML file and list its `features`. Governance provisions everything those features imply.
+
+`features` is an array of:
+
+- `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
+- `sentry` creates a Sentry project and writes its DSN to Vault
+- `oidc_client` provisions prod and staging Keycloak OIDC clients (redirect URI fixed at `/oauth2/callback`) and writes `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` to Vault for each profile
+- `admin_client` provisions a Keycloak service-account client with the `view-users` and `manage-users` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
+
+Documentation is controlled separately by `docs` (boolean, default `true`), which builds the repository's `./docs` directory into the documentation hub.
 
 ## 6. Push
 

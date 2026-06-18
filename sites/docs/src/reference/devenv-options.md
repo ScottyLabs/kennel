@@ -139,8 +139,6 @@ Type: `attrsOf submodule`
 Each service accepts:
 
 - `customDomain` (`nullOr str`, default: `null`) -- custom domain for this service
-- `oidc` (`nullOr submodule`, default: `null`) -- when set, kennel reconciles a Keycloak prod and staging client for the project on every deploy. Accepts:
-  - `redirectPaths` (`listOf str`) -- redirect URI paths (e.g. `"/oauth2/callback"`). Hosts are derived from kennel's URL pattern: `https://{slug}-main.scottylabs.net{path}` for prod (plus `customDomain` if set) and `https://{slug}-staging.scottylabs.net{path}` for staging. PR-preview URLs (`{slug}-pr-{N}.scottylabs.net`) are added to the staging client on PR open and removed on PR close
 
 ### `scottylabs.kennel.sites`
 

@@ -46,30 +46,6 @@ pub async fn teardown_deployment(
         }
     }
 
-    if deployment.service_type == "service"
-        && let Some(config_path) = deployment.config_store_path.as_deref()
-    {
-        let kennel_json = std::path::Path::new(config_path).join("kennel.json");
-        let content = std::fs::read_to_string(&kennel_json)?;
-        let cfg: kennel_config::KennelConfig = serde_json::from_str(&content)?;
-        if let Some(svc_config) = cfg.services.get(&deployment.service_name)
-            && let Err(e) = crate::keycloak::teardown_preview(
-                state,
-                &deployment.project_id,
-                &deployment.service_name,
-                &deployment.branch,
-                svc_config,
-            )
-            .await
-        {
-            tracing::warn!(
-                service = %deployment.service_name,
-                error = %e,
-                "keycloak preview teardown failed",
-            );
-        }
-    }
-
     // Remove GC roots
     crate::deploy::remove_gc_roots(&deployment.id).await;
 

@@ -5,7 +5,6 @@ mod deploy;
 mod forgejo;
 mod handlers;
 mod http;
-mod keycloak;
 mod reconcile;
 mod secrets;
 mod signal;
@@ -17,7 +16,6 @@ mod vault;
 use anyhow::Result;
 use cloudflare::CloudflareClient;
 use forgejo::ForgejoClient;
-use keycloak::KeycloakClient;
 use sea_orm::Database;
 use sea_orm_migration::MigratorTrait as _;
 use std::sync::Arc;
@@ -33,7 +31,6 @@ pub struct AppState {
     pub providers: Vec<kennel_provision::Provider>,
     pub forgejo: ForgejoClient,
     pub cloudflare: Option<CloudflareClient>,
-    pub keycloak: Option<KeycloakClient>,
     pub vault: Option<VaultClient>,
 }
 
@@ -98,7 +95,6 @@ async fn main() -> Result<()> {
     let providers = build_providers();
     let forgejo = build_forgejo_client()?;
     let cloudflare = build_cloudflare_client()?;
-    let keycloak = build_keycloak_client()?;
     let vault = vault::build_from_env()?;
     let signal = Arc::new(Notify::new());
 
@@ -109,11 +105,14 @@ async fn main() -> Result<()> {
         providers,
         forgejo,
         cloudflare,
-        keycloak,
         vault,
     });
 
     let cancel = CancellationToken::new();
+
+    // Requeue builds left `building` by a dead previous instance. The worker is
+    // not running yet, so any such row is necessarily orphaned.
+    state.store.builds().reset_stuck().await?;
 
     reconcile::run_once(&state).await?;
 
@@ -162,33 +161,6 @@ fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
 
     tracing::info!(zones = zones.len(), public_ip = %public_ip, "cloudflare DNS automation enabled");
     Ok(Some(CloudflareClient::new(token, zones, public_ip)))
-}
-
-fn build_keycloak_client() -> Result<Option<KeycloakClient>> {
-    let Ok(url) = dotenvy::var("KEYCLOAK_URL") else {
-        return Ok(None);
-    };
-    let realm = dotenvy::var("KEYCLOAK_REALM").unwrap_or_else(|_| "scottylabs".into());
-    let admin_client_id = dotenvy::var("KEYCLOAK_ADMIN_CLIENT_ID").map_err(|_| {
-        anyhow::anyhow!("KEYCLOAK_ADMIN_CLIENT_ID required when KEYCLOAK_URL is set")
-    })?;
-    let secret_file = dotenvy::var("KEYCLOAK_ADMIN_CLIENT_SECRET_FILE").map_err(|_| {
-        anyhow::anyhow!("KEYCLOAK_ADMIN_CLIENT_SECRET_FILE required when KEYCLOAK_URL is set")
-    })?;
-    let admin_client_secret = std::fs::read_to_string(&secret_file)
-        .map_err(|e| {
-            anyhow::anyhow!("failed to read keycloak admin secret from {secret_file}: {e}")
-        })?
-        .trim()
-        .to_string();
-
-    tracing::info!(url = %url, realm = %realm, "keycloak admin client enabled");
-    Ok(Some(KeycloakClient::new(
-        url,
-        realm,
-        admin_client_id,
-        admin_client_secret,
-    )))
 }
 
 fn build_forgejo_client() -> Result<ForgejoClient> {

@@ -24,10 +24,6 @@ Each PR deployment gets:
 
 Connection strings are injected as environment variables. Your application code does not need to know whether it is running in production or a PR preview.
 
-## OIDC redirect URIs
-
-For services declaring `oidc.redirectPaths`, kennel adds the PR-preview URL (`{project}-pr-{number}.scottylabs.net`) to the staging Keycloak client's `valid_redirect_uris` on PR open, and removes it on PR close. PR previews share the same OIDC client (and credentials) as the staging branch, so the same client secret applies.
-
 ## Expiry
 
 PR deployments that have had no activity for 7 days are hibernated: the process is stopped but the database is kept. After 30 days, the deployment and its resources are fully torn down.
