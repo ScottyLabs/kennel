@@ -26,20 +26,6 @@ Enforce [Conventional Commits](https://www.conventionalcommits.org/) on `git com
 
 Type: `bool`, default: `true`
 
-## `scottylabs.cachix`
-
-### `scottylabs.cachix.push`
-
-Push builds to the `scottylabs` cachix cache. Each developer must run this once, from inside any ScottyLabs devenv shell (after `bao login -method=oidc`):
-
-```
-cachix authtoken $(bao kv get -field=CACHIX_AUTH_TOKEN secret/shared/cachix)
-```
-
-The cache is always pulled when `scottylabs.enable = true`, regardless of this option.
-
-Type: `bool`, default: `true`
-
 ## `scottylabs.rust`
 
 ### `scottylabs.rust.enable`

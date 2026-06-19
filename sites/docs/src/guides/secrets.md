@@ -59,13 +59,17 @@ DISCORD_TOKEN = { providers = ["local"] }
 
 ## Local development
 
-Authenticate to OpenBao once:
+Log in to OpenBao once per machine:
 
 ```bash
-bao login -method=oidc
+nix run git+https://codeberg.org/ScottyLabs/devenv#login
 ```
 
-After that, your secrets are resolved and exported into the shell automatically each time direnv loads the environment (when you `cd` into the project).
+A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above.
+
+The token is periodic and renews on each shell entry, so it stays valid as long as you open a project shell at least once every 90 days. You only log in again on a new machine, or after 90 days without using it.
+
+Secrets then load into your shell automatically each time direnv reloads.
 
 ## Managing secrets
 

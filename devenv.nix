@@ -1,4 +1,4 @@
-{ pkgs, config, inputs, ... }:
+{ pkgs, inputs, ... }:
 
 {
   imports = [ inputs.scottylabs.devenvModules.default ];
@@ -8,7 +8,12 @@
     project.name = "kennel";
     rust = {
       enable = true;
-      cranelift.excludePackages = [ "aws-lc-sys" "aws-lc-rs" "rustls" "linkme" ];
+      cranelift.excludePackages = [
+        "aws-lc-sys"
+        "aws-lc-rs"
+        "rustls"
+        "linkme"
+      ];
     };
     sqlite.enable = true;
     kennel.sites.docs = {
