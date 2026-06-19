@@ -133,6 +133,15 @@ When developing the OAuth flow locally, enable the relay so the IdP redirects ba
 scottylabs.ricochet.enable = true;
 ```
 
+If your service reports errors to Sentry, add `sentry` to its `features` in governance. It creates a Sentry project and writes the project DSN to Vault as `SENTRY_DSN` on the `prod` profile, so declare it there:
+
+```toml
+[profiles.prod]
+SENTRY_DSN = { description = "Sentry project DSN" }
+```
+
+Read `SENTRY_DSN` at startup and pass it to the Sentry SDK to turn on error reporting, following [Sentry's setup guide](https://docs.sentry.io/platforms/). Without a DSN, in local development and previews, the SDK stays inert.
+
 For a static site:
 
 ```nix
@@ -169,7 +178,7 @@ In the ScottyLabs governance repository, add your repo to its team's TOML file a
 `features` is an array of:
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
-- `sentry` creates a Sentry project and writes its DSN to Vault
+- `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, and `OAUTH_RELAY_URL` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users` and `manage-users` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
