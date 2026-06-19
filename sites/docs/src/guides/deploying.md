@@ -123,6 +123,8 @@ scottylabs.kennel.sites.docs = {
 };
 ```
 
+Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure).
+
 ### Flake packages
 
 Your `flake.nix` must expose these packages, and their names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. For Rust projects, the supported pattern is [crane](https://crane.dev):
