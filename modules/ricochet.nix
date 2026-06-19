@@ -1,4 +1,9 @@
-{ ricochet, lib, config, ... }:
+{
+  ricochet,
+  lib,
+  config,
+  ...
+}:
 
 let
   cfg = config.scottylabs.ricochet;
@@ -12,9 +17,6 @@ in
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
-    processes.ricochet.exec =
-      "RICOCHET_DEV=1 RICOCHET_BIND=127.0.0.1:${toString port} ${ricochet}/bin/ricochet";
-
-    env.OAUTH_RELAY_URL = "http://localhost:${toString port}";
+    processes.ricochet.exec = "RICOCHET_DEV=1 RICOCHET_BIND=127.0.0.1:${toString port} ${ricochet}/bin/ricochet";
   };
 }
