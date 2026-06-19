@@ -1,6 +1,6 @@
-# PR Deployments
+# Preview Deployments
 
-Every pull request gets its own isolated deployment with its own database, cache, and URL.
+Every pull request and feature branch gets its own isolated deployment with its own database, cache, and URL.
 
 ## Lifecycle
 

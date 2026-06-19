@@ -1,3 +1,4 @@
+use futures_util::stream::StreamExt;
 use std::collections::HashMap;
 use zbus::Connection;
 use zbus::proxy::Proxy;
@@ -33,7 +34,10 @@ pub struct SystemdClient {
 impl SystemdClient {
     pub async fn connect() -> anyhow::Result<Self> {
         let conn = Connection::system().await?;
-        Ok(Self { conn })
+        let client = Self { conn };
+        // Subscribe to systemd job and unit signals
+        let _: Result<(), zbus::Error> = client.manager_proxy().await?.call("Subscribe", &()).await;
+        Ok(client)
     }
 
     async fn manager_proxy(&self) -> anyhow::Result<Proxy<'_>> {
@@ -54,12 +58,31 @@ impl SystemdClient {
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
-        // StartTransientUnit fails with UnitExists if a prior fragment is still loaded.
+        // Stop any prior unit and wait for the stop job to finish
+        // StartTransientUnit with mode fail errors while one is still loaded
         let service_unit = format!("{unit_name}.service");
-        let _: Result<zbus::zvariant::OwnedObjectPath, _> = proxy
-            .call("StopUnit", &(service_unit.clone(), "replace"))
+        let mut job_removed = proxy.receive_signal("JobRemoved").await?;
+        let stop: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
+            .call("StopUnit", &(service_unit.as_str(), "replace"))
             .await;
-        let _: Result<(), _> = proxy.call("ResetFailedUnit", &(service_unit,)).await;
+        if let Ok(job) = stop {
+            let _ = tokio::time::timeout(kennel_config::constants::UNIT_STOP_TIMEOUT, async {
+                while let Some(signal) = job_removed.next().await {
+                    if let Ok((_, removed, _, _)) =
+                        signal
+                            .body()
+                            .deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
+                        && removed == job
+                    {
+                        break;
+                    }
+                }
+            })
+            .await;
+        }
+        let _: Result<(), zbus::Error> = proxy
+            .call("ResetFailedUnit", &(service_unit.as_str(),))
+            .await;
 
         let mut properties: Vec<(&str, zbus::zvariant::Value)> = vec![
             ("Description", format!("Kennel: {unit_name}").into()),

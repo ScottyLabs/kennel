@@ -10,6 +10,7 @@ axum = "0.8.8"
 chrono = "0.4.44"
 dotenvy = "0.15.7"
 entity = { version = "0.1.0", path = "../entity" }
+futures-util = "0.3.32"
 hex = "0.4.3"
 hmac = "0.13.0"
 kennel-config = { version = "0.1.0", path = "../kennel-config" }

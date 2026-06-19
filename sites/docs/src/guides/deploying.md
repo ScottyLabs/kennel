@@ -4,9 +4,8 @@ This guide walks through setting up a ScottyLabs project for deployment with ken
 
 ## Prerequisites
 
-- A repository in the ScottyLabs Forgejo organization
+- A project registed in governance with an associated Codeberg repository
 - [devenv](https://devenv.sh) and [direnv](https://direnv.net/) installed locally
-- A `flake.nix` and `devenv.nix` in your project root
 
 ## 1. Import the shared module
 
@@ -66,6 +65,8 @@ Then allow it:
 direnv allow
 ```
 
+If this command fails with a secret-related error, make sure you have run the one-time [OpenBao setup](./secrets.md).
+
 Add a `.gitignore` for generated and local-only files:
 
 ```gitignore
@@ -114,34 +115,6 @@ processes.api = {
 };
 ```
 
-If your service needs OIDC, add `oidc_client` to its `features` in governance (and `admin_client` if it needs a privileged service-account client). Governance provisions the Keycloak clients and writes the credentials to Vault.
-
-Your service receives the client credentials and Keycloak connection settings as env vars, declared in your `secretspec.toml`:
-
-```toml
-[profiles.default]
-OIDC_CLIENT_ID = { description = "Keycloak OIDC client ID" }
-OIDC_CLIENT_SECRET = { description = "Keycloak OIDC client secret" }
-KEYCLOAK_URL = { description = "Keycloak base URL" }
-KEYCLOAK_REALM = { description = "Keycloak realm" }
-OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
-```
-
-When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
-
-```nix
-scottylabs.ricochet.enable = true;
-```
-
-If your service reports errors to Sentry, add `sentry` to its `features` in governance. It creates a Sentry project and writes the project DSN to Vault as `SENTRY_DSN` on the `prod` profile, so declare it there:
-
-```toml
-[profiles.prod]
-SENTRY_DSN = { description = "Sentry project DSN" }
-```
-
-Read `SENTRY_DSN` at startup and pass it to the Sentry SDK to turn on error reporting, following [Sentry's setup guide](https://docs.sentry.io/platforms/). Without a DSN, in local development and previews, the SDK stays inert.
-
 For a static site:
 
 ```nix
@@ -150,56 +123,9 @@ scottylabs.kennel.sites.docs = {
 };
 ```
 
-The site name (`docs`) must match a package in your `flake.nix` outputs. Kennel builds it with `nix build .#packages.{system}.docs`.
+### Flake packages
 
-### Runtime environment
-
-Kennel injects these variables into every backend service it deploys:
-
-- `PORT`: the port your service must bind to. Kennel allocates it and routes the public domain to it through Caddy, so read it at startup instead of hardcoding a port.
-- `COMMIT_HASH`: the full Git commit SHA of the running build.
-
-Resolved secrets from your `secretspec.toml` are injected alongside these.
-
-## 4. Enable infrastructure
-
-If your project needs a database:
-
-```nix
-scottylabs.postgres.enable = true;
-```
-
-This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
-
-## 5. Register your repository in governance
-
-In the ScottyLabs governance repository, add your repo to its team's TOML file and list its `features`. Governance provisions everything those features imply.
-
-`features` is an array of:
-
-- `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
-- `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile
-- `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, and `OAUTH_RELAY_URL` to Vault for each profile
-- `admin_client` provisions a Keycloak service-account client with the `view-users` and `manage-users` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
-
-For OIDC authentication, note the distinction between the OAuth relay (`scottylabs.ricochet.enable` in devenv) and the Keycloak OIDC client (`oidc_client` in governance). The OAuth relay is used to relay between the standardized authorized redirect URI used by the OIDC client.
-
-- prod uses the standard `<name>` OIDC client, preview and staging share `<name>-staging`, and dev uses `<name>-dev`
-- prod, staging, and preview all share the `https://oauth.scottylabs.org/oauth2/callback` (Ricochet) relay, while dev uses the `http://localhost:8090/oauth2/callback` (local) relay that requires `scottylabs.ricochet.enable` to be enabled in devenv.
-
-Documentation is controlled separately by `docs` (boolean, default `true`), which aggregates the repository's `./docs` directory into the documentation hub.
-
-## 6. Push
-
-Push to any branch. Kennel receives the webhook, builds your project, and deploys it. Your deployment will be available at:
-
-- `my-project-main.scottylabs.net` for the main branch
-- `my-project-pr-42.scottylabs.net` for PR #42
-- `my-project-feature-x.scottylabs.net` for a feature branch
-
-## Flake packages
-
-Your `flake.nix` must expose packages that kennel can build. The package names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. For Rust projects, the supported pattern is [crane](https://crane.dev):
+Your `flake.nix` must expose these packages, and their names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. For Rust projects, the supported pattern is [crane](https://crane.dev):
 
 ```nix
 inputs = {
@@ -235,3 +161,40 @@ outputs = { self, nixpkgs, crane, ... }:
 ```
 
 Kennel builds each package with `nix build .#packages.{system}.{name}`.
+
+### Runtime environment
+
+Kennel injects these variables into every backend service it deploys:
+
+- `PORT`: the port your service must bind to. Kennel allocates it and routes the public domain to it through Caddy, so read it at startup instead of hardcoding a port.
+- `COMMIT_HASH`: the full Git commit SHA of the running build.
+
+Resolved secrets from your `secretspec.toml` are injected alongside these.
+
+## 4. Enable infrastructure
+
+If your project needs a database:
+
+```nix
+scottylabs.postgres.enable = true;
+```
+
+This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
+
+`sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth.
+
+When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
+
+```nix
+scottylabs.ricochet.enable = true;
+```
+
+Note that governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so this setting only runs Ricohet in dev mode locally.
+
+## 4. Push
+
+Push to any branch. Kennel receives the webhook, builds your project, and deploys it. Your deployment will be available at:
+
+- `my-project-main.scottylabs.net` for the main branch
+- `my-project-pr-42.scottylabs.net` for PR #42
+- `my-project-feature-x.scottylabs.net` for a feature branch

@@ -4,9 +4,10 @@
 
 # Guides
 
+- [Enabling Features](./guides/features.md)
 - [Deploying a Project](./guides/deploying.md)
 - [Secrets](./guides/secrets.md)
-- [PR Deployments](./guides/pr-deployments.md)
+- [Preview Deployments](./guides/previews.md)
 
 # Reference
 
