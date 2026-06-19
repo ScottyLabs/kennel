@@ -429,8 +429,17 @@ pub async fn find_executable(store_path: &str) -> anyhow::Result<String> {
     let bin_dir = PathBuf::from(store_path).join("bin");
     if bin_dir.exists() {
         let mut entries = tokio::fs::read_dir(&bin_dir).await?;
-        if let Some(entry) = entries.next_entry().await? {
-            return Ok(entry.path().to_string_lossy().to_string());
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            // Skip makeWrapper's dot-prefixed wrapped binary and exec the wrapper
+            if entry.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            candidates.push(entry.path());
+        }
+        candidates.sort();
+        if let Some(path) = candidates.into_iter().next() {
+            return Ok(path.to_string_lossy().to_string());
         }
     }
     Ok(store_path.to_string())
