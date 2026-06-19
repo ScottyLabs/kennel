@@ -71,5 +71,12 @@ in
       { BAO_ADDR = "https://secrets2.scottylabs.org"; }
       (lib.mapAttrs (_: lib.mkDefault) config.secretspec.secrets)
     ];
+
+    # Renew the OpenBao token on entry
+    enterShell = ''
+      if bao token lookup >/dev/null 2>&1; then
+        bao token renew >/dev/null 2>&1 || true
+      fi
+    '';
   };
 }
