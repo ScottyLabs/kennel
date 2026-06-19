@@ -114,6 +114,14 @@ Type: `str`, default: `"${scottylabs.project.name}admin"`
 
 When `scottylabs.enable = true`, the `openbao` (`bao`) and `secretspec` CLIs are added to the shell, `BAO_ADDR` is set for OpenBao authentication, and every secret secretspec resolves is exported into the shell environment. Resolution is enabled per project through the `secretspec` block in `devenv.yaml` (see [Secrets](../guides/secrets.md)).
 
+## `scottylabs.ricochet`
+
+### `scottylabs.ricochet.enable`
+
+Run a local OAuth relay on `127.0.0.1:8090` for development, the loopback callback the `dev` Keycloak client is registered against. Enable it alongside `oidc_client` to complete an OAuth flow locally the way production does: the IdP redirects to the relay, which forwards the authorization code on to your service's own callback.
+
+Type: `bool`, default: `false`
+
 ## `scottylabs.kennel`
 
 ### `scottylabs.kennel.services`

@@ -119,12 +119,18 @@ If your service needs OIDC, add `oidc_client` to its `features` in governance (a
 Your service receives the client credentials and Keycloak connection settings as env vars, declared in your `secretspec.toml`:
 
 ```toml
-[profiles.prod]
+[profiles.default]
 OIDC_CLIENT_ID = { description = "Keycloak OIDC client ID" }
 OIDC_CLIENT_SECRET = { description = "Keycloak OIDC client secret" }
 KEYCLOAK_URL = { description = "Keycloak base URL" }
 KEYCLOAK_REALM = { description = "Keycloak realm" }
 OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
+```
+
+When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
+
+```nix
+scottylabs.ricochet.enable = true;
 ```
 
 For a static site:
@@ -164,10 +170,15 @@ In the ScottyLabs governance repository, add your repo to its team's TOML file a
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault
-- `oidc_client` provisions prod and staging Keycloak OIDC clients (redirect URI fixed at `/oauth2/callback`) and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, and `OAUTH_RELAY_URL` to Vault for each profile
+- `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, and `OAUTH_RELAY_URL` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users` and `manage-users` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
-Documentation is controlled separately by `docs` (boolean, default `true`), which builds the repository's `./docs` directory into the documentation hub.
+For OIDC authentication, note the distinction between the OAuth relay (`scottylabs.ricochet.enable` in devenv) and the Keycloak OIDC client (`oidc_client` in governance). The OAuth relay is used to relay between the standardized authorized redirect URI used by the OIDC client.
+
+- prod uses the standard `<name>` OIDC client, preview and staging share `<name>-staging`, and dev uses `<name>-dev`
+- prod, staging, and preview all share the `https://oauth.scottylabs.org/oauth2/callback` (Ricochet) relay, while dev uses the `http://localhost:8090/oauth2/callback` (local) relay that requires `scottylabs.ricochet.enable` to be enabled in devenv.
+
+Documentation is controlled separately by `docs` (boolean, default `true`), which aggregates the repository's `./docs` directory into the documentation hub.
 
 ## 6. Push
 
