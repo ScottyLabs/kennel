@@ -110,6 +110,12 @@ Caddy admin API URL.
 
 Type: `str`, default: `"http://localhost:2019"`
 
+### `services.kennel.customDomainsFile`
+
+Writes the custom domains of all live deployments to this path, one per line, refreshed on each reconciliation pass. Unset disables it.
+
+Type: `nullOr str`, default: `null`
+
 ### `services.kennel.builder.maxConcurrentBuilds`
 
 Maximum number of concurrent nix builds.

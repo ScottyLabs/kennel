@@ -160,11 +160,11 @@
     },
     "scottylabs": {
       "locked": {
-        "lastModified": 1781032851,
-        "narHash": "sha256-C16EeGxrHMmMBRrdfes70iLfcXtZn9kcTIvU/GkY9js=",
+        "lastModified": 1781829473,
+        "narHash": "sha256-STT2oIFCwrdLCkHP6AnejsALMRMvPEwuMdISmhX0wgA=",
         "ref": "refs/heads/main",
-        "rev": "07bce73e4465e288f866e6d16816d061a02f4d37",
-        "revCount": 30,
+        "rev": "2fc74c7edca9363c2bb0a675a263be4eb8ecb0fa",
+        "revCount": 33,
         "type": "git",
         "url": "https://codeberg.org/ScottyLabs/devenv"
       },

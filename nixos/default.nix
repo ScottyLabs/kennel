@@ -74,6 +74,13 @@ in
       description = "Caddy admin API URL";
     };
 
+    customDomainsFile = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      example = "/run/kennel/custom-domains";
+      description = "File to write the served custom domains to, one per line";
+    };
+
     builder = {
       maxConcurrentBuilds = mkOption {
         type = types.int;
@@ -250,7 +257,10 @@ in
         {
           CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
           KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
-        };
+        }
+      // optionalAttrs (cfg.customDomainsFile != null) {
+        CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
+      };
 
       serviceConfig = {
         User = cfg.user;

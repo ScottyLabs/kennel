@@ -1,6 +1,7 @@
 mod build;
 mod caddy;
 mod cloudflare;
+mod custom_domains;
 mod deploy;
 mod forgejo;
 mod handlers;
@@ -42,6 +43,7 @@ pub struct AppConfig {
     pub caddy_admin_url: String,
     pub max_concurrent_builds: usize,
     pub webhook_secret: String,
+    pub custom_domains_file: Option<String>,
 }
 
 impl AppConfig {
@@ -73,6 +75,7 @@ impl AppConfig {
                 .and_then(|n| n.parse().ok())
                 .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
             webhook_secret,
+            custom_domains_file: dotenvy::var("CUSTOM_DOMAINS_FILE").ok(),
         })
     }
 }

@@ -108,26 +108,6 @@ Type: `bool`, default: `false`
 
 When `scottylabs.enable = true`, the `openbao` (`bao`) and `secretspec` CLIs are added to the shell, `BAO_ADDR` is set for OpenBao authentication, and every secret secretspec resolves is exported into the shell environment. Resolution is enabled per project through the `secretspec` block in `devenv.yaml` (see [Secrets](../guides/secrets.md)).
 
-## `scottylabs.keycloak`
-
-### `scottylabs.keycloak.enable`
-
-Enable a local Keycloak instance for development. Bootstraps the `scottylabs` realm with a confidential OIDC client matching `scottylabs.project.name`. The client secret is read from `[profiles.dev].OIDC_CLIENT_SECRET.default` in the project's `secretspec.toml` so the dev realm and the secretspec contract stay in sync.
-
-Type: `bool`, default: `false`
-
-### `scottylabs.keycloak.port`
-
-HTTP port the local Keycloak listens on (bound to `127.0.0.1`).
-
-Type: `port`, default: `8088`
-
-### `scottylabs.keycloak.devClient.redirectUris`
-
-Permitted redirect URIs for the dev OIDC client.
-
-Type: `listOf str`, default: `[ "http://localhost:*/*" "http://127.0.0.1:*/*" ]`
-
 ## `scottylabs.kennel`
 
 ### `scottylabs.kennel.services`

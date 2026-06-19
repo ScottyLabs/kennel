@@ -48,6 +48,7 @@ The reconciler compares desired state (deployment rows in the database) against 
 - A deployment row with no running unit gets its unit started.
 - A running unit with no deployment row gets stopped.
 - All Caddy routes are re-added on each pass since Caddy config is ephemeral.
+- The custom domains of all live deployments are written to `customDomainsFile`, if configured.
 
 There are no intermediate deployment states like "deploying" or "tearing down" that could get stuck. A deployment either has a row in the database or it doesn't, which eliminates stuck-state bugs by construction.
 

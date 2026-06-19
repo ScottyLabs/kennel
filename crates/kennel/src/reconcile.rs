@@ -186,6 +186,10 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         }
     }
 
+    if let Err(e) = crate::custom_domains::publish(state).await {
+        tracing::warn!(error = %e, "failed to publish custom domains");
+    }
+
     tracing::debug!(deployments = deployments.len(), "reconciliation complete");
 
     Ok(())
