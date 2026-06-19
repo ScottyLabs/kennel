@@ -15,6 +15,7 @@ in
     ./rust.nix
     ./deno.nix
     ./garage.nix
+    ./ricochet.nix
     ./postgres.nix
     ./sqlite.nix
     ./secrets.nix

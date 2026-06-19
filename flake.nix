@@ -1,10 +1,16 @@
 {
   description = "ScottyLabs shared devenv configuration";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    ricochet = {
+      url = "git+https://codeberg.org/anish/ricochet";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { nixpkgs }:
+    { nixpkgs, ricochet, ... }:
     let
       systems = [
         "x86_64-linux"
@@ -15,7 +21,10 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      devenvModules.default = import ./modules;
+      devenvModules.default = { pkgs, ... }: {
+        imports = [ ./modules ];
+        _module.args.ricochet = ricochet.packages.${pkgs.system}.ricochet;
+      };
 
       # Authenticate to OpenBao before any project shell can build
       apps = forAllSystems (pkgs: {
