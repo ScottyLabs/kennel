@@ -104,6 +104,26 @@ Enable a local [Valkey](https://valkey.io/) instance for development. Layers `se
 
 Type: `bool`, default: `false`
 
+## `scottylabs.garage`
+
+### `scottylabs.garage.enable`
+
+Enable a local [Garage](https://garagehq.deuxfleurs.fr/) S3 instance for development. Creates a bucket named after `scottylabs.project.name` and exports `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `S3_BUCKET` into the shell environment.
+
+Type: `bool`, default: `false`
+
+### `scottylabs.garage.accessKey`
+
+S3 access key for the project bucket.
+
+Type: `str`, default: `scottylabs.project.name`
+
+### `scottylabs.garage.secretKey`
+
+S3 secret key for the project bucket.
+
+Type: `str`, default: `"${scottylabs.project.name}admin"`
+
 ## `scottylabs.secrets`
 
 When `scottylabs.enable = true`, the `openbao` (`bao`) and `secretspec` CLIs are added to the shell, `BAO_ADDR` is set for OpenBao authentication, and every secret secretspec resolves is exported into the shell environment. Resolution is enabled per project through the `secretspec` block in `devenv.yaml` (see [Secrets](../guides/secrets.md)).

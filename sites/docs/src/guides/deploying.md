@@ -116,12 +116,15 @@ processes.api = {
 
 If your service needs OIDC, add `oidc_client` to its `features` in governance (and `admin_client` if it needs a privileged service-account client). Governance provisions the Keycloak clients and writes the credentials to Vault.
 
-Your service receives the credentials via `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` env vars, declared in your `secretspec.toml`:
+Your service receives the client credentials and Keycloak connection settings as env vars, declared in your `secretspec.toml`:
 
 ```toml
 [profiles.prod]
 OIDC_CLIENT_ID = { description = "Keycloak OIDC client ID" }
 OIDC_CLIENT_SECRET = { description = "Keycloak OIDC client secret" }
+KEYCLOAK_URL = { description = "Keycloak base URL" }
+KEYCLOAK_REALM = { description = "Keycloak realm" }
+OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
 ```
 
 For a static site:
@@ -161,7 +164,7 @@ In the ScottyLabs governance repository, add your repo to its team's TOML file a
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault
-- `oidc_client` provisions prod and staging Keycloak OIDC clients (redirect URI fixed at `/oauth2/callback`) and writes `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` to Vault for each profile
+- `oidc_client` provisions prod and staging Keycloak OIDC clients (redirect URI fixed at `/oauth2/callback`) and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, and `OAUTH_RELAY_URL` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users` and `manage-users` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
 Documentation is controlled separately by `docs` (boolean, default `true`), which builds the repository's `./docs` directory into the documentation hub.
