@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 let
   cfg = config.scottylabs;
@@ -11,7 +16,6 @@ in
     ./rust.nix
     ./deno.nix
     ./garage.nix
-    ./keycloak.nix
     ./postgres.nix
     ./sqlite.nix
     ./secrets.nix

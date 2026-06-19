@@ -6,9 +6,6 @@ let
   kennelConfigJSON = builtins.toJSON {
     services = lib.mapAttrs (_: svc: {
       custom_domain = svc.customDomain;
-      oidc = if svc.oidc == null then null else {
-        redirect_paths = svc.oidc.redirectPaths;
-      };
     }) cfg.services;
 
     static_sites = lib.mapAttrs (name: site: {
@@ -27,17 +24,6 @@ in
             type = lib.types.nullOr lib.types.str;
             default = null;
             description = "Custom domain for this service";
-          };
-
-          oidc = lib.mkOption {
-            type = lib.types.nullOr (lib.types.submodule {
-              options.redirectPaths = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                description = "Redirect URI paths (e.g. \"/oauth2/callback\"). Kennel ensures Keycloak prod and staging clients exist with the matching hosts derived from kennel's URL pattern, plus customDomain and PR previews.";
-              };
-            });
-            default = null;
-            description = "OIDC client config for this service";
           };
         };
       });
