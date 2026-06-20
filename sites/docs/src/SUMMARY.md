@@ -13,4 +13,5 @@
 
 - [Architecture](./reference/architecture.md)
 - [devenv Options](./reference/devenv-options.md)
+- [Build Helpers](./reference/build-helpers.md)
 - [NixOS Module](./reference/nixos-module.md)

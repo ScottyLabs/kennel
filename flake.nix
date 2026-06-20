@@ -11,43 +11,44 @@
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     devenv.url = "github:cachix/devenv";
-    crane.url = "github:ipetkov/crane";
+    scottylabs = {
+      url = "git+https://codeberg.org/ScottyLabs/devenv";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, devenv, crane, ... }:
+  outputs =
+    { nixpkgs
+    , devenv
+    , scottylabs
+    , ...
+    }:
     let
-      supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: nixpkgs.legacyPackages.${system};
     in
     {
-      packages = forAllSystems (system:
+      packages = forAllSystems (
+        system:
         let
           pkgs = pkgsFor system;
-          craneLib = crane.mkLib pkgs;
 
-          commonArgs = {
+          kennel = (scottylabs.mkLib pkgs).buildRustService {
+            src = ./.;
             pname = "kennel";
             version = "0.1.0";
-            src = craneLib.cleanCargoSource ./.;
-            strictDeps = true;
+            buildArgs.cargoExtraArgs = "-p kennel";
           };
 
-          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-          kennel = craneLib.buildPackage (commonArgs // {
-            inherit cargoArtifacts;
-            cargoExtraArgs = "-p kennel";
-            doCheck = false;
-          });
-
-          docs = pkgs.stdenv.mkDerivation {
-            pname = "kennel-docs";
-            version = "0.1.0";
+          docs = (scottylabs.mkLib pkgs).buildMdbook {
             src = ./sites/docs;
-            nativeBuildInputs = [ pkgs.mdbook ];
-            buildPhase = "mdbook build";
-            installPhase = "mkdir -p $out && cp -r book/* $out/";
+            name = "kennel-docs";
           };
         in
         {

@@ -127,40 +127,39 @@ Note that custom domains that are not already in use must first have their Cloud
 
 ### Flake packages
 
-Your `flake.nix` must expose these packages, and their names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. For Rust projects, the supported pattern is [crane](https://crane.dev):
+Your `flake.nix` must expose these packages, and their names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. Build them with the shared [build helpers](../reference/build-helpers.md):
 
 ```nix
 inputs = {
   nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
-  crane.url = "github:ipetkov/crane";
+  scottylabs = {
+    url = "git+https://codeberg.org/ScottyLabs/devenv";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 };
 
-outputs = { self, nixpkgs, crane, ... }:
+outputs = { self, nixpkgs, scottylabs, ... }:
   let
     forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
   in {
     packages = forAllSystems (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        craneLib = crane.mkLib pkgs;
-        commonArgs = {
-          src = craneLib.cleanCargoSource ./.;
-          strictDeps = true;
-        };
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        helpers = scottylabs.mkLib pkgs;
       in {
-        api = craneLib.buildPackage (commonArgs // {
-          inherit cargoArtifacts;
+        api = helpers.buildRustService {
+          src = ./.;
           pname = "api";
-          cargoExtraArgs = "-p my-project";
-          doCheck = false;
-        });
-        docs = pkgs.stdenv.mkDerivation { ... };
+          buildArgs.cargoExtraArgs = "-p api";
+        };
+        docs = helpers.buildMdbook { src = ./sites/docs; };
         default = self.packages.${system}.api;
       }
     );
   };
 ```
+
+A Deno or JavaScript front-end uses `buildDenoTask` the same way.
 
 Kennel builds each package with `nix build .#packages.{system}.{name}`.
 
