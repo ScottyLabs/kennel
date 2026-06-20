@@ -46,7 +46,10 @@ in
         enable = true;
         settings = {
           plugins = oxlintPlugins;
-          deny = [ "all" ];
+          deny = [
+            "all"
+            "nursery"
+          ];
         };
       };
       svelte-check = lib.mkIf cfg.svelte.enable {
