@@ -115,6 +115,8 @@ processes.api = {
 };
 ```
 
+Locally, `devenv up` runs the entries in the `processes` block. In production kennel runs the matching flake package instead, so a `scottylabs.kennel.services` key, a `processes` entry, and a flake package must share the same name (here, `api`).
+
 For a static site:
 
 ```nix
