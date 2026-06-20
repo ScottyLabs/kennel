@@ -110,6 +110,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             }
             env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
 
+            // Public URL of this deployment
+            let app_url = format!(
+                "https://{}",
+                deployment
+                    .custom_domain
+                    .as_deref()
+                    .unwrap_or(deployment.domain.as_str())
+            );
+            env_vars.entry("APP_URL".to_string()).or_insert(app_url);
+
             let exec = deploy::find_executable(&deployment.store_path).await;
             if let Ok(exec_start) = exec
                 && let Err(e) = systemd

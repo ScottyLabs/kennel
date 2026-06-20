@@ -104,4 +104,4 @@ Kennel authenticates to OpenBao with a service token provided via `VAULT_TOKEN` 
 | `dev` | `dev` |
 | `pr-*` | `preview` |
 
-If a required secret cannot be resolved, the deployment fails. Deployed services also receive `PORT` and `COMMIT_HASH` (see [Deploying a Project](./deploying.md#runtime-environment)).
+If a required secret cannot be resolved, the deployment fails. Deployed services also receive `PORT`, `COMMIT_HASH`, and `APP_URL` (see [Deploying a Project](./deploying.md#runtime-environment)).

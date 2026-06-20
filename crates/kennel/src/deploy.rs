@@ -302,6 +302,16 @@ async fn deploy_service(
     env_vars.insert("PORT".to_string(), port.to_string());
     env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
 
+    // Public URL of this deployment
+    let app_url = format!(
+        "https://{}",
+        svc_config
+            .custom_domain
+            .as_deref()
+            .unwrap_or(domain.as_str())
+    );
+    env_vars.entry("APP_URL".to_string()).or_insert(app_url);
+
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
         .start_transient_unit(&unit_name, &exec_start, &env_vars)

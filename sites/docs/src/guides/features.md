@@ -25,6 +25,8 @@ KEYCLOAK_REALM = { description = "Keycloak realm" }
 OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
 ```
 
+Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Kennel injects `APP_URL` per deployment (see [runtime environment](./deploying.md#runtime-environment)).
+
 ### Sentry
 
 If your service reports errors to Sentry, add `sentry` to its `features` in governance. It creates a Sentry project and writes the project DSN to Vault as `SENTRY_DSN` on the `prod` profile, so declare it there:

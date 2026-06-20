@@ -169,6 +169,7 @@ Kennel injects these variables into every backend service it deploys:
 
 - `PORT`: the port your service must bind to. Kennel allocates it and routes the public domain to it through Caddy, so read it at startup instead of hardcoding a port.
 - `COMMIT_HASH`: the full Git commit SHA of the running build.
+- `APP_URL`: the public URL of this deployment, its custom domain when configured or the generated domain otherwise.
 
 Resolved secrets from your `secretspec.toml` are injected alongside these.
 
