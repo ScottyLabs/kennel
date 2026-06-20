@@ -122,6 +122,12 @@ Run a local OAuth relay on `127.0.0.1:8090` for development, the loopback callba
 
 Type: `bool`, default: `false`
 
+### `scottylabs.ricochet.appUrl`
+
+Public URL the service is reached at in local development, exported as `APP_URL` so it can build OAuth redirect targets and absolute links. Required when `scottylabs.ricochet.enable` is set. This is the development value only; deployed environments receive `APP_URL` from kennel, derived from the deployment domain (see [Deploying a Project](../guides/deploying.md#runtime-environment)), so it is never declared in `secretspec.toml`.
+
+Type: `str`
+
 ## `scottylabs.kennel`
 
 ### `scottylabs.kennel.services`

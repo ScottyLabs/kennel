@@ -189,9 +189,10 @@ When developing the OAuth flow locally, enable the relay so the IdP redirects ba
 
 ```nix
 scottylabs.ricochet.enable = true;
+scottylabs.ricochet.appUrl = "http://localhost:3000";
 ```
 
-Note that governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so this setting only runs Ricohet in dev mode locally.
+Governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so `enable` only runs Ricochet locally. `appUrl` is your service's local URL, the port your dev server listens on, exported as `APP_URL` so the relay can return to it. Set it only for development: deployed environments receive `APP_URL` from kennel automatically (see [Runtime environment](#runtime-environment)), and it is never declared in `secretspec.toml`.
 
 ## 4. Push
 

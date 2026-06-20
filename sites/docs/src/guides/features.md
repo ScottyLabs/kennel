@@ -25,7 +25,7 @@ KEYCLOAK_REALM = { description = "Keycloak realm" }
 OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
 ```
 
-Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Kennel injects `APP_URL` per deployment (see [runtime environment](./deploying.md#runtime-environment)).
+Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/devenv-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).
 
 ### Sentry
 
