@@ -1,4 +1,5 @@
 use reqwest::Client;
+use std::collections::HashSet;
 
 pub struct CaddyClient {
     client: Client,
@@ -93,9 +94,33 @@ impl CaddyClient {
         Ok(())
     }
 
+    /// Returns the set of `@id` values for all routes on the kennel server
+    pub async fn list_route_ids(&self) -> anyhow::Result<HashSet<String>> {
+        let url = format!(
+            "{}/config/apps/http/servers/{}/routes",
+            self.admin_url,
+            kennel_config::constants::CADDY_SERVER_NAME
+        );
+        let resp = self.client.get(&url).send().await?;
+        if !resp.status().is_success() {
+            return Ok(HashSet::new());
+        }
+        let routes: Vec<serde_json::Value> = resp.json().await?;
+        Ok(routes
+            .iter()
+            .filter_map(|r| r["@id"].as_str().map(String::from))
+            .collect())
+    }
+
+    // Atomic upsert via PUT
     async fn add_route(&self, config: &serde_json::Value) -> anyhow::Result<()> {
         if let Some(id) = config["@id"].as_str() {
-            let _ = self.remove_route(id).await;
+            let url = format!("{}/id/{}", self.admin_url, id);
+            let resp = self.client.put(&url).json(config).send().await?;
+            if resp.status().is_success() {
+                return Ok(());
+            }
+            // Route doesn't exist yet, fall through to POST
         }
 
         let url = format!(

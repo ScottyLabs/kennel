@@ -131,41 +131,48 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         }
     }
 
-    // Caddy does not persist routes across restarts, so re-add all of them
+    // Caddy does not persist dynamic routes, re-add the missing ones
+    let existing_routes = caddy.list_route_ids().await.unwrap_or_default();
+
     for deployment in &deployments {
         let route_id = format!("kennel-{}", deployment.id);
 
-        if deployment.service_type == "static" {
-            let _ = caddy
-                .add_static_route(
-                    &route_id,
-                    &deployment.domain,
-                    &deployment.store_path,
-                    deployment.spa,
-                )
-                .await;
-        } else if let Some(port) = deployment.port {
-            let _ = caddy
-                .add_proxy_route(&route_id, &deployment.domain, port as u16)
-                .await;
-        }
-
-        if let Some(ref custom_domain) = deployment.custom_domain {
-            let custom_route_id = format!("kennel-{}-custom", deployment.id);
+        if !existing_routes.contains(&route_id) {
             if deployment.service_type == "static" {
                 let _ = caddy
                     .add_static_route(
-                        &custom_route_id,
-                        custom_domain,
+                        &route_id,
+                        &deployment.domain,
                         &deployment.store_path,
                         deployment.spa,
                     )
                     .await;
             } else if let Some(port) = deployment.port {
                 let _ = caddy
-                    .add_proxy_route(&custom_route_id, custom_domain, port as u16)
+                    .add_proxy_route(&route_id, &deployment.domain, port as u16)
                     .await;
             }
+        }
+
+        if let Some(ref custom_domain) = deployment.custom_domain {
+            let custom_route_id = format!("kennel-{}-custom", deployment.id);
+            if !existing_routes.contains(&custom_route_id) {
+                if deployment.service_type == "static" {
+                    let _ = caddy
+                        .add_static_route(
+                            &custom_route_id,
+                            custom_domain,
+                            &deployment.store_path,
+                            deployment.spa,
+                        )
+                        .await;
+                } else if let Some(port) = deployment.port {
+                    let _ = caddy
+                        .add_proxy_route(&custom_route_id, custom_domain, port as u16)
+                        .await;
+                }
+            }
+
             let project_name = state
                 .store
                 .projects()
