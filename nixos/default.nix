@@ -204,6 +204,7 @@ in
 
     users.groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
 
+    security.polkit.enable = true;
     security.polkit.extraConfig = ''
       polkit.addRule(function(action, subject) {
         if (action.id == "org.freedesktop.systemd1.manage-units" &&
