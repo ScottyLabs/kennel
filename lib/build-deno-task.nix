@@ -14,17 +14,19 @@
   version ? "0.1.0",
   task ? "build",
   output ? "dist",
+  entrypoint ? null,
 }:
 
 let
   lock = builtins.fromJSON (builtins.readFile (src + "/deno.lock"));
 
-  # Strip the optional _peer suffix, then split the scoped name from the version
   parse =
     key:
     let
-      clean = builtins.head (lib.splitString "_" key);
-      m = builtins.match "(.+)@([^@]+)" clean;
+      # Split the scoped name from the version, bounding the version at the
+      # first "_" so Deno's optional "_peer@ver" suffix is dropped. A version
+      # never contains "_", while a package name may
+      m = builtins.match "(@?[^@]+)@([^_]+).*" key;
     in
     {
       name = builtins.elemAt m 0;
@@ -78,7 +80,7 @@ stdenv.mkDerivation {
     mkdir -p "$DENO_DIR"
     cp -r ${denoCache}/npm "$DENO_DIR/npm"
     chmod -R u+w "$DENO_DIR"
-    deno install --cached-only --frozen
+    deno install --cached-only --frozen${lib.optionalString (entrypoint != null) " --entrypoint ${lib.escapeShellArg entrypoint}"}
     ${patchAddons}
     runHook postConfigure
   '';
