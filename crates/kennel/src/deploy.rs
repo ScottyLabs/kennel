@@ -171,6 +171,20 @@ async fn deploy_static_site(
         &state.config.ephemeral_domain,
     );
 
+    let deployment_id = match state
+        .store
+        .deployments()
+        .find_by_project_service_branch(&build.project_id, name, &build.branch)
+        .await?
+    {
+        Some(existing) => existing.id,
+        None => uuid::Uuid::now_v7().to_string(),
+    };
+
+    // Root the store path before anything references it, so nix-gc cannot
+    // collect a path a live route or the database points at.
+    add_gc_root(&deployment_id, store_path).await?;
+
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(&build.project_id)
         .join(branch_slug);
@@ -188,15 +202,6 @@ async fn deploy_static_site(
     }
     tokio::fs::rename(&temp, &link).await?;
 
-    let deployment_id = match state
-        .store
-        .deployments()
-        .find_by_project_service_branch(&build.project_id, name, &build.branch)
-        .await?
-    {
-        Some(existing) => existing.id,
-        None => uuid::Uuid::now_v7().to_string(),
-    };
     let route_id = format!("kennel-{deployment_id}");
 
     caddy
@@ -228,8 +233,6 @@ async fn deploy_static_site(
     };
 
     state.store.deployments().upsert(model).await?;
-
-    add_gc_root(&deployment_id, store_path).await?;
 
     tracing::info!(site = %name, domain = %domain, "deployed static site");
     Ok(())
@@ -312,11 +315,6 @@ async fn deploy_service(
     );
     env_vars.entry("APP_URL".to_string()).or_insert(app_url);
 
-    let systemd = crate::systemd::SystemdClient::connect().await?;
-    systemd
-        .start_transient_unit(&unit_name, &exec_start, &env_vars)
-        .await?;
-
     let deployment_id = match state
         .store
         .deployments()
@@ -326,6 +324,19 @@ async fn deploy_service(
         Some(existing) => existing.id,
         None => uuid::Uuid::now_v7().to_string(),
     };
+
+    // Root the store paths before anything references them, so nix-gc cannot
+    // collect a path the unit, a live route, or the database points at.
+    add_gc_root(&deployment_id, store_path).await?;
+    if let Some(ref config_store_path) = build.config_store_path {
+        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
+    }
+
+    let systemd = crate::systemd::SystemdClient::connect().await?;
+    systemd
+        .start_transient_unit(&unit_name, &exec_start, &env_vars)
+        .await?;
+
     let route_id = format!("kennel-{deployment_id}");
 
     caddy.add_proxy_route(&route_id, &domain, port).await?;
@@ -358,11 +369,6 @@ async fn deploy_service(
     };
 
     state.store.deployments().upsert(model).await?;
-
-    add_gc_root(&deployment_id, store_path).await?;
-    if let Some(ref config_store_path) = build.config_store_path {
-        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
-    }
 
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");
     Ok(())
