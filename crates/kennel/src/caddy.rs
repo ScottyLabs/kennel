@@ -112,14 +112,20 @@ impl CaddyClient {
             .collect())
     }
 
-    // Atomic upsert via PUT
+    // Upsert a route by its @id
     async fn add_route(&self, config: &serde_json::Value) -> anyhow::Result<()> {
         if let Some(id) = config["@id"].as_str() {
             let url = format!("{}/id/{}", self.admin_url, id);
-            let resp = self.client.put(&url).json(config).send().await?;
+            let resp = self.client.patch(&url).json(config).send().await?;
             if resp.status().is_success() {
                 return Ok(());
             }
+
+            anyhow::ensure!(
+                resp.status().as_u16() == 404,
+                "caddy route patch failed: {}",
+                resp.text().await?
+            );
             // Route doesn't exist yet, fall through to POST
         }
 
