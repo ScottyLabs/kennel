@@ -276,6 +276,7 @@ in
         ReadWritePaths = [
           "/var/lib/kennel"
           "/run/kennel"
+          "/nix/var/nix/gcroots/kennel"
         ] ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
         ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
 
