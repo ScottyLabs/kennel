@@ -52,7 +52,7 @@
         _module.args.ricochet = ricochet.packages.${pkgs.system}.ricochet;
       };
 
-      # Build helpers bound to a consumer pkgs, mirroring crane.mkLib
+      # build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {
         buildDenoTask = pkgs.callPackage ./lib/build-deno-task.nix {
           deno = nixpkgs-deno.legacyPackages.${pkgs.system}.deno;
@@ -76,7 +76,7 @@
           '';
       };
 
-      # Authenticate to OpenBao before any project shell can build
+      # authenticate to OpenBao before any project shell can build
       apps = forAllSystems (pkgs: {
         login = {
           type = "app";

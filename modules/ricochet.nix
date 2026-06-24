@@ -8,7 +8,7 @@
 let
   cfg = config.scottylabs.ricochet;
 
-  # Fixed so governance can register one dev redirect for every app
+  # fixed so governance can register one dev redirect for every app
   port = 8090;
 in
 {
