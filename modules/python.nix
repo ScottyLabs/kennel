@@ -35,6 +35,7 @@ in
 
     git-hooks.hooks = {
       ruff.enable = true;
+      # https://github.com/cachix/git-hooks.nix/pull/724
       ty = {
         enable = true;
         name = "ty";
