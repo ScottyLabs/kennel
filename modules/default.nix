@@ -1,19 +1,16 @@
-{
-  pkgs,
-  lib,
-  config,
-  ...
-}:
+{ lib, config, ... }:
 
 let
   cfg = config.scottylabs;
 in
 {
   imports = [
+    ./auto-update.nix
     ./claude.nix
     ./kennel.nix
     ./rust.nix
     ./deno.nix
+    ./python.nix
     ./garage.nix
     ./ricochet.nix
     ./postgres.nix
@@ -51,18 +48,6 @@ in
     git-hooks.hooks = {
       treefmt.enable = true;
       commitizen.enable = cfg.conventionalCommits.enable;
-      flake-lock-update = {
-        enable = true;
-        name = "flake-lock-update";
-        entry = "${pkgs.writeShellScript "flake-lock-update" ''
-          set -euo pipefail
-          ${lib.getExe pkgs.nix} flake lock
-          git add flake.lock
-        ''}";
-        files = "^flake\\.(nix|lock)$";
-        language = "system";
-        pass_filenames = false;
-      };
     };
   };
 }
