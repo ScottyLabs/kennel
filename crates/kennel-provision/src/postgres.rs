@@ -70,6 +70,24 @@ impl ResourceProvider for PostgresProvider {
             .await?;
 
         if String::from_utf8_lossy(&output.stdout).trim().is_empty() {
+            // Creating a database owned by another role requires the caller to SET ROLE to it.
+            // The createuser auto-grant gives ADMIN on the role but not SET so add SET here.
+            let grant = tokio::process::Command::new("psql")
+                .args([
+                    "-h",
+                    &self.socket_dir,
+                    "-c",
+                    &format!("GRANT \"{user}\" TO CURRENT_USER WITH SET TRUE"),
+                ])
+                .output()
+                .await?;
+
+            anyhow::ensure!(
+                grant.status.success(),
+                "grant set role failed: {}",
+                String::from_utf8_lossy(&grant.stderr)
+            );
+
             let create = tokio::process::Command::new("createdb")
                 .args(["-h", &self.socket_dir, "-O", user, &db_name])
                 .output()
