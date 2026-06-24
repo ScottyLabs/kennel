@@ -60,6 +60,14 @@ Add the [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/
 
 Type: `bool`, default: `false`
 
+## `scottylabs.python`
+
+### `scottylabs.python.enable`
+
+Enable the Python development toolchain. Manages a virtual environment with [uv](https://docs.astral.sh/uv/) (running `uv sync` on shell entry once a `pyproject.toml` exists), adds [ruff](https://docs.astral.sh/ruff/) (lint pre-commit hook, formatting via treefmt's `ruff-format`) and [ty](https://github.com/astral-sh/ty) (type-check pre-commit hook) on `PATH`.
+
+Type: `bool`, default: `false`
+
 ## `scottylabs.postgres`
 
 ### `scottylabs.postgres.enable`

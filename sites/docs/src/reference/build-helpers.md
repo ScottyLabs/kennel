@@ -18,7 +18,7 @@ Each helper takes the consumer's `pkgs`, so packages build against your nixpkgs 
 
 ## `buildRustService`
 
-Builds a Rust crate with [crane](https://crane.dev), caching dependencies separately from the build. Dependencies are fetched by the checksums in `Cargo.lock`, so there is no hash to maintain.
+Builds a Rust crate with [crane](https://crane.dev), caching dependencies separately from the build.
 
 ### `src`
 
@@ -67,7 +67,7 @@ Type: `attrs`, default: `{ }`
 
 ## `buildDenoTask`
 
-Builds a Deno project that has npm dependencies, running a `deno task` and copying its output directory. Each package is fetched by the integrity already in `deno.lock`, so there is no hash to maintain. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
+Builds a Deno project that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
 
 ### `src`
 
@@ -99,11 +99,63 @@ Directory the task emits, copied verbatim to the result.
 
 Type: `str`, default: `"dist"`
 
+### `entrypoint`
+
+Passed to `deno install --entrypoint` so dependency resolution ignores dependencies not reachable from it, such as test-only dependencies.
+
+Type: `nullOr str`, default: `null`
+
+### `compile`
+
+Provision [denort](https://docs.deno.com/runtime/reference/cli/compile/) so `deno compile` runs inside the offline build sandbox. Enable when the task compiles a binary instead of emitting a `dist` directory.
+
+Type: `bool`, default: `false`
+
 ```nix
 (scottylabs.mkLib pkgs).buildDenoTask {
   src = ./sites/web;
   pname = "link-shortener-web";
   version = "0.1.0";
+}
+```
+
+## `buildPythonService`
+
+Builds a [uv](https://docs.astral.sh/uv/) project into a virtual environment with [uv2nix](https://github.com/pyproject-nix/uv2nix), resolving every dependency from `uv.lock` as a Nix derivation. The result is a relocatable venv exposing each `[project.scripts]` entry under `bin/`, consumed as `${pkg}/bin/<script>`.
+
+### `src`
+
+Project root holding `pyproject.toml` and `uv.lock`. The package name is read from `pyproject.toml`.
+
+Type: `path`, required
+
+### `python`
+
+The Python interpreter the environment is built against.
+
+Type: `package`, default: `pkgs.python3`
+
+### `sourcePreference`
+
+Whether dependencies come from prebuilt wheels (`"wheel"`) or are built from source (`"sdist"`). The build-system overlay is matched to this choice automatically.
+
+Type: `str`, default: `"wheel"`
+
+### `selectDeps`
+
+Selects the locked dependency closure to install from the loaded workspace. Override to install an optional group, for example `ws: ws.deps.optionals.prod`.
+
+Type: `function`, default: `ws: ws.deps.default`
+
+### `overrides`
+
+An overlay applied last over the Python package set, to supply system libraries or build tools uv2nix cannot infer for a package built from source (for example adding `pkgs.openssl` to `buildInputs`).
+
+Type: `function`, default: `_final: _prev: { }`
+
+```nix
+(scottylabs.mkLib pkgs).buildPythonService {
+  src = ./.;
 }
 ```
 
