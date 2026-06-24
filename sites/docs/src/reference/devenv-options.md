@@ -10,7 +10,7 @@ imports = [ inputs.scottylabs.devenvModules.default ];
 
 ### `scottylabs.enable`
 
-Enable the shared ScottyLabs development configuration. Required for all other `scottylabs.*` options to take effect.
+Enable the shared ScottyLabs development configuration. Required for all other `scottylabs.*` options to take effect. Also installs two always-on pre-commit hooks that refresh and stage `flake.lock` (`nix flake update`) and `devenv.lock` (`devenv update`) on every commit.
 
 Type: `bool`, default: `false`
 
