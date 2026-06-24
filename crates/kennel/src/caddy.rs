@@ -69,7 +69,14 @@ impl CaddyClient {
         let config = serde_json::json!({
             "@id": route_id,
             "match": [{"host": [domain]}],
+            // Nix-store epoch mtimes defeat HTML cache validators
             "handle": [{
+                "handler": "headers",
+                "response": {
+                    "require": {"headers": {"Content-Type": ["text/html*"]}},
+                    "set": {"Cache-Control": ["no-store"]}
+                }
+            }, {
                 "handler": "reverse_proxy",
                 "upstreams": [{"dial": format!("localhost:{port}")}]
             }]

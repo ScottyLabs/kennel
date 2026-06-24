@@ -22,6 +22,8 @@ Systemd transient units are created via D-Bus using the zbus crate. Units are pl
 
 Caddy routes are managed via the [admin API](https://caddyserver.com/docs/api). Each deployment gets a route identified by `@id` for individual add/remove operations. Caddy handles TLS certificate provisioning, HTTP/3, static file serving, reverse proxying, and SPA fallback.
 
+Nix-store files carry epoch modification times, so a frozen `Last-Modified` strands proxied clients on a stale shell. Reverse-proxy routes mark `text/html` responses `Cache-Control: no-store`. Static-site routes need none, since Caddy's file server drops epoch validators itself.
+
 ## HTTP API
 
 Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
