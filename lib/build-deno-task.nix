@@ -15,6 +15,8 @@
   task ? "build",
   output ? "dist",
   entrypoint ? null,
+  # provision denort so `deno compile` runs inside the offline sandbox
+  compile ? false,
 }:
 
 let
@@ -23,9 +25,7 @@ let
   parse =
     key:
     let
-      # Split the scoped name from the version, bounding the version at the
-      # first "_" so Deno's optional "_peer@ver" suffix is dropped. A version
-      # never contains "_", while a package name may
+      # split name@version, bounding the version at the first "_" to drop Deno's "_peer" suffix
       m = builtins.match "(@?[^@]+)@([^_]+).*" key;
     in
     {
@@ -48,7 +48,7 @@ let
     }
   ) (lock.npm or { });
 
-  # The npm cache deno reads is just the extracted tarball per version
+  # the npm cache deno reads is just the extracted tarball per version
   denoCache = runCommand "${pname}-deno-cache" { } ''
     mkdir -p "$out/npm/registry.npmjs.org"
     ${lib.concatStringsSep "\n" (
@@ -60,10 +60,12 @@ let
     )}
   '';
 
-  # Patchelf linux addons, dropping musl which it cannot fix
+  # patchelf linux addons, dropping musl which it cannot fix
   patchAddons = lib.optionalString stdenv.isLinux ''
-    find node_modules -path '*-musl*' -name '*.node' -delete
-    autoPatchelf node_modules
+    if [ -d node_modules ]; then
+      find node_modules -path '*-musl*' -name '*.node' -delete
+      autoPatchelf node_modules
+    fi
   '';
 in
 stdenv.mkDerivation {
@@ -72,6 +74,9 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ deno ] ++ lib.optional stdenv.isLinux autoPatchelfHook;
   buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
   dontAutoPatchelf = true;
+  # strip/patchelf would corrupt the trailer deno compile appends
+  dontStrip = compile;
+  dontPatchELF = compile;
 
   configurePhase = ''
     runHook preConfigure
@@ -80,7 +85,10 @@ stdenv.mkDerivation {
     mkdir -p "$DENO_DIR"
     cp -r ${denoCache}/npm "$DENO_DIR/npm"
     chmod -R u+w "$DENO_DIR"
-    deno install --cached-only --frozen${lib.optionalString (entrypoint != null) " --entrypoint ${lib.escapeShellArg entrypoint}"}
+    ${lib.optionalString compile ''export DENORT_BIN="${deno.denort}/bin/denort"''}
+    deno install --cached-only --frozen${
+      lib.optionalString (entrypoint != null) " --entrypoint ${lib.escapeShellArg entrypoint}"
+    }
     ${patchAddons}
     runHook postConfigure
   '';
