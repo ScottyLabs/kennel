@@ -55,6 +55,11 @@ pub async fn teardown_deployment(
         service_name: deployment.service_name.clone(),
         branch_slug: deployment.branch_slug.clone(),
         environment: kennel_config::Environment::from_branch(&deployment.branch),
+        system_user: deployment
+            .unit_name
+            .as_deref()
+            .map(crate::deploy::service_user)
+            .unwrap_or_default(),
     };
 
     for provider in &state.providers {

@@ -11,6 +11,7 @@ pub struct ResourceRequest {
     pub service_name: String,
     pub branch_slug: String,
     pub environment: Environment,
+    pub system_user: String,
 }
 
 // Dispatched concretely through the `Provider` enum, never behind `dyn` or a

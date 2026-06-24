@@ -77,11 +77,13 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         if !systemd.is_active(unit_name).await {
             tracing::info!(unit = %unit_name, "restarting missing unit");
 
+            let system_user = deploy::service_user(unit_name);
             let request = kennel_provision::ResourceRequest {
                 project_name: deployment.project_id.clone(),
                 service_name: deployment.service_name.clone(),
                 branch_slug: deployment.branch_slug.clone(),
                 environment: kennel_config::Environment::from_branch(&deployment.branch),
+                system_user: system_user.clone(),
             };
 
             let mut env_vars: std::collections::HashMap<String, String> =
@@ -123,7 +125,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             let exec = deploy::find_executable(&deployment.store_path).await;
             if let Ok(exec_start) = exec
                 && let Err(e) = systemd
-                    .start_transient_unit(unit_name, &exec_start, &env_vars)
+                    .start_transient_unit(unit_name, &exec_start, &env_vars, &system_user)
                     .await
             {
                 tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
@@ -194,6 +196,11 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             service_name: d.service_name.clone(),
             branch_slug: d.branch_slug.clone(),
             environment: kennel_config::Environment::from_branch(&d.branch),
+            system_user: d
+                .unit_name
+                .as_deref()
+                .map(deploy::service_user)
+                .unwrap_or_default(),
         })
         .collect();
 

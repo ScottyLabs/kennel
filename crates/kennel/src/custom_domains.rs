@@ -19,7 +19,7 @@ pub async fn publish(state: &AppState) -> anyhow::Result<()> {
     let mut body = hosts.join("\n");
     body.push('\n');
 
-    // write then rename so a reader never sees a partially written file
+    // Write then rename so a reader never sees a partially written file
     let tmp = format!("{path}.tmp");
     tokio::fs::write(&tmp, &body)
         .await

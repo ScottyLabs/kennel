@@ -29,6 +29,35 @@ impl ResourceProvider for PostgresProvider {
         request: &ResourceRequest,
     ) -> anyhow::Result<HashMap<String, String>> {
         let db_name = Self::db_name(request);
+        let user = &request.system_user;
+
+        // Ensure the login role exists so the unit can reach postgres over the
+        // socket by peer auth. The role owns its database below, so it needs no
+        // further grants.
+        let role = tokio::process::Command::new("psql")
+            .args([
+                "-h",
+                &self.socket_dir,
+                "-tAc",
+                &format!("SELECT 1 FROM pg_roles WHERE rolname = '{user}'"),
+            ])
+            .output()
+            .await?;
+
+        if String::from_utf8_lossy(&role.stdout).trim().is_empty() {
+            let create = tokio::process::Command::new("createuser")
+                .args(["-h", &self.socket_dir, user])
+                .output()
+                .await?;
+
+            anyhow::ensure!(
+                create.status.success(),
+                "createuser failed: {}",
+                String::from_utf8_lossy(&create.stderr)
+            );
+
+            tracing::info!(user = %user, "created role");
+        }
 
         let output = tokio::process::Command::new("psql")
             .args([
@@ -42,7 +71,7 @@ impl ResourceProvider for PostgresProvider {
 
         if String::from_utf8_lossy(&output.stdout).trim().is_empty() {
             let create = tokio::process::Command::new("createdb")
-                .args(["-h", &self.socket_dir, &db_name])
+                .args(["-h", &self.socket_dir, "-O", user, &db_name])
                 .output()
                 .await?;
 

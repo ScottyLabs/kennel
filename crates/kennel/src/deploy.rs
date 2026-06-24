@@ -264,12 +264,14 @@ async fn deploy_service(
         branch_slug,
         sanitize(name)
     );
+    let system_user = service_user(&unit_name);
 
     let request = ResourceRequest {
         project_name: build.project_id.clone(),
         service_name: name.to_string(),
         branch_slug: branch_slug.to_string(),
         environment: *environment,
+        system_user: system_user.clone(),
     };
 
     let mut env_vars: HashMap<String, String> = HashMap::new();
@@ -334,7 +336,7 @@ async fn deploy_service(
 
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
-        .start_transient_unit(&unit_name, &exec_start, &env_vars)
+        .start_transient_unit(&unit_name, &exec_start, &env_vars, &system_user)
         .await?;
 
     let route_id = format!("kennel-{deployment_id}");
@@ -430,6 +432,14 @@ pub fn sanitize(s: &str) -> String {
             }
         })
         .collect()
+}
+
+/// Stable login name for a unit. The unit runs under this name as a `DynamicUser`
+/// and postgres maps it to a same-named role over peer auth.
+pub fn service_user(unit_name: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(unit_name.as_bytes());
+    format!("kennel_{}", hex::encode(&digest[..8]))
 }
 
 fn allocate_port(unit_name: &str) -> u16 {

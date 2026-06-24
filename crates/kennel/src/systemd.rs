@@ -55,6 +55,7 @@ impl SystemdClient {
         unit_name: &str,
         exec_start: &str,
         env: &HashMap<String, String>,
+        user: &str,
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
@@ -90,6 +91,7 @@ impl SystemdClient {
             ("Restart", "on-failure".into()),
             ("RestartUSec", 5_000_000u64.into()),
             ("DynamicUser", true.into()),
+            ("User", user.into()),
             ("CPUAccounting", true.into()),
             ("MemoryAccounting", true.into()),
             ("IOAccounting", true.into()),
