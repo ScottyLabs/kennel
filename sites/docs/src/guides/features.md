@@ -25,6 +25,15 @@ KEYCLOAK_REALM = { description = "Keycloak realm" }
 OAUTH_RELAY_URL = { description = "OAuth relay callback URL" }
 PROJECT_GROUP = { description = "Keycloak project group path" }
 PROJECT_ADMIN_GROUP = { description = "Keycloak project admin group path" }
+
+# Declare all profiles, even if you only use default
+[profiles.prod]
+
+[profiles.staging]
+
+[profiles.preview]
+
+[profiles.dev]
 ```
 
 Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/devenv-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).

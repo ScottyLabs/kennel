@@ -17,12 +17,14 @@ STRIPE_KEY = { description = "Stripe API key", required = true }
 
 # Declare all profiles, even if you only use default
 # default secrets can only be substituted into existing profiles
-[profiles.dev]
-
 [profiles.prod]
+
+[profiles.staging]
 
 [profiles.preview]
 STRIPE_KEY = { description = "Stripe test key", required = false }
+
+[profiles.dev]
 ```
 
 `[profiles.default]` holds the secrets shared across every profile; named profiles inherit from it and may override individual entries, for example making `STRIPE_KEY` optional in preview. Declare a `[profiles.<name>]` header for `dev` (used locally) and for every environment you deploy to (see the [branch-to-profile mapping](#production)); a section may be left empty to inherit `default` unchanged.
