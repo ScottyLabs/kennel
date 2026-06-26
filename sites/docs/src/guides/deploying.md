@@ -108,24 +108,25 @@ For a backend service:
 scottylabs.kennel.services.api = {
   customDomain = "api.my-project.scottylabs.org";
 };
-
-processes.api = {
-  exec = "${pkgs.my-project}/bin/api";
-  ready.http.get = { port = 8080; path = "/health"; };
-};
 ```
 
-Locally, `devenv up` runs the entries in the `processes` block. In production kennel runs the matching flake package instead, so a `scottylabs.kennel.services` key, a `processes` entry, and a flake package must share the same name (here, `api`).
+In production kennel runs the flake package, so the `scottylabs.kennel.services` key and the flake package must share the same name (here, `api`).
 
 For a static site:
 
 ```nix
-scottylabs.kennel.sites.docs = {
-  spa = false;
+scottylabs.kennel.sites.app = {
+  spa = true;
 };
 ```
 
+Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched routes. It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
+
 Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure).
+
+### Health checks
+
+Every backend service must expose a `GET /health` endpoint that returns HTTP `200` once it is ready to accept traffic. After starting a service, kennel polls this endpoint every 2 seconds for up to 60 seconds, holding back traffic until it returns `200`. If it has not passed by then, the deployment is marked failed and the public domain is never routed to it. Static sites have no health endpoint and are exempt.
 
 ### Flake packages
 
@@ -196,10 +197,25 @@ scottylabs.ricochet.appUrl = "http://localhost:3000";
 
 Governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so `enable` only runs Ricochet locally. `appUrl` is your service's local URL, the port your dev server listens on, exported as `APP_URL` so the relay can return to it. Set it only for development: deployed environments receive `APP_URL` from kennel automatically (see [Runtime environment](#runtime-environment)), and it is never declared in `secretspec.toml`.
 
-## 4. Push
+## 5. Development scripts
+
+`scripts.<name>.exec` defines a command available in your shell whenever the devenv environment is active. Use it for project-specific development tasks such as database migrations or code generation:
+
+```nix
+scripts = {
+  migrate.exec = "sea-orm-cli migrate up -d crates/migration";
+  generate-api.exec = "cd app && deno task generate-api";
+};
+```
+
+Running `migrate` in the shell then executes that command. Scripts are a development convenience only. Kennel never runs them, in builds or deployments.
+
+## 6. Push
 
 Push to any branch. Kennel receives the webhook, builds your project, and deploys it. Your deployment will be available at:
 
 - `my-project-main.scottylabs.net` for the main branch
 - `my-project-pr-42.scottylabs.net` for PR #42
 - `my-project-feature-x.scottylabs.net` for a feature branch
+
+As it works, kennel reports progress back to Forgejo as commit statuses on the pushed commit. The `kennel/build` status moves from pending to success or failure as the build runs, and `kennel/deploy` reports success once the deployment passes its health check. A failed status means the commit never reached a healthy deployment; check the build log to see why.

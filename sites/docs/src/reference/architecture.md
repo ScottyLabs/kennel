@@ -10,7 +10,7 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 
 1. Forgejo sends a webhook to kennel's `/webhook` endpoint.
 1. Kennel parses the repository name from the payload, verifies the HMAC signature, and creates a build record.
-1. The build worker clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, then runs `nix build` for each package. Every subprocess (git, devenv, nix, cachix) streams its stdout and stderr line-by-line through structured tracing, so the build log shows up in journald (and downstream Loki) labelled by `build_id` and `phase`. The full per-phase log is also persisted to the `builds.log` column for later retrieval.
+1. The build worker runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
 1. The reconciler picks up the completed build, provisions resources (database, cache, storage), resolves secrets from OpenBao, starts a systemd transient unit for services, and adds a Caddy route for each deployment.
 1. Caddy serves traffic over HTTPS with on-demand TLS.
 
@@ -32,9 +32,7 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
 | GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects` gauges. |
-| GET | `/builds/:id/log` | Plaintext concatenation of every subprocess's output captured during the build, with `=== phase: <name> ===` separators. |
-| GET | `/deployments/:id/logs` | journald output for the deployment's systemd unit. Query params: `?follow=true` for chunked live tail, `?lines=N&since=...`. |
-| GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `active_enter_usec`, `n_restarts` from the unit's D-Bus properties. |
+| GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/health`) from the unit's D-Bus properties. |
 | GET | `/internal/caddy/check-domain` | Used by Caddy's on-demand TLS to validate a hostname is a registered deployment before acquiring a cert. |
 
 All endpoints other than `/webhook` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
@@ -64,7 +62,7 @@ Runtime process state (running, stopped, failed) is owned by systemd and queried
 
 ## Crate structure
 
-- `kennel` -- main binary. HTTP router lives in `src/http.rs`, request handlers under `src/handlers/{webhook,metrics,builds,deployments,caddy}.rs`. Build orchestration in `src/build.rs`, deploy in `src/deploy.rs`, reconciliation in `src/reconcile.rs`. Systemd, Caddy, and OpenBao clients each have their own module.
+- `kennel` -- main binary. HTTP router lives in `src/http.rs`, request handlers under `src/handlers/{webhook,metrics,deployments,caddy}.rs`. Build orchestration in `src/build.rs`, deploy in `src/deploy.rs`, reconciliation in `src/reconcile.rs`. Systemd, Caddy, and OpenBao clients each have their own module.
 - `kennel-config` -- shared types, constants, environment enum
 - `kennel-provision` -- resource provisioning trait and implementations (PostgreSQL, Valkey, Garage)
 - `entity` -- SeaORM generated entities
