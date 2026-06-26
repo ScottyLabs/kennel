@@ -164,7 +164,7 @@ impl SystemdClient {
             ("Environment", env_strings.into()),
             ("NoNewPrivileges", true.into()),
             ("ProtectSystem", "strict".into()),
-            ("ProtectHome", true.into()),
+            ("ProtectHome", "yes".into()),
             ("PrivateTmp", true.into()),
             ("ReadWritePaths", vec![working_dir.to_string()].into()),
             ("ExecStart", exec_start.into()),
