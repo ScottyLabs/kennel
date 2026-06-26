@@ -4,11 +4,14 @@ use crate::teardown::teardown_deployment;
 use crate::{AppState, deploy};
 use chrono::Utc;
 use kennel_provision::ResourceProvider;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
-pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
+pub async fn run_once(
+    state: &AppState,
+    restart_failures: &mut HashMap<String, u32>,
+) -> anyhow::Result<()> {
     let systemd = SystemdClient::connect().await?;
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
@@ -75,6 +78,17 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         };
 
         if !systemd.is_active(unit_name).await {
+            let fail_count = restart_failures.entry(unit_name.clone()).or_insert(0);
+            if *fail_count >= kennel_config::constants::HEALTHCHECK_FAILURE_THRESHOLD {
+                tracing::warn!(
+                    unit = %unit_name,
+                    failures = *fail_count,
+                    "unit crash-looping, skipping restart"
+                );
+                continue;
+            }
+            *fail_count += 1;
+
             tracing::info!(unit = %unit_name, "restarting missing unit");
 
             let system_user = deploy::service_user(unit_name);
@@ -112,7 +126,6 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             }
             env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
 
-            // Public URL of this deployment
             let app_url = format!(
                 "https://{}",
                 deployment
@@ -130,6 +143,9 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             {
                 tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
             }
+        } else {
+            // Reset the failure counter once the unit is healthy
+            restart_failures.remove(unit_name);
         }
     }
 
@@ -221,6 +237,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
 pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
     let mut interval = tokio::time::interval(kennel_config::constants::RECONCILE_INTERVAL);
+    let mut restart_failures: HashMap<String, u32> = HashMap::new();
 
     loop {
         tokio::select! {
@@ -229,7 +246,7 @@ pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
             _ = cancel.cancelled() => break,
         }
 
-        if let Err(e) = run_once(&state).await {
+        if let Err(e) = run_once(&state, &mut restart_failures).await {
             tracing::error!(error = %e, "reconciliation failed");
         }
     }
