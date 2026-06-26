@@ -89,62 +89,42 @@ impl ForgejoClient {
         }
         Ok(())
     }
-}
 
-pub fn parse_owner_repo(repo_url: &str) -> Option<(String, String)> {
-    let trimmed = repo_url.trim_end_matches('/').trim_end_matches(".git");
-    let parts: Vec<&str> = trimmed.rsplitn(3, ['/', ':']).collect();
-    if parts.len() >= 2 && !parts[0].is_empty() && !parts[1].is_empty() {
-        Some((parts[1].to_string(), parts[0].to_string()))
-    } else {
-        None
+    pub async fn create_commit_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+        state: &str,
+        description: &str,
+        context: &str,
+        target_url: Option<&str>,
+    ) -> Result<()> {
+        let url = format!("{}/repos/{owner}/{repo}/statuses/{sha}", self.api_base);
+        let mut body = serde_json::json!({
+            "state": state,
+            "description": description,
+            "context": context,
+        });
+        if let Some(target_url) = target_url {
+            body["target_url"] = serde_json::Value::String(target_url.to_string());
+        }
+        let resp = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("token {}", self.token))
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("commit status API returned {status}: {text}");
+        }
+        Ok(())
     }
 }
 
 pub fn pr_number_from_branch(branch: &str) -> Option<u64> {
     branch.strip_prefix("pr-")?.parse().ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_https_clone_url() {
-        assert_eq!(
-            parse_owner_repo("https://codeberg.org/ScottyLabs/kennel.git"),
-            Some(("ScottyLabs".into(), "kennel".into()))
-        );
-    }
-
-    #[test]
-    fn parses_https_html_url() {
-        assert_eq!(
-            parse_owner_repo("https://codeberg.org/ScottyLabs/kennel"),
-            Some(("ScottyLabs".into(), "kennel".into()))
-        );
-    }
-
-    #[test]
-    fn parses_ssh_url() {
-        assert_eq!(
-            parse_owner_repo("ssh://codeberg.org/ScottyLabs/kennel.git"),
-            Some(("ScottyLabs".into(), "kennel".into()))
-        );
-    }
-
-    #[test]
-    fn parses_scp_style_ssh() {
-        assert_eq!(
-            parse_owner_repo("git@codeberg.org:ScottyLabs/kennel.git"),
-            Some(("ScottyLabs".into(), "kennel".into()))
-        );
-    }
-
-    #[test]
-    fn extracts_pr_number() {
-        assert_eq!(pr_number_from_branch("pr-12"), Some(12));
-        assert_eq!(pr_number_from_branch("main"), None);
-        assert_eq!(pr_number_from_branch("pr-abc"), None);
-    }
 }

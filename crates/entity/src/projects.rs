@@ -14,6 +14,8 @@ pub struct Model {
     pub repo_type: String,
     pub default_branch: String,
     pub created_at: DateTimeUtc,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub owner: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

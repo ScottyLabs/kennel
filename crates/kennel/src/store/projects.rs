@@ -25,6 +25,17 @@ impl<'a> ProjectRepository<'a> {
         model.insert(self.db).await
     }
 
+    pub async fn set_owner(&self, id: &str, owner: &str) -> Result<(), DbErr> {
+        let mut model: projects::ActiveModel = Projects::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| DbErr::RecordNotFound(id.to_string()))?
+            .into();
+        model.owner = Set(Some(owner.to_string()));
+        model.update(self.db).await?;
+        Ok(())
+    }
+
     pub async fn list(&self) -> Result<Vec<projects::Model>, DbErr> {
         Projects::find().all(self.db).await
     }

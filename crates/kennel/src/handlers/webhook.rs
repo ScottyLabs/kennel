@@ -28,7 +28,7 @@ pub async fn handle(
         StatusCode::BAD_REQUEST
     })?;
 
-    let project = find_or_create_project(&state, &event.repo_name, &event.repo_url)
+    let project = find_or_create_project(&state, &event.repo_name, &event.repo_url, &event.owner)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "failed to find or create project");
@@ -124,7 +124,7 @@ async fn teardown_branch(
     );
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(branch)
-        && let Some((owner, repo)) = crate::forgejo::parse_owner_repo(&project.repo_url)
+        && let Some(owner) = project.owner.as_deref()
     {
         let body = format!(
             "### Kennel Deployments\n\nTorn down at {}.\n",
@@ -132,7 +132,7 @@ async fn teardown_branch(
         );
         if let Err(e) = state
             .forgejo
-            .upsert_pr_comment(&owner, &repo, pr_number, &body)
+            .upsert_pr_comment(owner, &project.name, pr_number, &body)
             .await
         {
             tracing::warn!(pr = pr_number, error = %e, "failed to post teardown comment");
@@ -146,8 +146,13 @@ async fn find_or_create_project(
     state: &AppState,
     repo_name: &str,
     repo_url: &str,
+    owner: &str,
 ) -> anyhow::Result<::entity::projects::Model> {
-    if let Some(project) = state.store.projects().find_by_name(repo_name).await? {
+    if let Some(mut project) = state.store.projects().find_by_name(repo_name).await? {
+        if project.owner.as_deref() != Some(owner) {
+            state.store.projects().set_owner(&project.id, owner).await?;
+            project.owner = Some(owner.to_string());
+        }
         return Ok(project);
     }
 
@@ -156,6 +161,7 @@ async fn find_or_create_project(
         id: Set(id),
         name: Set(repo_name.to_string()),
         repo_url: Set(repo_url.to_string()),
+        owner: Set(Some(owner.to_string())),
         repo_type: Set("forgejo".to_string()),
         default_branch: Set("main".to_string()),
         ..Default::default()
@@ -237,6 +243,7 @@ async fn create_build(
 struct ParsedEvent {
     repo_name: String,
     repo_url: String,
+    owner: String,
     kind: EventKind,
 }
 
@@ -286,6 +293,12 @@ fn parse_event(headers: &HeaderMap, body: &[u8]) -> anyhow::Result<ParsedEvent> 
         .ok_or_else(|| anyhow::anyhow!("missing repository.name"))?
         .to_string();
 
+    let owner = json["repository"]["owner"]["login"]
+        .as_str()
+        .or_else(|| json["repository"]["owner"]["username"].as_str())
+        .ok_or_else(|| anyhow::anyhow!("missing repository.owner.login"))?
+        .to_string();
+
     let repo_url = json["repository"]["clone_url"]
         .as_str()
         .or_else(|| json["repository"]["html_url"].as_str())
@@ -319,12 +332,25 @@ fn parse_event(headers: &HeaderMap, body: &[u8]) -> anyhow::Result<ParsedEvent> 
                 commit_sha: sha,
             }
         }
+        "delete" => {
+            let ref_name = json["ref"].as_str().unwrap_or("");
+            let ref_type = json["ref_type"].as_str().unwrap_or("");
+            if ref_type != "branch" {
+                anyhow::bail!("ignoring delete of {ref_type}");
+            }
+            EventKind::Push {
+                branch: ref_name.to_string(),
+                commit_sha: ZERO_SHA.to_string(),
+                deleted: true,
+            }
+        }
         other => anyhow::bail!("unsupported event type: {other}"),
     };
 
     Ok(ParsedEvent {
         repo_name,
         repo_url,
+        owner,
         kind,
     })
 }

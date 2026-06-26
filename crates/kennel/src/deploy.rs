@@ -82,23 +82,54 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         environment: &environment,
     };
 
-    for (name, site_config) in &kennel_config.static_sites {
-        let Some(store_path) = store_paths.get(name) else {
-            tracing::warn!(site = %name, "no store path, skipping");
-            continue;
-        };
+    let deploy_result: anyhow::Result<()> = async {
+        for (name, site_config) in &kennel_config.static_sites {
+            let Some(store_path) = store_paths.get(name) else {
+                tracing::warn!(site = %name, "no store path, skipping");
+                continue;
+            };
 
-        deploy_static_site(&ctx, name, store_path, site_config).await?;
+            deploy_static_site(&ctx, name, store_path, site_config).await?;
+        }
+
+        for (name, svc_config) in &kennel_config.services {
+            let Some(store_path) = store_paths.get(name) else {
+                tracing::warn!(service = %name, "no store path, skipping");
+                continue;
+            };
+
+            deploy_service(&ctx, name, store_path, svc_config).await?;
+        }
+        Ok(())
+    }
+    .await;
+
+    if let Some(owner) = project.owner.as_deref() {
+        let (status, description) = match &deploy_result {
+            Ok(()) => ("success", "deployment healthy".to_string()),
+            Err(e) => ("failure", format!("{e:#}")),
+        };
+        let target_url = state.config.grafana_url.as_deref().and_then(|base| {
+            kennel_config.services.keys().next().map(|service| {
+                let unit = service_unit_name(&project.name, &branch_slug, service);
+                drilldown_unit_url(base, &format!("{unit}.service"), "now-1h", "now")
+            })
+        });
+        let _ = state
+            .forgejo
+            .create_commit_status(
+                owner,
+                &project.name,
+                &build.commit_sha,
+                status,
+                &description,
+                "kennel/deploy",
+                target_url.as_deref(),
+            )
+            .await;
     }
 
-    for (name, svc_config) in &kennel_config.services {
-        let Some(store_path) = store_paths.get(name) else {
-            tracing::warn!(service = %name, "no store path, skipping");
-            continue;
-        };
-
-        deploy_service(&ctx, name, store_path, svc_config).await?;
-    }
+    deploy_result?;
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch)
         && let Err(e) = post_pr_deployment_comment(state, &project, build, pr_number).await
@@ -115,8 +146,8 @@ async fn post_pr_deployment_comment(
     build: &::entity::builds::Model,
     pr_number: u64,
 ) -> anyhow::Result<()> {
-    let Some((owner, repo)) = crate::forgejo::parse_owner_repo(&project.repo_url) else {
-        anyhow::bail!("could not parse owner/repo from {}", project.repo_url);
+    let Some(owner) = project.owner.as_deref() else {
+        anyhow::bail!("project {} has no owner recorded", project.name);
     };
 
     let deployments = state
@@ -146,7 +177,7 @@ async fn post_pr_deployment_comment(
 
     state
         .forgejo
-        .upsert_pr_comment(&owner, &repo, pr_number, &body)
+        .upsert_pr_comment(owner, &project.name, pr_number, &body)
         .await
 }
 
@@ -181,8 +212,7 @@ async fn deploy_static_site(
         None => uuid::Uuid::now_v7().to_string(),
     };
 
-    // Root the store path before anything references it, so nix-gc cannot
-    // collect a path a live route or the database points at.
+    // Pin the store path against nix-gc before anything references it
     add_gc_root(&deployment_id, store_path).await?;
 
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
@@ -327,8 +357,7 @@ async fn deploy_service(
         None => uuid::Uuid::now_v7().to_string(),
     };
 
-    // Root the store paths before anything references them, so nix-gc cannot
-    // collect a path the unit, a live route, or the database points at.
+    // Pin the store paths against nix-gc before anything references them
     add_gc_root(&deployment_id, store_path).await?;
     if let Some(ref config_store_path) = build.config_store_path {
         add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
@@ -338,6 +367,14 @@ async fn deploy_service(
     systemd
         .start_transient_unit(&unit_name, &exec_start, &env_vars, &system_user)
         .await?;
+
+    // Wait for the service to become healthy before routing traffic
+    let healthy = wait_for_healthy(port).await;
+    if !healthy {
+        tracing::error!(service = %name, port, "healthcheck failed, stopping unit");
+        let _ = systemd.stop_unit(&unit_name).await;
+        anyhow::bail!("service '{name}' failed healthcheck within startup grace period");
+    }
 
     let route_id = format!("kennel-{deployment_id}");
 
@@ -376,10 +413,7 @@ async fn deploy_service(
     Ok(())
 }
 
-/// Best-effort upsert of a Cloudflare A record for a custom domain. Failures
-/// are logged but never fail the deploy; DNS automation is opportunistic when
-/// a matching zone is configured, and external records (manual, tofu-managed,
-/// etc.) remain valid.
+/// Upserts the Cloudflare A record for a custom domain.
 pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str) {
     let Some(cf) = &state.cloudflare else {
         return;
@@ -434,6 +468,34 @@ pub fn sanitize(s: &str) -> String {
         .collect()
 }
 
+pub fn build_unit_name(project_name: &str, branch: &str) -> String {
+    format!(
+        "kennel-build-{}-{}",
+        sanitize(project_name),
+        sanitize(branch)
+    )
+}
+
+pub fn service_unit_name(project_name: &str, branch_slug: &str, service: &str) -> String {
+    format!(
+        "kennel-{}-{}-{}",
+        sanitize(project_name),
+        branch_slug,
+        sanitize(service)
+    )
+}
+
+/// Builds a Grafana Logs Drilldown URL scoped to a single systemd unit.
+pub fn drilldown_unit_url(base: &str, unit: &str, from: &str, to: &str) -> String {
+    let base = base.trim_end_matches('/');
+    let unit_path = urlencoding::encode(unit);
+    let filter = format!("unit|=|{unit}");
+    let unit_filter = urlencoding::encode(&filter);
+    format!(
+        "{base}/a/grafana-lokiexplore-app/explore/unit/{unit_path}/logs?patterns=%5B%5D&var-ds=loki&var-filters={unit_filter}&from={from}&to={to}"
+    )
+}
+
 /// Stable login name for a unit. The unit runs under this name as a `DynamicUser`
 /// and postgres maps it to a same-named role over peer auth.
 pub fn service_user(unit_name: &str) -> String {
@@ -469,4 +531,21 @@ pub async fn find_executable(store_path: &str) -> anyhow::Result<String> {
         }
     }
     Ok(store_path.to_string())
+}
+
+async fn wait_for_healthy(port: u16) -> bool {
+    use kennel_config::constants::{HEALTHCHECK_INTERVAL, HEALTHCHECK_STARTUP_GRACE};
+
+    let deadline = tokio::time::Instant::now() + HEALTHCHECK_STARTUP_GRACE;
+    let mut interval = tokio::time::interval(HEALTHCHECK_INTERVAL);
+
+    loop {
+        interval.tick().await;
+        if crate::health::probe(port).await {
+            return true;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+    }
 }
