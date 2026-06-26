@@ -205,9 +205,8 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
     tokio::fs::write(work_dir.join(INPUT_FILE), serde_json::to_vec(&input)?).await?;
 
     let home = work_dir.join("home");
-    tokio::fs::create_dir_all(&home).await?;
+    // Build-exec creates $HOME so the ephemeral build user owns it
     set_group_writable(&work_dir)?;
-    set_group_writable(&home)?;
 
     let unit_name = crate::deploy::build_unit_name(&project.name, &build.branch);
     let kennel_bin = std::env::current_exe()?.to_string_lossy().into_owned();
@@ -276,6 +275,9 @@ pub async fn build_exec(build_id: &str) -> anyhow::Result<()> {
     let work_root = std::env::var("WORK_DIR")
         .unwrap_or_else(|_| kennel_config::constants::DEFAULT_WORK_DIR.to_string());
     let work_dir = PathBuf::from(work_root).join(build_id);
+
+    // Nix rejects a $HOME it does not own, so create it as the build user
+    tokio::fs::create_dir_all(work_dir.join("home")).await?;
 
     let mut log = String::new();
     let result = build_pipeline(&work_dir, &mut log).await;
