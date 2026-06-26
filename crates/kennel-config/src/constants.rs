@@ -7,6 +7,7 @@ pub const CADDY_SERVER_NAME: &str = "srv0";
 
 pub const DEFAULT_MAX_CONCURRENT_BUILDS: usize = 2;
 pub const DEFAULT_WORK_DIR: &str = "/var/lib/kennel/builds";
+pub const KENNEL_BUILD_GROUP: &str = "kennel-builds";
 pub const DEFAULT_DB_PATH: &str = "/var/lib/kennel/kennel.db";
 
 pub const SITES_BASE_DIR: &str = "/var/lib/kennel/sites";
@@ -18,6 +19,12 @@ pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(300);
 pub const UNIT_STOP_TIMEOUT: Duration = Duration::from_secs(10);
+
+pub const HEALTHCHECK_PATH: &str = "/health";
+pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(2);
+pub const HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(2);
+pub const HEALTHCHECK_STARTUP_GRACE: Duration = Duration::from_secs(60);
+pub const HEALTHCHECK_FAILURE_THRESHOLD: u32 = 5;
 
 pub const PORT_RANGE_START: u16 = 10000;
 pub const PORT_RANGE_SIZE: u16 = 50000;

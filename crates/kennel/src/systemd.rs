@@ -23,8 +23,11 @@ pub struct UnitHealth {
     pub active: bool,
     pub active_state: String,
     pub sub_state: String,
+    pub result: String,
     pub active_enter_usec: u64,
     pub n_restarts: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_healthy: Option<bool>,
 }
 
 pub struct SystemdClient {
@@ -127,6 +130,86 @@ impl SystemdClient {
         Ok(())
     }
 
+    pub async fn run_build_unit(
+        &self,
+        unit_name: &str,
+        argv: &[String],
+        working_dir: &str,
+        env: &HashMap<String, String>,
+        group: &str,
+        timeout: std::time::Duration,
+    ) -> anyhow::Result<bool> {
+        let proxy = self.manager_proxy().await?;
+        let service_unit = format!("{unit_name}.service");
+
+        let mut job_removed = proxy.receive_signal("JobRemoved").await?;
+        let _: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
+            .call("StopUnit", &(service_unit.as_str(), "replace"))
+            .await;
+        let _: Result<(), zbus::Error> = proxy
+            .call("ResetFailedUnit", &(service_unit.as_str(),))
+            .await;
+
+        let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        let exec_start: Vec<(String, Vec<String>, bool)> =
+            vec![(argv[0].clone(), argv.to_vec(), false)];
+
+        let properties: Vec<(&str, zbus::zvariant::Value)> = vec![
+            ("Description", format!("Kennel build: {unit_name}").into()),
+            ("Slice", "kennel.slice".into()),
+            ("Type", "oneshot".into()),
+            ("DynamicUser", true.into()),
+            ("SupplementaryGroups", vec![group.to_string()].into()),
+            ("WorkingDirectory", working_dir.into()),
+            ("Environment", env_strings.into()),
+            ("NoNewPrivileges", true.into()),
+            ("ProtectSystem", "strict".into()),
+            ("ProtectHome", true.into()),
+            ("PrivateTmp", true.into()),
+            ("ReadWritePaths", vec![working_dir.to_string()].into()),
+            ("ExecStart", exec_start.into()),
+        ];
+
+        let start_job: zbus::zvariant::OwnedObjectPath = proxy
+            .call(
+                "StartTransientUnit",
+                &(
+                    service_unit.as_str(),
+                    "replace",
+                    properties,
+                    Vec::<(String, Vec<(String, zbus::zvariant::Value)>)>::new(),
+                ),
+            )
+            .await?;
+
+        tracing::info!(unit = %unit_name, "started build unit");
+
+        let waited = tokio::time::timeout(timeout, async {
+            while let Some(signal) = job_removed.next().await {
+                if let Ok((_, removed, _, result)) =
+                    signal
+                        .body()
+                        .deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
+                    && removed == start_job
+                {
+                    return result;
+                }
+            }
+            "failed".to_string()
+        })
+        .await;
+
+        match waited {
+            Ok(result) => Ok(result == "done"),
+            Err(_) => {
+                let _: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
+                    .call("StopUnit", &(service_unit.as_str(), "replace"))
+                    .await;
+                anyhow::bail!("build unit {unit_name} timed out")
+            }
+        }
+    }
+
     pub async fn stop_unit(&self, unit_name: &str) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
@@ -167,7 +250,7 @@ impl SystemdClient {
             .await
             .unwrap_or_default();
 
-        state == "active"
+        matches!(state.as_str(), "active" | "activating" | "reloading")
     }
 
     pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<UnitHealth> {
@@ -197,13 +280,16 @@ impl SystemdClient {
             .await
             .unwrap_or(0);
         let n_restarts: u32 = unit_proxy.get_property("NRestarts").await.unwrap_or(0);
+        let result: String = unit_proxy.get_property("Result").await.unwrap_or_default();
 
         Ok(UnitHealth {
             active: active_state == "active",
             active_state,
             sub_state,
+            result,
             active_enter_usec,
             n_restarts,
+            app_healthy: None,
         })
     }
 

@@ -5,6 +5,7 @@ mod custom_domains;
 mod deploy;
 mod forgejo;
 mod handlers;
+mod health;
 mod http;
 mod reconcile;
 mod secrets;
@@ -44,6 +45,7 @@ pub struct AppConfig {
     pub max_concurrent_builds: usize,
     pub webhook_secret: String,
     pub custom_domains_file: Option<String>,
+    pub grafana_url: Option<String>,
 }
 
 impl AppConfig {
@@ -76,6 +78,7 @@ impl AppConfig {
                 .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
             webhook_secret,
             custom_domains_file: dotenvy::var("CUSTOM_DOMAINS_FILE").ok(),
+            grafana_url: dotenvy::var("GRAFANA_URL").ok(),
         })
     }
 }
@@ -83,6 +86,14 @@ impl AppConfig {
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("build-exec") {
+        let build_id = args
+            .get(2)
+            .ok_or_else(|| anyhow::anyhow!("build-exec requires a build id"))?;
+        return build::build_exec(build_id).await;
+    }
 
     tracing_subscriber::fmt().json().init();
 
@@ -117,7 +128,7 @@ async fn main() -> Result<()> {
     // not running yet, so any such row is necessarily orphaned.
     state.store.builds().reset_stuck().await?;
 
-    reconcile::run_once(&state).await?;
+    reconcile::run_once(&state, &mut std::collections::HashMap::new()).await?;
 
     let build_handle = tokio::spawn(build::run_worker(state.clone(), cancel.clone()));
     let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));

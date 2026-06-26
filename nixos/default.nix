@@ -68,6 +68,12 @@ in
       description = "Public domain for the kennel API and webhook endpoint";
     };
 
+    grafanaUrl = mkOption {
+      type = types.nullOr types.str;
+      default = "https://grafana.scottylabs.org";
+      description = "Base URL of Grafana for Logs Drilldown links in commit statuses";
+    };
+
     caddy.adminUrl = mkOption {
       type = types.str;
       default = "http://localhost:2019";
@@ -199,10 +205,14 @@ in
     users.users.${cfg.user} = mkIf (cfg.user == "kennel") {
       isSystemUser = true;
       group = cfg.group;
+      extraGroups = [ "kennel-builds" ];
       description = "Kennel service user";
     };
 
     users.groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
+
+    # Shared group so the daemon can read back the build units' work dirs
+    users.groups.kennel-builds = { };
 
     security.polkit.enable = true;
     security.polkit.extraConfig = ''
@@ -261,6 +271,8 @@ in
         }
       // optionalAttrs (cfg.customDomainsFile != null) {
         CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
+      } // optionalAttrs (cfg.grafanaUrl != null) {
+        GRAFANA_URL = cfg.grafanaUrl;
       };
 
       serviceConfig = {
@@ -289,7 +301,7 @@ in
 
     systemd.tmpfiles.rules = [
       "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/builds 0755 ${cfg.user} ${cfg.group} -"
+      "d /var/lib/kennel/builds 2770 ${cfg.user} kennel-builds -"
       "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
       "d /nix/var/nix/gcroots/kennel 0755 ${cfg.user} ${cfg.group} -"
       "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
