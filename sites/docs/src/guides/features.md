@@ -4,6 +4,7 @@ In the ScottyLabs governance repository, add your project to its team's TOML fil
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile
+- `posthog` creates a PostHog project and writes its key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users`, `manage-users`, and `view-identity-providers` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
@@ -50,6 +51,18 @@ SENTRY_DSN = { description = "Sentry project DSN" }
 ```
 
 Read `SENTRY_DSN` at startup and pass it to the Sentry SDK to turn on error reporting, following [Sentry's setup guide](https://docs.sentry.io/platforms/). Without a DSN, in local development and previews, the SDK stays inert.
+
+### PostHog
+
+If your service sends product analytics to PostHog, add `posthog` to its `features` in governance. It creates a PostHog project and writes the project key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile, so declare them there:
+
+```toml
+[profiles.prod]
+POSTHOG_KEY = { description = "PostHog project API key" }
+POSTHOG_HOST = { description = "PostHog instance host" }
+```
+
+Read them at startup and pass them to the PostHog SDK to turn on analytics. Without a key, in local development and previews, the SDK stays inert.
 
 ## Documentation
 
