@@ -51,7 +51,7 @@ pub struct AppConfig {
 impl AppConfig {
     fn from_env() -> Result<Self> {
         let webhook_secret_file =
-            dotenvy::var("WEBHOOK_SECRET_FILE").expect("WEBHOOK_SECRET_FILE must be set");
+            std::env::var("WEBHOOK_SECRET_FILE").expect("WEBHOOK_SECRET_FILE must be set");
         let webhook_secret = std::fs::read_to_string(&webhook_secret_file)
             .map_err(|e| {
                 anyhow::anyhow!("failed to read webhook secret from {webhook_secret_file}: {e}")
@@ -60,33 +60,31 @@ impl AppConfig {
             .to_string();
 
         Ok(Self {
-            api_host: dotenvy::var("API_HOST")
+            api_host: std::env::var("API_HOST")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_API_HOST.into()),
-            api_port: dotenvy::var("API_PORT")
+            api_port: std::env::var("API_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(kennel_config::constants::DEFAULT_API_PORT),
-            ephemeral_domain: dotenvy::var("EPHEMERAL_DOMAIN")
+            ephemeral_domain: std::env::var("EPHEMERAL_DOMAIN")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_EPHEMERAL_DOMAIN.into()),
-            work_dir: dotenvy::var("WORK_DIR")
+            work_dir: std::env::var("WORK_DIR")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_WORK_DIR.into()),
-            caddy_admin_url: dotenvy::var("CADDY_ADMIN_URL")
+            caddy_admin_url: std::env::var("CADDY_ADMIN_URL")
                 .unwrap_or_else(|_| "http://localhost:2019".into()),
-            max_concurrent_builds: dotenvy::var("MAX_CONCURRENT_BUILDS")
+            max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
                 .ok()
                 .and_then(|n| n.parse().ok())
                 .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
             webhook_secret,
-            custom_domains_file: dotenvy::var("CUSTOM_DOMAINS_FILE").ok(),
-            grafana_url: dotenvy::var("GRAFANA_URL").ok(),
+            custom_domains_file: std::env::var("CUSTOM_DOMAINS_FILE").ok(),
+            grafana_url: std::env::var("GRAFANA_URL").ok(),
         })
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenvy::dotenv().ok();
-
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("build-exec") {
         let build_id = args
@@ -98,7 +96,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().json().init();
 
     let config = AppConfig::from_env()?;
-    let db_path = dotenvy::var("DATABASE_PATH")
+    let db_path = std::env::var("DATABASE_PATH")
         .unwrap_or_else(|_| kennel_config::constants::DEFAULT_DB_PATH.into());
     let db_url = format!("sqlite://{}?mode=rwc", db_path);
 
@@ -152,13 +150,13 @@ async fn main() -> Result<()> {
 }
 
 fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
-    let Ok(token) = dotenvy::var("CLOUDFLARE_API_TOKEN") else {
+    let Ok(token) = std::env::var("CLOUDFLARE_API_TOKEN") else {
         return Ok(None);
     };
-    let Ok(zones_json) = dotenvy::var("CLOUDFLARE_ZONES_JSON") else {
+    let Ok(zones_json) = std::env::var("CLOUDFLARE_ZONES_JSON") else {
         return Ok(None);
     };
-    let Ok(public_ip) = dotenvy::var("KENNEL_PUBLIC_IP") else {
+    let Ok(public_ip) = std::env::var("KENNEL_PUBLIC_IP") else {
         return Ok(None);
     };
 
@@ -178,36 +176,36 @@ fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
 }
 
 fn build_forgejo_client() -> Result<ForgejoClient> {
-    let token_file = dotenvy::var("FORGEJO_API_TOKEN_FILE")
+    let token_file = std::env::var("FORGEJO_API_TOKEN_FILE")
         .map_err(|_| anyhow::anyhow!("FORGEJO_API_TOKEN_FILE must be set"))?;
     let token = std::fs::read_to_string(&token_file)
         .map_err(|e| anyhow::anyhow!("failed to read forgejo token from {token_file}: {e}"))?
         .trim()
         .to_string();
     let api_base =
-        dotenvy::var("FORGEJO_API_URL").unwrap_or_else(|_| "https://codeberg.org/api/v1".into());
+        std::env::var("FORGEJO_API_URL").unwrap_or_else(|_| "https://codeberg.org/api/v1".into());
     Ok(ForgejoClient::new(api_base, token))
 }
 
 fn build_providers() -> Vec<kennel_provision::Provider> {
     let mut providers = Vec::new();
 
-    if let Ok(socket_dir) = dotenvy::var("POSTGRES_SOCKET_DIR") {
+    if let Ok(socket_dir) = std::env::var("POSTGRES_SOCKET_DIR") {
         providers.push(kennel_provision::Provider::Postgres(
             kennel_provision::postgres::PostgresProvider::new(socket_dir),
         ));
     }
 
-    if let Ok(socket_path) = dotenvy::var("VALKEY_SOCKET_PATH") {
+    if let Ok(socket_path) = std::env::var("VALKEY_SOCKET_PATH") {
         providers.push(kennel_provision::Provider::Valkey(
             kennel_provision::valkey::ValkeyProvider::new(socket_path),
         ));
     }
 
-    if let Ok(admin_endpoint) = dotenvy::var("GARAGE_ADMIN_ENDPOINT") {
+    if let Ok(admin_endpoint) = std::env::var("GARAGE_ADMIN_ENDPOINT") {
         let s3_endpoint =
-            dotenvy::var("GARAGE_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:3900".into());
-        let admin_token = dotenvy::var("GARAGE_ADMIN_TOKEN")
+            std::env::var("GARAGE_S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:3900".into());
+        let admin_token = std::env::var("GARAGE_ADMIN_TOKEN")
             .expect("GARAGE_ADMIN_TOKEN required when GARAGE_ADMIN_ENDPOINT is set");
         providers.push(kennel_provision::Provider::Garage(
             kennel_provision::garage::GarageProvider::new(admin_endpoint, s3_endpoint, admin_token),

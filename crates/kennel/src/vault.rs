@@ -97,7 +97,7 @@ impl VaultClient {
 }
 
 pub fn build_from_env() -> Result<Option<VaultClient>> {
-    let Ok(endpoint) = dotenvy::var("VAULT_ENDPOINT") else {
+    let Ok(endpoint) = std::env::var("VAULT_ENDPOINT") else {
         return Ok(None);
     };
     // VAULT_ENDPOINT is the full secretspec provider URI of the form
@@ -114,9 +114,9 @@ pub fn build_from_env() -> Result<Option<VaultClient>> {
     ensure!(!mount.is_empty(), "VAULT_ENDPOINT mount is empty");
     let base = format!("https://{host}");
 
-    let role_id = dotenvy::var("VAULT_ROLE_ID")
+    let role_id = std::env::var("VAULT_ROLE_ID")
         .map_err(|_| anyhow!("VAULT_ROLE_ID required when VAULT_ENDPOINT is set"))?;
-    let secret_id = dotenvy::var("VAULT_SECRET_ID")
+    let secret_id = std::env::var("VAULT_SECRET_ID")
         .map_err(|_| anyhow!("VAULT_SECRET_ID required when VAULT_ENDPOINT is set"))?;
 
     tracing::info!(url = %base, mount = %mount, "vault client enabled");

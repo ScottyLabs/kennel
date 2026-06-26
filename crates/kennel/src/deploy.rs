@@ -317,7 +317,7 @@ async fn deploy_service(
         }
     }
 
-    if let Ok(vault_endpoint) = dotenvy::var("VAULT_ENDPOINT")
+    if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT")
         && let Some(ref config_store_path) = build.config_store_path
     {
         let env_str = environment.to_string();

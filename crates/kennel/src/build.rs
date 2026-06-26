@@ -248,7 +248,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
             .map_err(|e| anyhow::anyhow!("build unit produced no result file: {e}"))?,
     )?;
 
-    if let Ok(cache_name) = dotenvy::var("CACHIX_CACHE_NAME") {
+    if let Ok(cache_name) = std::env::var("CACHIX_CACHE_NAME") {
         let paths: Vec<&str> = output.store_paths.values().map(String::as_str).collect();
         if let Err(e) = cachix_push(&cache_name, &paths).await {
             tracing::warn!(error = %e, "cachix push failed");

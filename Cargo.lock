@@ -1907,7 +1907,6 @@ dependencies = [
  "anyhow",
  "axum",
  "chrono",
- "dotenvy",
  "entity",
  "futures-util",
  "hex",
