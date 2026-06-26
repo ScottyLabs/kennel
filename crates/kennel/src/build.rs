@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::forgejo::CommitStatus;
 use kennel_config::KennelConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -65,10 +66,12 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                     owner,
                     repo,
                     &build.commit_sha,
-                    "pending",
-                    "build started",
-                    "kennel/build",
-                    build_log_url.as_deref(),
+                    CommitStatus {
+                        state: "pending",
+                        description: "build started",
+                        context: "kennel/build",
+                        target_url: build_log_url.as_deref(),
+                    },
                 )
                 .await;
         }
@@ -90,10 +93,12 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                 owner,
                                 repo,
                                 &build.commit_sha,
-                                "success",
-                                "build succeeded",
-                                "kennel/build",
-                                build_log_url.as_deref(),
+                                CommitStatus {
+                                    state: "success",
+                                    description: "build succeeded",
+                                    context: "kennel/build",
+                                    target_url: build_log_url.as_deref(),
+                                },
                             )
                             .await;
                     }
@@ -108,10 +113,12 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                 owner,
                                 repo,
                                 &build.commit_sha,
-                                "failure",
-                                &format!("{e:#}"),
-                                "kennel/build",
-                                build_log_url.as_deref(),
+                                CommitStatus {
+                                    state: "failure",
+                                    description: &format!("{e:#}"),
+                                    context: "kennel/build",
+                                    target_url: build_log_url.as_deref(),
+                                },
                             )
                             .await;
                     }
@@ -127,10 +134,12 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                             owner,
                             repo,
                             &build.commit_sha,
-                            "error",
-                            "build panicked",
-                            "kennel/build",
-                            build_log_url.as_deref(),
+                            CommitStatus {
+                                state: "error",
+                                description: "build panicked",
+                                context: "kennel/build",
+                                target_url: build_log_url.as_deref(),
+                            },
                         )
                         .await;
                 }

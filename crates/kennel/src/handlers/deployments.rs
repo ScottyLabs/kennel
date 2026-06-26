@@ -29,10 +29,10 @@ pub async fn health(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    if h.active {
-        if let Some(port) = deployment.port {
-            h.app_healthy = Some(crate::health::probe(port as u16).await);
-        }
+    if h.active
+        && let Some(port) = deployment.port
+    {
+        h.app_healthy = Some(crate::health::probe(port as u16).await);
     }
 
     Ok(Json(h))

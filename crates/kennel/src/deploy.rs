@@ -1,5 +1,6 @@
 use crate::AppState;
 use crate::caddy::CaddyClient;
+use crate::forgejo::CommitStatus;
 use kennel_config::Environment;
 use kennel_provision::{ResourceProvider, ResourceRequest};
 use sea_orm::ActiveValue::Set;
@@ -121,10 +122,12 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
                 owner,
                 &project.name,
                 &build.commit_sha,
-                status,
-                &description,
-                "kennel/deploy",
-                target_url.as_deref(),
+                CommitStatus {
+                    state: status,
+                    description: &description,
+                    context: "kennel/deploy",
+                    target_url: target_url.as_deref(),
+                },
             )
             .await;
     }

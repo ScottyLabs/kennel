@@ -21,6 +21,15 @@ struct CommentBody<'a> {
     body: &'a str,
 }
 
+#[derive(Serialize)]
+pub struct CommitStatus<'a> {
+    pub state: &'a str,
+    pub description: &'a str,
+    pub context: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_url: Option<&'a str>,
+}
+
 impl ForgejoClient {
     pub fn new(api_base: String, token: String) -> Self {
         Self {
@@ -95,31 +104,20 @@ impl ForgejoClient {
         owner: &str,
         repo: &str,
         sha: &str,
-        state: &str,
-        description: &str,
-        context: &str,
-        target_url: Option<&str>,
+        status: CommitStatus<'_>,
     ) -> Result<()> {
         let url = format!("{}/repos/{owner}/{repo}/statuses/{sha}", self.api_base);
-        let mut body = serde_json::json!({
-            "state": state,
-            "description": description,
-            "context": context,
-        });
-        if let Some(target_url) = target_url {
-            body["target_url"] = serde_json::Value::String(target_url.to_string());
-        }
         let resp = self
             .client
             .post(&url)
             .header("Authorization", format!("token {}", self.token))
-            .json(&body)
+            .json(&status)
             .send()
             .await?;
         if !resp.status().is_success() {
-            let status = resp.status();
+            let code = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            anyhow::bail!("commit status API returned {status}: {text}");
+            anyhow::bail!("commit status API returned {code}: {text}");
         }
         Ok(())
     }
