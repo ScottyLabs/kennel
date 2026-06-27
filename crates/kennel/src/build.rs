@@ -59,8 +59,8 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                 _ => None,
             };
 
-        if let Some((ref owner, ref repo)) = owner_repo {
-            let _ = state
+        if let Some((ref owner, ref repo)) = owner_repo
+            && let Err(e) = state
                 .forgejo
                 .create_commit_status(
                     owner,
@@ -73,7 +73,11 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                         target_url: build_log_url.as_deref(),
                     },
                 )
-                .await;
+                .await
+        {
+            tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
+            let _ = state.store.builds().set_status(&build.id, "failed").await;
+            continue;
         }
 
         tracing::info!(build_id = %build.id, project = %build.project_id, "processing build");
@@ -86,8 +90,8 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
         match outcome {
             Ok(result) => match result {
                 Ok(()) => {
-                    if let Some((ref owner, ref repo)) = owner_repo {
-                        let _ = state
+                    if let Some((ref owner, ref repo)) = owner_repo
+                        && let Err(e) = state
                             .forgejo
                             .create_commit_status(
                                 owner,
@@ -100,14 +104,18 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                     target_url: build_log_url.as_deref(),
                                 },
                             )
-                            .await;
+                            .await
+                    {
+                        tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
+                        let _ = state.store.builds().set_status(&build.id, "failed").await;
+                        continue;
                     }
                     state.signal.notify_one();
                 }
                 Err(e) => {
                     tracing::error!(build_id = %build.id, error = %e, "build failed");
-                    if let Some((ref owner, ref repo)) = owner_repo {
-                        let _ = state
+                    if let Some((ref owner, ref repo)) = owner_repo
+                        && let Err(post_err) = state
                             .forgejo
                             .create_commit_status(
                                 owner,
@@ -120,15 +128,17 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                     target_url: build_log_url.as_deref(),
                                 },
                             )
-                            .await;
+                            .await
+                    {
+                        tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
                     }
                     let _ = state.store.builds().set_status(&build.id, "failed").await;
                 }
             },
             Err(join_err) => {
                 tracing::error!(build_id = %build.id, error = %join_err, "build task panicked");
-                if let Some((ref owner, ref repo)) = owner_repo {
-                    let _ = state
+                if let Some((ref owner, ref repo)) = owner_repo
+                    && let Err(post_err) = state
                         .forgejo
                         .create_commit_status(
                             owner,
@@ -141,7 +151,9 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                 target_url: build_log_url.as_deref(),
                             },
                         )
-                        .await;
+                        .await
+                {
+                    tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
                 }
                 let _ = state.store.builds().set_status(&build.id, "failed").await;
             }

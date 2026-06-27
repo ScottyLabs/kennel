@@ -116,7 +116,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
                 drilldown_unit_url(base, &format!("{unit}.service"), "now-1h", "now")
             })
         });
-        let _ = state
+        let posted = state
             .forgejo
             .create_commit_status(
                 owner,
@@ -130,6 +130,11 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
                 },
             )
             .await;
+        if deploy_result.is_ok() {
+            posted?;
+        } else if let Err(post_err) = posted {
+            tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
+        }
     }
 
     deploy_result?;
