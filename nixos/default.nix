@@ -326,6 +326,8 @@ in
 
     nix.settings = {
       extra-substituters = [ "https://scottylabs.cachix.org" ];
+      # Lets the untrusted build units pull from the cache without --accept-flake-config
+      trusted-substituters = [ "https://scottylabs.cachix.org" ];
       extra-trusted-public-keys = [
         "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
       ];
