@@ -1,6 +1,6 @@
 use crate::AppState;
 use crate::forgejo::CommitStatus;
-use kennel_config::KennelConfig;
+use kennel_config::{Environment, KennelConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -89,7 +89,11 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
 
         match outcome {
             Ok(result) => match result {
-                Ok(()) => {
+                Ok(outcome) => {
+                    let description = match outcome {
+                        BuildOutcome::Built => "build succeeded",
+                        BuildOutcome::PreviewSkipped => "preview deployments disabled",
+                    };
                     if let Some((ref owner, ref repo)) = owner_repo
                         && let Err(e) = state
                             .forgejo
@@ -99,7 +103,7 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                                 &build.commit_sha,
                                 CommitStatus {
                                     state: "success",
-                                    description: "build succeeded",
+                                    description,
                                     context: "kennel/build",
                                     target_url: build_log_url.as_deref(),
                                 },
@@ -110,7 +114,9 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                         let _ = state.store.builds().set_status(&build.id, "failed").await;
                         continue;
                     }
-                    state.signal.notify_one();
+                    if matches!(outcome, BuildOutcome::Built) {
+                        state.signal.notify_one();
+                    }
                 }
                 Err(e) => {
                     tracing::error!(build_id = %build.id, error = %e, "build failed");
@@ -167,6 +173,7 @@ struct BuildInput {
     repo_url: String,
     git_ref: String,
     commit_sha: String,
+    environment: Environment,
 }
 
 /// The isolated build hands these results back through a work-dir file.
@@ -175,6 +182,14 @@ struct BuildOutput {
     store_paths: HashMap<String, String>,
     kennel_config: KennelConfig,
     config_store_path: Option<String>,
+    #[serde(default)]
+    skipped: bool,
+}
+
+/// Whether a processed build produced artifacts to deploy or was skipped.
+enum BuildOutcome {
+    Built,
+    PreviewSkipped,
 }
 
 const INPUT_FILE: &str = "input.json";
@@ -197,7 +212,10 @@ fn set_group_writable(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Runs a build in a separate systemd unit and records its result.
-async fn process_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
+async fn process_build(
+    state: &AppState,
+    build: &::entity::builds::Model,
+) -> anyhow::Result<BuildOutcome> {
     let work_dir = PathBuf::from(&state.config.work_dir).join(&build.id);
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await?;
@@ -213,6 +231,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
         repo_url: project.repo_url.clone(),
         git_ref: build.git_ref.clone(),
         commit_sha: build.commit_sha.clone(),
+        environment: Environment::from_branch(&build.branch).unwrap_or(Environment::Dev),
     };
     tokio::fs::write(work_dir.join(INPUT_FILE), serde_json::to_vec(&input)?).await?;
 
@@ -260,6 +279,16 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
             .map_err(|e| anyhow::anyhow!("build unit produced no result file: {e}"))?,
     )?;
 
+    if output.skipped {
+        state
+            .store
+            .builds()
+            .set_status(&build.id, "skipped")
+            .await?;
+        let _ = tokio::fs::remove_dir_all(&work_dir).await;
+        return Ok(BuildOutcome::PreviewSkipped);
+    }
+
     if let Ok(cache_name) = std::env::var("CACHIX_CACHE_NAME") {
         let paths: Vec<&str> = output.store_paths.values().map(String::as_str).collect();
         if let Err(e) = cachix_push(&cache_name, &paths).await {
@@ -279,7 +308,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
         .await?;
 
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
-    Ok(())
+    Ok(BuildOutcome::Built)
 }
 
 /// Entry point for the `kennel build-exec <id>` subcommand.
@@ -326,6 +355,19 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
         anyhow::bail!("no services or static sites defined");
     }
 
+    if input.environment == Environment::Preview && !kennel_config.preview_deployments {
+        log_line(
+            log,
+            "preview deployments are disabled for this project; skipping build",
+        );
+        return Ok(BuildOutput {
+            store_paths: HashMap::new(),
+            kennel_config,
+            config_store_path: (!config_store_path.is_empty()).then_some(config_store_path),
+            skipped: true,
+        });
+    }
+
     let mut store_paths: HashMap<String, String> = HashMap::new();
     for name in kennel_config.services.keys() {
         store_paths.insert(name.clone(), nix_build(log, &repo_path, name).await?);
@@ -339,6 +381,7 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
         store_paths,
         kennel_config,
         config_store_path: (!config_store_path.is_empty()).then_some(config_store_path),
+        skipped: false,
     })
 }
 

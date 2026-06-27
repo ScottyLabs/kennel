@@ -212,10 +212,21 @@ Running `migrate` in the shell then executes that command. Scripts are a develop
 
 ## 6. Push
 
-Push to any branch. Kennel receives the webhook, builds your project, and deploys it. Your deployment will be available at:
+Kennel deploys three long-lived branches (`main`, `staging`, or `dev`). To get a preview, open a pull request and kennel builds and deploys it. Pushing any other branch is ignored.
+
+Your deployment will be available at:
 
 - `my-project-main.scottylabs.net` for the main branch
 - `my-project-pr-42.scottylabs.net` for PR #42
-- `my-project-feature-x.scottylabs.net` for a feature branch
 
 As it works, kennel reports progress back to Forgejo as commit statuses on the pushed commit. The `kennel/build` status moves from pending to success or failure as the build runs, and `kennel/deploy` reports success once the deployment passes its health check. A failed status means the commit never reached a healthy deployment; check the build log to see why.
+
+### Disabling preview deployments
+
+Some services should never run more than one instance at a time. A Discord bot, for example, would respond twice if a preview ran alongside production. Disable preview deployments for the whole project:
+
+```nix
+scottylabs.kennel.previewDeployments = false;
+```
+
+It defaults to `true`. When disabled, opening or updating a pull request still evaluates the config and reports `kennel/build`, but kennel skips the preview build and deploy entirely.

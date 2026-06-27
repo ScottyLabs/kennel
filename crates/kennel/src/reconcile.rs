@@ -35,9 +35,9 @@ pub async fn run_once(
         Utc::now() - chrono::Duration::days(kennel_config::constants::DEPLOYMENT_EXPIRY_DAYS);
     for deployment in &all_deployments {
         let env = kennel_config::Environment::from_branch(&deployment.branch);
-        if matches!(
+        if !matches!(
             env,
-            kennel_config::Environment::Preview | kennel_config::Environment::Dev
+            Some(kennel_config::Environment::Prod) | Some(kennel_config::Environment::Staging)
         ) && deployment.updated_at < expiry_cutoff
         {
             tracing::info!(
@@ -96,7 +96,8 @@ pub async fn run_once(
                 project_name: deployment.project_id.clone(),
                 service_name: deployment.service_name.clone(),
                 branch_slug: deployment.branch_slug.clone(),
-                environment: kennel_config::Environment::from_branch(&deployment.branch),
+                environment: kennel_config::Environment::from_branch(&deployment.branch)
+                    .unwrap_or(kennel_config::Environment::Dev),
                 system_user: system_user.clone(),
             };
 
@@ -211,7 +212,8 @@ pub async fn run_once(
             project_name: d.project_id.clone(),
             service_name: d.service_name.clone(),
             branch_slug: d.branch_slug.clone(),
-            environment: kennel_config::Environment::from_branch(&d.branch),
+            environment: kennel_config::Environment::from_branch(&d.branch)
+                .unwrap_or(kennel_config::Environment::Dev),
             system_user: d
                 .unit_name
                 .as_deref()

@@ -11,13 +11,14 @@ pub enum Environment {
 }
 
 impl Environment {
-    pub fn from_branch(branch: &str) -> Self {
+    /// Maps a branch to its deployment environment
+    pub fn from_branch(branch: &str) -> Option<Self> {
         match branch {
-            "main" => Self::Prod,
-            "staging" => Self::Staging,
-            "dev" => Self::Dev,
-            s if s.starts_with("pr-") => Self::Preview,
-            _ => Self::Dev,
+            "main" => Some(Self::Prod),
+            "staging" => Some(Self::Staging),
+            "dev" => Some(Self::Dev),
+            s if s.starts_with("pr-") => Some(Self::Preview),
+            _ => None,
         }
     }
 }

@@ -36,7 +36,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         .map(|v| serde_json::from_value(v.clone()).unwrap_or_default())
         .unwrap_or_default();
 
-    let environment = Environment::from_branch(&build.branch);
+    let environment = Environment::from_branch(&build.branch).unwrap_or(Environment::Dev);
     let branch_slug = sanitize(&build.branch);
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 

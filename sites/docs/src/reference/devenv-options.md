@@ -159,6 +159,12 @@ Each site accepts:
 - `spa` (`bool`, default: `false`) -- serve index.html for all routes
 - `customDomain` (`nullOr str`, default: `null`) -- custom domain for this site
 
+### `scottylabs.kennel.previewDeployments`
+
+Deploy a preview environment for each open pull request. Disable for singleton services such as bots, where a preview would run a second instance alongside production. When disabled, pull request commits still build and report `kennel/build`, but kennel skips the preview build and deploy.
+
+Type: `bool`, default: `true`
+
 ### `scottylabs.kennel.config`
 
 Read-only. The generated `kennel.json` derivation that the kennel builder evaluates at build time. You do not set this directly.

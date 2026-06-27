@@ -54,7 +54,8 @@ pub async fn teardown_deployment(
         project_name: deployment.project_id.clone(),
         service_name: deployment.service_name.clone(),
         branch_slug: deployment.branch_slug.clone(),
-        environment: kennel_config::Environment::from_branch(&deployment.branch),
+        environment: kennel_config::Environment::from_branch(&deployment.branch)
+            .unwrap_or(kennel_config::Environment::Dev),
         system_user: deployment
             .unit_name
             .as_deref()

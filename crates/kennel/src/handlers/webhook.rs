@@ -12,6 +12,7 @@ use crate::AppState;
 use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
 use crate::teardown::teardown_deployment;
+use kennel_config::Environment;
 
 pub async fn handle(
     State(state): State<Arc<AppState>>,
@@ -49,12 +50,19 @@ pub async fn handle(
                 return Ok(StatusCode::ACCEPTED);
             }
 
-            let git_ref = if branch.starts_with("pr-") {
-                let num = branch.strip_prefix("pr-").unwrap();
-                format!("refs/pull/{num}/head")
-            } else {
-                format!("refs/heads/{branch}")
-            };
+            if !matches!(
+                Environment::from_branch(&branch),
+                Some(Environment::Prod | Environment::Staging | Environment::Dev)
+            ) {
+                tracing::info!(
+                    project = %project.name,
+                    branch = %branch,
+                    "ignoring push to non-deployable branch; open a PR for a preview"
+                );
+                return Ok(StatusCode::ACCEPTED);
+            }
+
+            let git_ref = format!("refs/heads/{branch}");
 
             create_build(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
                 tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "create_build failed");
