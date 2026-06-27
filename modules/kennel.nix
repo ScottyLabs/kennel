@@ -13,6 +13,8 @@ let
       spa = site.spa;
       custom_domain = site.customDomain;
     }) cfg.sites;
+
+    preview_deployments = cfg.previewDeployments;
   };
 in
 {
@@ -49,6 +51,12 @@ in
       });
       default = { };
       description = "Static sites deployed by kennel";
+    };
+
+    previewDeployments = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Deploy a preview environment for each open pull request. Disable for singleton services such as bots.";
     };
 
     config = lib.mkOption {
