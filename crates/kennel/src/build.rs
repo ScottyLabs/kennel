@@ -286,6 +286,10 @@ pub async fn build_exec(build_id: &str) -> anyhow::Result<()> {
     }
     let _ = tokio::fs::write(work_dir.join(LOG_FILE), &log).await;
 
+    // Remove the build-user-owned scratch so the daemon can reclaim the work dir
+    let _ = tokio::fs::remove_dir_all(work_dir.join("repo")).await;
+    let _ = tokio::fs::remove_dir_all(work_dir.join("home")).await;
+
     let output = result?;
     tokio::fs::write(work_dir.join(OUTPUT_FILE), serde_json::to_vec(&output)?).await?;
     Ok(())
