@@ -20,7 +20,7 @@ pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(300);
 pub const UNIT_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 
-pub const HEALTHCHECK_PATH: &str = "/health";
+pub const HEALTHCHECK_PATH: &str = "/api/health";
 pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_STARTUP_GRACE: Duration = Duration::from_secs(60);

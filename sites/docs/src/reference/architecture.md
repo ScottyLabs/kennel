@@ -32,7 +32,7 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
 | GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects` gauges. |
-| GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/health`) from the unit's D-Bus properties. |
+| GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/api/health`) from the unit's D-Bus properties. |
 | GET | `/internal/caddy/check-domain` | Used by Caddy's on-demand TLS to validate a hostname is a registered deployment before acquiring a cert. |
 
 All endpoints other than `/webhook` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
