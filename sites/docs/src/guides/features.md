@@ -5,6 +5,7 @@ In the ScottyLabs governance repository, add your project to its team's TOML fil
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile
 - `posthog` creates a PostHog project and writes its key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile
+- `cdn` provisions a per-project public-read [Garage](https://garagehq.deuxfleurs.fr/) bucket and writes `CDN_S3_ENDPOINT`, `CDN_S3_BUCKET`, `CDN_ACCESS_KEY_ID`, `CDN_SECRET_ACCESS_KEY`, and `CDN_PUBLIC_URL` to Vault on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users`, `manage-users`, and `view-identity-providers` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 
@@ -63,6 +64,21 @@ POSTHOG_HOST = { description = "PostHog instance host" }
 ```
 
 Read them at startup and pass them to the PostHog SDK to turn on analytics. Without a key, in local development and previews, the SDK stays inert.
+
+### CDN
+
+If your service serves static assets from object storage, add `cdn` to its `features` in governance. It provisions a per-project [Garage](https://garagehq.deuxfleurs.fr/) bucket with website mode enabled and a scoped access key, then writes the S3 credentials and public URL to Vault on the `prod` profile, so declare them there:
+
+```toml
+[profiles.prod]
+CDN_S3_ENDPOINT = { description = "Garage S3 endpoint" }
+CDN_S3_BUCKET = { description = "CDN bucket name" }
+CDN_ACCESS_KEY_ID = { description = "CDN bucket access key ID" }
+CDN_SECRET_ACCESS_KEY = { description = "CDN bucket secret access key" }
+CDN_PUBLIC_URL = { description = "Public base URL for the bucket" }
+```
+
+Upload assets with the S3 credentials; they are publicly readable under `CDN_PUBLIC_URL` (`https://cdn.scottylabs.org/<repo>/`).
 
 ## Documentation
 
