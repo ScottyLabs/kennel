@@ -32,32 +32,31 @@ impl GarageProvider {
             .get(format!("{}{path}", self.admin_endpoint))
             .header("Authorization", format!("Bearer {}", self.admin_token))
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         Ok(resp.json().await?)
     }
 
     async fn api_post(
         &self,
         path: &str,
-        body: &serde_json::Value,
+        body: Option<&serde_json::Value>,
     ) -> anyhow::Result<serde_json::Value> {
-        let resp = self
+        let mut req = self
             .client
             .post(format!("{}{path}", self.admin_endpoint))
-            .header("Authorization", format!("Bearer {}", self.admin_token))
-            .json(body)
-            .send()
-            .await?;
-        Ok(resp.json().await?)
-    }
+            .header("Authorization", format!("Bearer {}", self.admin_token));
 
-    async fn api_delete(&self, path: &str) -> anyhow::Result<()> {
-        self.client
-            .delete(format!("{}{path}", self.admin_endpoint))
-            .header("Authorization", format!("Bearer {}", self.admin_token))
-            .send()
-            .await?;
-        Ok(())
+        if let Some(body) = body {
+            req = req.json(body);
+        }
+
+        let text = req.send().await?.error_for_status()?.text().await?;
+        if text.is_empty() {
+            Ok(serde_json::Value::Null)
+        } else {
+            Ok(serde_json::from_str(&text)?)
+        }
     }
 }
 
@@ -73,50 +72,86 @@ impl ResourceProvider for GarageProvider {
         let bucket_name = Self::bucket_name(request);
         let key_name = Self::key_name(request);
 
-        // Check if bucket exists
-        let buckets = self.api_get("/v1/bucket?list").await?;
-        let bucket_exists = buckets.as_array().unwrap_or(&vec![]).iter().any(|b| {
-            b["globalAliases"]
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .any(|a| a.as_str() == Some(&bucket_name))
-        });
-
-        if !bucket_exists {
-            self.api_post(
-                "/v1/bucket",
-                &serde_json::json!({"globalAlias": bucket_name}),
-            )
-            .await?;
-            tracing::info!(bucket = %bucket_name, "created garage bucket");
-        }
-
-        // Check if key exists
-        let keys = self.api_get("/v1/key?list").await?;
-        let existing_key = keys
+        // Find the bucket by global alias, or create it, capturing its id
+        let buckets = self.api_get("/v2/ListBuckets").await?;
+        let existing_bucket_id = buckets
             .as_array()
-            .unwrap_or(&vec![])
-            .iter()
-            .find(|k| k["name"].as_str() == Some(&key_name))
-            .cloned();
+            .into_iter()
+            .flatten()
+            .find(|b| {
+                b["globalAliases"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|a| a.as_str() == Some(&bucket_name))
+            })
+            .and_then(|b| b["id"].as_str().map(String::from));
 
-        let (access_key_id, secret_access_key) = if let Some(key) = existing_key {
-            let key_id = key["accessKeyId"].as_str().unwrap_or("").to_string();
-            let detail = self.api_get(&format!("/v1/key?id={key_id}")).await?;
-            (
-                key_id,
-                detail["secretAccessKey"].as_str().unwrap_or("").to_string(),
-            )
-        } else {
-            let key = self
-                .api_post("/v1/key", &serde_json::json!({"name": key_name}))
-                .await?;
-            let key_id = key["accessKeyId"].as_str().unwrap_or("").to_string();
-            let secret = key["secretAccessKey"].as_str().unwrap_or("").to_string();
-            tracing::info!(key = %key_name, "created garage API key");
-            (key_id, secret)
+        let bucket_id = match existing_bucket_id {
+            Some(id) => id,
+            None => {
+                let created = self
+                    .api_post(
+                        "/v2/CreateBucket",
+                        Some(&serde_json::json!({ "globalAlias": bucket_name })),
+                    )
+                    .await?;
+                tracing::info!(bucket = %bucket_name, "created garage bucket");
+                created["id"].as_str().unwrap_or_default().to_string()
+            }
         };
+
+        // Find the key by name, or create it, capturing its id and secret
+        // The secret is only returned at creation, so existing keys are re-read
+        let keys = self.api_get("/v2/ListKeys").await?;
+        let existing_key_id = keys
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|k| k["name"].as_str() == Some(&key_name))
+            .and_then(|k| k["id"].as_str().map(String::from));
+
+        let (access_key_id, secret_access_key) = match existing_key_id {
+            Some(id) => {
+                let detail = self
+                    .api_get(&format!("/v2/GetKeyInfo?id={id}&showSecretKey=true"))
+                    .await?;
+                (
+                    id,
+                    detail["secretAccessKey"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
+            None => {
+                let key = self
+                    .api_post(
+                        "/v2/CreateKey",
+                        Some(&serde_json::json!({ "name": key_name })),
+                    )
+                    .await?;
+                tracing::info!(key = %key_name, "created garage API key");
+                (
+                    key["accessKeyId"].as_str().unwrap_or_default().to_string(),
+                    key["secretAccessKey"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            }
+        };
+
+        // Grant the key full access to the bucket, idempotent on re-provision
+        self.api_post(
+            "/v2/AllowBucketKey",
+            Some(&serde_json::json!({
+                "bucketId": bucket_id,
+                "accessKeyId": access_key_id,
+                "permissions": { "read": true, "write": true, "owner": true },
+            })),
+        )
+        .await?;
 
         let mut env = HashMap::new();
         env.insert("S3_ENDPOINT".into(), self.s3_endpoint.clone());
@@ -130,30 +165,36 @@ impl ResourceProvider for GarageProvider {
         let bucket_name = Self::bucket_name(request);
         let key_name = Self::key_name(request);
 
-        // Delete key
-        let keys = self.api_get("/v1/key?list").await?;
-        if let Some(key) = keys
+        // Delete the key by id
+        let keys = self.api_get("/v2/ListKeys").await?;
+        if let Some(key_id) = keys
             .as_array()
-            .unwrap_or(&vec![])
-            .iter()
+            .into_iter()
+            .flatten()
             .find(|k| k["name"].as_str() == Some(&key_name))
-            && let Some(key_id) = key["accessKeyId"].as_str()
+            .and_then(|k| k["id"].as_str())
         {
-            self.api_delete(&format!("/v1/key?id={key_id}")).await?;
+            self.api_post(&format!("/v2/DeleteKey?id={key_id}"), None)
+                .await?;
             tracing::info!(key = %key_name, "deleted garage API key");
         }
 
-        // Delete bucket (must be empty first)
-        let buckets = self.api_get("/v1/bucket?list").await?;
-        if let Some(bucket) = buckets.as_array().unwrap_or(&vec![]).iter().find(|b| {
-            b["globalAliases"]
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .any(|a| a.as_str() == Some(&bucket_name))
-        }) && let Some(bucket_id) = bucket["id"].as_str()
+        // Delete the bucket by id, must be empty first
+        let buckets = self.api_get("/v2/ListBuckets").await?;
+        if let Some(bucket_id) = buckets
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|b| {
+                b["globalAliases"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|a| a.as_str() == Some(&bucket_name))
+            })
+            .and_then(|b| b["id"].as_str())
         {
-            self.api_delete(&format!("/v1/bucket?id={bucket_id}"))
+            self.api_post(&format!("/v2/DeleteBucket?id={bucket_id}"), None)
                 .await?;
             tracing::info!(bucket = %bucket_name, "deleted garage bucket");
         }
@@ -165,18 +206,18 @@ impl ResourceProvider for GarageProvider {
         let active_buckets: std::collections::HashSet<String> =
             active.iter().map(Self::bucket_name).collect();
 
-        let buckets = self.api_get("/v1/bucket?list").await?;
-        for bucket in buckets.as_array().unwrap_or(&vec![]) {
-            let empty = vec![];
-            let aliases = bucket["globalAliases"].as_array().unwrap_or(&empty);
-            for alias in aliases {
+        let buckets = self.api_get("/v2/ListBuckets").await?;
+        for bucket in buckets.as_array().into_iter().flatten() {
+            for alias in bucket["globalAliases"].as_array().into_iter().flatten() {
                 if let Some(name) = alias.as_str()
                     && name.starts_with("kennel-")
                     && !active_buckets.contains(name)
                 {
                     tracing::info!(bucket = %name, "deleting orphaned garage bucket");
                     if let Some(id) = bucket["id"].as_str() {
-                        let _ = self.api_delete(&format!("/v1/bucket?id={id}")).await;
+                        let _ = self
+                            .api_post(&format!("/v2/DeleteBucket?id={id}"), None)
+                            .await;
                     }
                 }
             }
