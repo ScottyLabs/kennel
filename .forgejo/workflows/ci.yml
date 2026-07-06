@@ -55,4 +55,7 @@ jobs:
         run: devenv shell -- pre-commit run --all-files
 
       - name: Build
-        run: devenv shell -- nix build
+        run: |
+          config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')
+          packages=$(jq -r '[(.services // {} | keys[]), (.static_sites // {} | keys[])] | .[] | ".#" + .' "$config/kennel.json")
+          [ -n "$packages" ] && devenv shell -- nix build $packages
