@@ -141,7 +141,7 @@ inputs = {
   };
 };
 
-outputs = { self, nixpkgs, scottylabs, ... }:
+outputs = { nixpkgs, scottylabs, ... }:
   let
     forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
   in {
@@ -156,7 +156,6 @@ outputs = { self, nixpkgs, scottylabs, ... }:
           buildArgs.cargoExtraArgs = "-p api";
         };
         docs = helpers.buildMdbook { src = ./sites/docs; };
-        default = self.packages.${system}.api;
       }
     );
   };
