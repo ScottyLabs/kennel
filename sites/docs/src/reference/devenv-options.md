@@ -10,7 +10,7 @@ imports = [ inputs.scottylabs.devenvModules.default ];
 
 ### `scottylabs.enable`
 
-Enable the shared ScottyLabs development configuration. Required for all other `scottylabs.*` options to take effect. Also installs two always-on pre-commit hooks that refresh and stage `flake.lock` (`nix flake update`) and `devenv.lock` (`devenv update`) on every commit.
+Enable the shared ScottyLabs development configuration. Required for all other `scottylabs.*` options to take effect. Also installs always-on hooks: two that refresh and stage `flake.lock` (`nix flake update`) and `devenv.lock` (`devenv update`) on every commit, and one that rejects commits carrying AI tool co-author trailers.
 
 Type: `bool`, default: `false`
 
@@ -30,7 +30,7 @@ Type: `bool`, default: `true`
 
 ### `scottylabs.rust.enable`
 
-Enable the Rust development toolchain. Configures nightly Rust with [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift) (fast debug-mode codegen), clippy, rustfmt, and the [wild](https://github.com/davidlattimore/wild)/lld linker.
+Enable the Rust development toolchain. Configures nightly Rust with [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift) (fast debug-mode codegen), clippy, rustfmt, [wild](https://github.com/davidlattimore/wild)/lld linker, and [sccache](https://github.com/mozilla/sccache) backed by the org's S3 cache. Sets `CARGO_TARGET_DIR` to `.devenv/state/target`. Clippy and `cargo test` run on every commit.
 
 Type: `bool`, default: `false`
 
@@ -40,11 +40,17 @@ Crate names forced to the LLVM backend instead of cranelift. Some crates use fea
 
 Type: `listOf str`, default: `[ "aws-lc-sys" "aws-lc-rs" "rustls" ]`
 
+### `scottylabs.rust.nativeBuildInputs`
+
+Extra packages for crates that link C libraries (e.g. `[ pkgs.pkg-config pkgs.openssl ]`). Prefer `rustls` over `native-tls` for TLS (e.g. `reqwest = { default-features = false, features = ["rustls-tls"] }`) to avoid needing OpenSSL.
+
+Type: `listOf package`, default: `[ ]`
+
 ## `scottylabs.deno`
 
 ### `scottylabs.deno.enable`
 
-Enable the Deno/JavaScript development toolchain. Adds [Deno](https://deno.com), [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (with `--deny all`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for `oxlint --type-aware`.
+Enable the Deno/JavaScript development toolchain. Adds [Deno](https://deno.com), [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (with `--deny all`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on every commit.
 
 Type: `bool`, default: `false`
 

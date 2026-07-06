@@ -11,6 +11,9 @@ Create a `secretspec.toml` in your project root. The `[project]` table requires 
 name = "my-project"
 revision = "1.0"
 
+[profiles.ci.defaults]
+required = false
+
 [profiles.default]
 JWT_SECRET = { description = "JWT signing key", required = true }
 STRIPE_KEY = { description = "Stripe API key", required = true }
@@ -28,6 +31,8 @@ STRIPE_KEY = { description = "Stripe test key", required = false }
 ```
 
 `[profiles.default]` holds the secrets shared across every profile; named profiles inherit from it and may override individual entries, for example making `STRIPE_KEY` optional in preview. Declare a `[profiles.<name>]` header for `dev` (used locally) and for every environment you deploy to (see the [branch-to-profile mapping](#production)); a section may be left empty to inherit `default` unchanged.
+
+The `[profiles.ci.defaults]` block makes every inherited secret optional for CI. The shared CI workflow sets `SECRETSPEC_PROFILE=ci` and `SECRETSPEC_PROVIDER=env` so that `devenv shell` does not require an OpenBao token. This means that no CI checks should use secrets.
 
 ## Configuring the provider
 
@@ -61,13 +66,13 @@ DISCORD_TOKEN = { providers = ["local"] }
 
 ## Local development
 
-Log in to OpenBao once per machine:
+Log in to OpenBao and configure Cachix once per machine:
 
 ```bash
 nix run git+https://codeberg.org/ScottyLabs/devenv#login
 ```
 
-A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above.
+A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above. It also stores your Cachix auth token so devenv pulls from and pushes to the shared binary cache.
 
 The token is periodic and renews on each shell entry, so it stays valid as long as you open a project shell at least once every 90 days. You only log in again on a new machine, or after 90 days without using it.
 
@@ -107,3 +112,13 @@ Kennel authenticates to OpenBao with a service token provided via `VAULT_TOKEN` 
 | `pr-*` | `preview` |
 
 If a required secret cannot be resolved, the deployment fails. Deployed services also receive `PORT`, `COMMIT_HASH`, and `APP_URL` (see [Deploying a Project](./deploying.md#runtime-environment)).
+
+## Runtime loading
+
+Use the typed secretspec SDKs to load secrets in your application code. Environment variables work but lose type safety and expose every secret to every process. The SDKs generate typed accessors from your `secretspec.toml` at build time.
+
+- [Rust](https://secretspec.dev/sdk/rust/)
+- [TypeScript](https://secretspec.dev/sdk/nodejs/)
+- [Python](https://secretspec.dev/sdk/python/)
+
+See the [SDK overview](https://secretspec.dev/sdk/overview/) for the full list of supported languages.
