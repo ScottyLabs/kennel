@@ -25,7 +25,7 @@ jobs:
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
 
       - name: Install devenv
-        run: nix profile add nixpkgs#devenv
+        run: nix profile install nixpkgs#devenv
 
       # .devenv/state/target is handled by Swatinem/rust-cache below
       - name: Cache devenv state
