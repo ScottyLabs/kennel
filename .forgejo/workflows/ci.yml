@@ -1,12 +1,9 @@
 name: CI
-
 on:
   workflow_call:
-
 env:
   SECRETSPEC_PROFILE: ci
   SECRETSPEC_PROVIDER: env
-
 jobs:
   check:
     runs-on: docker
@@ -16,17 +13,16 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
-
       - name: Install Lix
         uses: https://github.com/samueldr/lix-gha-installer-action@v2026-06-15
         with:
           extra_nix_config: |
             extra-substituters = https://scottylabs.cachix.org
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
-
+            # Lix's remote build-hook crashes in the CI container and we use no remote builders
+            build-hook =
       - name: Install devenv
         run: nix profile install nixpkgs#devenv
-
       # .devenv/state/target is handled by Swatinem/rust-cache below
       - name: Cache devenv state
         uses: https://code.forgejo.org/actions/cache@v6
@@ -36,24 +32,20 @@ jobs:
             .devenv/state/uv
           key: devenv-state-${{ hashFiles('**/deno.lock', '**/uv.lock') }}
           restore-keys: devenv-state-
-
       - name: Cache devenv eval
         uses: https://code.forgejo.org/actions/cache@v6
         with:
           path: .devenv/nix-eval-cache*
           key: devenv-eval-${{ hashFiles('devenv.lock', 'flake.lock', 'devenv.nix') }}
           restore-keys: devenv-eval-
-
       # cmd-format runs cargo metadata inside the devenv shell so that Swatinem
       # caches CARGO_TARGET_DIR=.devenv/state/target
       - name: Cache Rust
         uses: https://github.com/Swatinem/rust-cache@v2
         with:
           cmd-format: "devenv shell {0}"
-
       - name: Run hooks
         run: devenv shell -- pre-commit run --all-files
-
       - name: Build
         run: |
           config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')

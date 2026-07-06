@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     crane.url = "github:ipetkov/crane";
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     ricochet = {
       url = "git+https://codeberg.org/anish/ricochet";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -29,6 +33,7 @@
     {
       nixpkgs,
       crane,
+      treefmt-nix,
       ricochet,
       pyproject-nix,
       uv2nix,
@@ -88,5 +93,14 @@
           ''}";
         };
       });
+
+      formatter = forAllSystems (
+        pkgs:
+        (treefmt-nix.lib.evalModule pkgs {
+          programs.nixfmt.enable = true;
+          programs.mdformat.enable = true;
+          programs.yamlfmt.enable = true;
+        }).config.build.wrapper
+      );
     };
 }

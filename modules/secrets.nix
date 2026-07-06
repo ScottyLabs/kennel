@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 let
   cfg = config.scottylabs.secrets;
@@ -13,7 +18,10 @@ in
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
-    packages = [ pkgs.openbao pkgs.secretspec ];
+    packages = [
+      pkgs.openbao
+      pkgs.secretspec
+    ];
 
     # secretspec sources per-developer secrets from a gitignored .env via its dotenv provider
     # devenv's own dotenv integration should stay off
