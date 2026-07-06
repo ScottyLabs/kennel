@@ -76,13 +76,20 @@
           '';
       };
 
-      # authenticate to OpenBao before any project shell can build
+      # This authenticates to OpenBao and stores CACHIX_AUTH_TOKEN in
+      # ~/.config/cachix/cachix.dhall. cachix could read directly from
+      # CACHIX_AUTH_TOKEN instead, but devenv tries reading that before
+      # enterShell, so we can't directly inject it there.
+      # https://github.com/cachix/devenv/pull/2783 adds pre-flight env
+      # injection, which lets us eliminate the extra authtoken step
       apps = forAllSystems (pkgs: {
         login = {
           type = "app";
-          program = "${pkgs.writeShellScript "bao-login" ''
+          program = "${pkgs.writeShellScript "scottylabs-login" ''
             export BAO_ADDR=https://secrets2.scottylabs.org
-            exec ${pkgs.openbao}/bin/bao login -method=oidc
+            ${pkgs.openbao}/bin/bao login -method=oidc
+            ${pkgs.openbao}/bin/bao kv get -field=CACHIX_AUTH_TOKEN secret/shared/cachix \
+              | ${pkgs.cachix}/bin/cachix authtoken --stdin
           ''}";
         };
       });

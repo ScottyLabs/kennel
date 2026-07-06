@@ -35,7 +35,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    cachix.pull = [ "scottylabs" ];
+    cachix = {
+      pull = [ "scottylabs" ];
+      push = "scottylabs";
+    };
 
     treefmt = {
       enable = true;

@@ -21,6 +21,8 @@ in
       ty
     ];
 
+    env.UV_CACHE_DIR = "${config.devenv.root}/.devenv/state/uv";
+
     languages.python = {
       enable = true;
       lsp.enable = false; # disable pyright in favor of ty
@@ -34,8 +36,8 @@ in
     treefmt.config.programs.ruff-format.enable = true;
 
     git-hooks.hooks = {
-      ruff.enable = true;
-      # https://github.com/cachix/git-hooks.nix/pull/724
+      ruff.enable = true; # lint
+      # TODO: https://github.com/cachix/git-hooks.nix/pull/724
       ty = {
         enable = true;
         name = "ty";
