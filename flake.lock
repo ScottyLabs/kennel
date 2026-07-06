@@ -309,22 +309,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-deno": {
-      "locked": {
-        "lastModified": 1782281949,
-        "narHash": "sha256-LoO3M9NswSI10SUCGIBybW7xl+dfnknWkJTlVRuobJk=",
-        "owner": "ap-1",
-        "repo": "nixpkgs",
-        "rev": "d57f9b1e069ae53bb96724cf9fc4149c6415c4ee",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ap-1",
-        "ref": "deno-keep-denort",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nixpkgs-src": {
       "flake": false,
       "locked": {
@@ -450,7 +434,6 @@
       "inputs": {
         "crane": "crane",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-deno": "nixpkgs-deno",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",

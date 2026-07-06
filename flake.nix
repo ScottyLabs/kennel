@@ -4,8 +4,6 @@
   inputs = {
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     crane.url = "github:ipetkov/crane";
-    # https://github.com/NixOS/nixpkgs/pull/534873
-    nixpkgs-deno.url = "github:ap-1/nixpkgs/deno-keep-denort";
     ricochet = {
       url = "git+https://codeberg.org/anish/ricochet";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -30,7 +28,6 @@
   outputs =
     {
       nixpkgs,
-      nixpkgs-deno,
       crane,
       ricochet,
       pyproject-nix,
@@ -54,9 +51,7 @@
 
       # build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {
-        buildDenoTask = pkgs.callPackage ./lib/build-deno-task.nix {
-          deno = nixpkgs-deno.legacyPackages.${pkgs.system}.deno;
-        };
+        buildDenoTask = pkgs.callPackage ./lib/build-deno-task.nix { };
         buildRustService = import ./lib/build-rust-service.nix { inherit pkgs crane; };
         buildPythonService = import ./lib/build-python-service.nix {
           inherit
