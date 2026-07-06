@@ -37,6 +37,7 @@ in
       CARGO_PROFILE_DEV_DEBUG = "0";
       CARGO_TARGET_DIR = "${config.devenv.root}/.devenv/state/target";
       RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
+      RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
       SCCACHE_BUCKET = "sccache";
       SCCACHE_ENDPOINT = "https://s3.scottylabs.org";
       SCCACHE_REGION = "us-east-1";
@@ -67,12 +68,11 @@ in
       };
     };
 
-    # wrap rustc with sccache only when its S3 creds resolve from OpenBao
+    # fetch sccache S3 creds from OpenBao unless CI already set them
     enterShell = ''
-      if key=$(${pkgs.openbao}/bin/bao kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache 2>/dev/null); then
-        export AWS_ACCESS_KEY_ID="$key"
+      if [ -z "''${AWS_ACCESS_KEY_ID:-}" ]; then
+        export AWS_ACCESS_KEY_ID=$(${pkgs.openbao}/bin/bao kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache)
         export AWS_SECRET_ACCESS_KEY=$(${pkgs.openbao}/bin/bao kv get -field=AWS_SECRET_ACCESS_KEY secret/shared/sccache)
-        export RUSTC_WRAPPER=${pkgs.sccache}/bin/sccache
       fi
     '';
 
