@@ -6,6 +6,7 @@
 
 - [Enabling Features](./guides/features.md)
 - [Deploying a Project](./guides/deploying.md)
+- [Continuous Integration](./guides/ci.md)
 - [Secrets](./guides/secrets.md)
 - [Preview Deployments](./guides/previews.md)
 

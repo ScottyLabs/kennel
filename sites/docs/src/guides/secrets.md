@@ -32,7 +32,7 @@ STRIPE_KEY = { description = "Stripe test key", required = false }
 
 `[profiles.default]` holds the secrets shared across every profile; named profiles inherit from it and may override individual entries, for example making `STRIPE_KEY` optional in preview. Declare a `[profiles.<name>]` header for `dev` (used locally) and for every environment you deploy to (see the [branch-to-profile mapping](#production)); a section may be left empty to inherit `default` unchanged.
 
-The `[profiles.ci.defaults]` block makes every inherited secret optional for CI. The shared CI workflow sets `SECRETSPEC_PROFILE=ci` and `SECRETSPEC_PROVIDER=env` so that `devenv shell` does not require an OpenBao token. This means that no CI checks should use secrets.
+The `[profiles.ci.defaults]` block makes every inherited secret optional for CI. The shared CI workflow sets `SECRETSPEC_PROFILE=ci` and `SECRETSPEC_PROVIDER=env` so that `devenv shell` does not require an OpenBao token. CI checks run without project secret values and must not depend on them. The workflow's only secrets are the org-level Cachix and sccache credentials it forwards for binary caching.
 
 ## Configuring the provider
 
