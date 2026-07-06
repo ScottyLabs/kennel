@@ -84,6 +84,14 @@ in
         packageOverrides.cargo = config.languages.rust.toolchainPackage;
         packageOverrides.clippy = config.languages.rust.toolchainPackage;
       };
+      cargo-test = {
+        enable = true;
+        name = "cargo-test";
+        entry = "cargo test";
+        files = "\\.(rs|toml)$";
+        pass_filenames = false;
+        language = "system";
+      };
     };
   };
 }

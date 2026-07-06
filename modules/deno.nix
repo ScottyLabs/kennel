@@ -59,6 +59,22 @@ in
         files = "\\.(svelte|ts|js|mts|cts|mjs|cjs|tsx|jsx)$";
         pass_filenames = false;
       };
+      deno-check = {
+        enable = true;
+        name = "deno-check";
+        entry = "deno check .";
+        files = "\\.(ts|tsx|mts|cts)$";
+        pass_filenames = false;
+        language = "system";
+      };
+      deno-test = {
+        enable = true;
+        name = "deno-test";
+        entry = "deno test";
+        files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$";
+        pass_filenames = false;
+        language = "system";
+      };
     };
   };
 }
