@@ -1,4 +1,4 @@
-{ lib, config, ... }:
+{ lib, pkgs, config, ... }:
 
 let
   cfg = config.scottylabs;
@@ -48,6 +48,18 @@ in
     git-hooks.hooks = {
       treefmt.enable = true;
       commitizen.enable = cfg.conventionalCommits.enable;
+
+      block-ai-coauthors = {
+        enable = true;
+        name = "block-ai-coauthors";
+        entry = "${pkgs.writeShellScript "block-ai-coauthors" ''
+          if grep -iqE '^[[:space:]]*co-authored-by:.*(claude|cursor|copilot|codex)' "$1"; then
+            echo "AI tool co-author trailers are not allowed. Remove the Co-authored-by line." >&2
+            exit 1
+          fi
+        ''}";
+        stages = [ "commit-msg" ];
+      };
     };
   };
 }
