@@ -373,7 +373,13 @@ async fn deploy_service(
 
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
-        .start_transient_unit(&unit_name, &exec_start, &env_vars, &system_user)
+        .start_transient_unit(
+            &unit_name,
+            &exec_start,
+            &env_vars,
+            &system_user,
+            build.config_store_path.as_deref(),
+        )
         .await?;
 
     // Wait for the service to become healthy before routing traffic

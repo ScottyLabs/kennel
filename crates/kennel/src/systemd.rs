@@ -59,6 +59,7 @@ impl SystemdClient {
         exec_start: &str,
         env: &HashMap<String, String>,
         user: &str,
+        working_dir: Option<&str>,
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
@@ -99,6 +100,10 @@ impl SystemdClient {
             ("MemoryAccounting", true.into()),
             ("IOAccounting", true.into()),
             ("TasksAccounting", true.into()),
+            ("NoNewPrivileges", true.into()),
+            ("ProtectSystem", "strict".into()),
+            ("ProtectHome", "yes".into()),
+            ("PrivateTmp", true.into()),
         ];
 
         let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
@@ -108,6 +113,10 @@ impl SystemdClient {
 
         if let Some(group) = valkey_supplementary_group(env) {
             properties.push(("SupplementaryGroups", vec![group].into()));
+        }
+
+        if let Some(dir) = working_dir {
+            properties.push(("WorkingDirectory", dir.into()));
         }
 
         let exec_start_value: Vec<(String, Vec<String>, bool)> =

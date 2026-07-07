@@ -175,6 +175,8 @@ Kennel injects these variables into every backend service it deploys:
 
 Resolved secrets from your `secretspec.toml` are injected alongside these.
 
+Kennel runs each service from a working directory that contains your `secretspec.toml`, so the [secretspec SDK's runtime `load()`](./secrets.md#runtime-loading) finds it automatically. The filesystem is read-only apart from a private `/tmp`, so keep persistent state in a provisioned database or object store.
+
 ## 4. Enable infrastructure
 
 If your project needs a database:

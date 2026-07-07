@@ -139,7 +139,13 @@ pub async fn run_once(
             let exec = deploy::find_executable(&deployment.store_path).await;
             if let Ok(exec_start) = exec
                 && let Err(e) = systemd
-                    .start_transient_unit(unit_name, &exec_start, &env_vars, &system_user)
+                    .start_transient_unit(
+                        unit_name,
+                        &exec_start,
+                        &env_vars,
+                        &system_user,
+                        deployment.config_store_path.as_deref(),
+                    )
                     .await
             {
                 tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");

@@ -18,7 +18,7 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 
 Kennel delegates process supervision to systemd and HTTP routing to Caddy, keeping the core focused on build orchestration and resource provisioning.
 
-Systemd transient units are created via D-Bus using the zbus crate. Units are placed in the `kennel.slice` cgroup for aggregate accounting, with `CPUAccounting`, `MemoryAccounting`, `IOAccounting`, and `TasksAccounting` enabled so per-deployment resource usage is queryable from cgroup metrics by anything scraping `systemd_unit_*` or `systemd_slice_*` (e.g. `prometheus-systemd-exporter` filtered to `kennel-*` units). Transient units survive kennel crashes since they are independent of the kennel process.
+Systemd transient units are created via D-Bus using the zbus crate. Units are placed in the `kennel.slice` cgroup for aggregate accounting, with `CPUAccounting`, `MemoryAccounting`, `IOAccounting`, and `TasksAccounting` enabled so per-deployment resource usage is queryable from cgroup metrics by anything scraping `systemd_unit_*` or `systemd_slice_*` (e.g. `prometheus-systemd-exporter` filtered to `kennel-*` units). Each unit runs sandboxed as a `DynamicUser` with no daemon credentials, a read-only filesystem (`ProtectSystem=strict`, `ProtectHome=yes`) except a private `/tmp` (`PrivateTmp=yes`), and `NoNewPrivileges`. Transient units survive kennel crashes since they are independent of the kennel process.
 
 Caddy routes are managed via the [admin API](https://caddyserver.com/docs/api). Each deployment gets a route identified by `@id` for individual add/remove operations. Caddy handles TLS certificate provisioning, HTTP/3, static file serving, reverse proxying, and SPA fallback.
 

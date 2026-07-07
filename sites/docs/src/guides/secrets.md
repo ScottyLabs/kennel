@@ -117,6 +117,8 @@ If a required secret cannot be resolved, the deployment fails. Deployed services
 
 Use the typed secretspec SDKs to load secrets in your application code. Environment variables work but lose type safety and expose every secret to every process. The SDKs generate typed accessors from your `secretspec.toml` at build time.
 
+Runtime `load()` reads `secretspec.toml` from disk, not only at build time. Kennel makes it available to deployed services automatically (see [Runtime environment](./deploying.md#runtime-environment)).
+
 - [Rust](https://secretspec.dev/sdk/rust/)
 - [TypeScript](https://secretspec.dev/sdk/nodejs/)
 - [Python](https://secretspec.dev/sdk/python/)
