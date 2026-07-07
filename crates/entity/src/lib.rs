@@ -3,5 +3,6 @@
 pub mod prelude;
 
 pub mod builds;
+pub mod deploy_requests;
 pub mod deployments;
 pub mod projects;

@@ -1,4 +1,5 @@
 pub mod builds;
+pub mod deploy_requests;
 pub mod deployments;
 pub mod projects;
 
@@ -27,5 +28,9 @@ impl Store {
 
     pub fn deployments(&self) -> deployments::DeploymentRepository<'_> {
         deployments::DeploymentRepository::new(&self.db)
+    }
+
+    pub fn deploy_requests(&self) -> deploy_requests::DeployRequestRepository<'_> {
+        deploy_requests::DeployRequestRepository::new(&self.db)
     }
 }

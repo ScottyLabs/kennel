@@ -122,18 +122,17 @@ impl<'a> BuildRepository<'a> {
         Ok(())
     }
 
-    pub async fn cancel_stale(
+    /// Cancel queued builds for commits no deploy request targets anymore
+    pub async fn cancel_unreferenced(
         &self,
         project_id: &str,
-        branch: &str,
-        exclude_id: &str,
+        referenced: &[String],
     ) -> Result<u64, DbErr> {
         let result = Builds::update_many()
             .col_expr(builds::Column::Status, Expr::value("cancelled"))
             .filter(builds::Column::ProjectId.eq(project_id))
-            .filter(builds::Column::Branch.eq(branch))
-            .filter(builds::Column::Status.is_in(["queued", "building"]))
-            .filter(builds::Column::Id.ne(exclude_id))
+            .filter(builds::Column::Status.eq("queued"))
+            .filter(builds::Column::CommitSha.is_not_in(referenced.iter().map(String::as_str)))
             .exec(self.db)
             .await?;
         Ok(result.rows_affected)

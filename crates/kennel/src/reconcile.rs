@@ -15,17 +15,54 @@ pub async fn run_once(
     let systemd = SystemdClient::connect().await?;
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
-    // Deploy completed builds that haven't been deployed yet
-    let built = state.store.builds().find_by_status("built").await?;
-    for build in &built {
-        match deploy::deploy_build(state, build).await {
-            Ok(()) => {
-                let _ = state.store.builds().set_status(&build.id, "done").await;
+    // Deploy pending intents whose build artifacts are ready
+    let pending = state
+        .store
+        .deploy_requests()
+        .find_by_status("pending")
+        .await?;
+    for request in &pending {
+        let Some(build) = state
+            .store
+            .builds()
+            .find_by_project_commit(&request.project_id, &request.commit_sha)
+            .await?
+        else {
+            continue;
+        };
+        match build.status.as_str() {
+            "built" => match deploy::deploy_request(state, request, &build).await {
+                Ok(deploy::DeployOutcome::Deployed) => {
+                    let _ = state
+                        .store
+                        .deploy_requests()
+                        .set_status(&request.id, "deployed")
+                        .await;
+                }
+                Ok(deploy::DeployOutcome::SkippedPreview) => {
+                    let _ = state
+                        .store
+                        .deploy_requests()
+                        .set_status(&request.id, "skipped")
+                        .await;
+                }
+                Err(e) => {
+                    tracing::error!(request_id = %request.id, error = %e, "deploy failed during reconciliation");
+                    let _ = state
+                        .store
+                        .deploy_requests()
+                        .set_status(&request.id, "failed")
+                        .await;
+                }
+            },
+            "failed" | "cancelled" => {
+                let _ = state
+                    .store
+                    .deploy_requests()
+                    .set_status(&request.id, "failed")
+                    .await;
             }
-            Err(e) => {
-                tracing::error!(build_id = %build.id, error = %e, "deploy failed during reconciliation");
-                let _ = state.store.builds().set_status(&build.id, "failed").await;
-            }
+            _ => {}
         }
     }
 

@@ -4,6 +4,7 @@ mod m20220101_000001_create_table;
 mod m20260419_014922_add_config_store_path_to_deployments;
 mod m20260514_080000_add_log_to_builds;
 mod m20260626_000000_add_owner_to_projects;
+mod m20260707_000000_create_deploy_requests;
 
 pub struct Migrator;
 
@@ -15,6 +16,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260419_014922_add_config_store_path_to_deployments::Migration),
             Box::new(m20260514_080000_add_log_to_builds::Migration),
             Box::new(m20260626_000000_add_owner_to_projects::Migration),
+            Box::new(m20260707_000000_create_deploy_requests::Migration),
         ]
     }
 }

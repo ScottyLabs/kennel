@@ -64,8 +64,8 @@ pub async fn handle(
 
             let git_ref = format!("refs/heads/{branch}");
 
-            create_build(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
-                tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "create_build failed");
+            enqueue_deploy(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+                tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "enqueue_deploy failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
 
@@ -81,8 +81,8 @@ pub async fn handle(
 
             match action.as_str() {
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
-                    create_build(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
-                        tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "create_build failed");
+                    enqueue_deploy(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+                        tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "enqueue_deploy failed");
                         StatusCode::INTERNAL_SERVER_ERROR
                     })?;
                     Ok(StatusCode::OK)
@@ -105,6 +105,12 @@ async fn teardown_branch(
     project: &::entity::projects::Model,
     branch: &str,
 ) -> anyhow::Result<()> {
+    let _ = state
+        .store
+        .deploy_requests()
+        .delete_by_project_branch(&project.id, branch)
+        .await;
+
     let deployments = state
         .store
         .deployments()
@@ -180,30 +186,23 @@ async fn find_or_create_project(
     Ok(project)
 }
 
-async fn create_build(
+/// Ensure the commit's artifacts are built and record the branch's deploy intent
+async fn enqueue_deploy(
     state: &AppState,
     project: &::entity::projects::Model,
     branch: &str,
     git_ref: &str,
     commit_sha: &str,
 ) -> anyhow::Result<()> {
-    if let Some(existing) = state
+    // One build per commit is reused across every branch
+    match state
         .store
         .builds()
         .find_by_project_commit(&project.id, commit_sha)
         .await?
     {
-        match existing.status.as_str() {
-            "queued" | "building" | "built" => {
-                tracing::debug!(
-                    project = %project.name,
-                    commit = %commit_sha,
-                    status = %existing.status,
-                    "build already in flight, skipping"
-                );
-                return Ok(());
-            }
-            _ => {
+        Some(existing) => {
+            if matches!(existing.status.as_str(), "failed" | "cancelled") {
                 state.store.builds().requeue(&existing.id).await?;
                 tracing::info!(
                     project = %project.name,
@@ -211,39 +210,47 @@ async fn create_build(
                     previous_status = %existing.status,
                     "requeued build for redelivery"
                 );
-                state.signal.notify_one();
-                return Ok(());
             }
+        }
+        None => {
+            let model = ::entity::builds::ActiveModel {
+                id: Set(uuid::Uuid::now_v7().to_string()),
+                project_id: Set(project.id.clone()),
+                branch: Set(branch.to_string()),
+                git_ref: Set(git_ref.to_string()),
+                commit_sha: Set(commit_sha.to_string()),
+                status: Set("queued".to_string()),
+                ..Default::default()
+            };
+            state.store.builds().create(model).await?;
         }
     }
 
-    let build_id = uuid::Uuid::now_v7().to_string();
+    state
+        .store
+        .deploy_requests()
+        .upsert(&project.id, branch, git_ref, commit_sha)
+        .await?;
 
-    let model = ::entity::builds::ActiveModel {
-        id: Set(build_id.clone()),
-        project_id: Set(project.id.clone()),
-        branch: Set(branch.to_string()),
-        git_ref: Set(git_ref.to_string()),
-        commit_sha: Set(commit_sha.to_string()),
-        status: Set("queued".to_string()),
-        ..Default::default()
-    };
-
-    state.store.builds().create(model).await?;
-
-    let cancelled = state
+    let referenced = state
+        .store
+        .deploy_requests()
+        .active_commits(&project.id)
+        .await?;
+    if let Ok(cancelled) = state
         .store
         .builds()
-        .cancel_stale(&project.id, branch, &build_id)
-        .await?;
-    if cancelled > 0 {
+        .cancel_unreferenced(&project.id, &referenced)
+        .await
+        && cancelled > 0
+    {
         tracing::info!(
             project = %project.name,
-            branch = %branch,
             cancelled = cancelled,
-            "cancelled stale builds"
+            "cancelled superseded builds"
         );
     }
+
     state.signal.notify_one();
     Ok(())
 }

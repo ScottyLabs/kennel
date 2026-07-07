@@ -12,11 +12,22 @@ struct DeployCtx<'a> {
     caddy: &'a CaddyClient,
     project_name: &'a str,
     build: &'a ::entity::builds::Model,
+    branch: &'a str,
     branch_slug: &'a str,
     environment: &'a Environment,
 }
 
-pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
+/// Result of a deploy attempt for a branch's intent
+pub enum DeployOutcome {
+    Deployed,
+    SkippedPreview,
+}
+
+pub async fn deploy_request(
+    state: &AppState,
+    request: &::entity::deploy_requests::Model,
+    build: &::entity::builds::Model,
+) -> anyhow::Result<DeployOutcome> {
     let project = state
         .store
         .projects()
@@ -36,14 +47,19 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         .map(|v| serde_json::from_value(v.clone()).unwrap_or_default())
         .unwrap_or_default();
 
-    let environment = Environment::from_branch(&build.branch).unwrap_or(Environment::Dev);
-    let branch_slug = sanitize(&build.branch);
+    let environment = Environment::from_branch(&request.branch).unwrap_or(Environment::Dev);
+
+    if environment == Environment::Preview && !kennel_config.preview_deployments {
+        return Ok(DeployOutcome::SkippedPreview);
+    }
+
+    let branch_slug = sanitize(&request.branch);
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
     let existing = state
         .store
         .deployments()
-        .find_by_project_branch(&build.project_id, &build.branch)
+        .find_by_project_branch(&build.project_id, &request.branch)
         .await?;
     let systemd = crate::systemd::SystemdClient::connect().await?;
     for deployment in &existing {
@@ -79,6 +95,7 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
         caddy: &caddy,
         project_name: &project.name,
         build,
+        branch: &request.branch,
         branch_slug: &branch_slug,
         environment: &environment,
     };
@@ -139,19 +156,27 @@ pub async fn deploy_build(state: &AppState, build: &::entity::builds::Model) -> 
 
     deploy_result?;
 
-    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&build.branch)
-        && let Err(e) = post_pr_deployment_comment(state, &project, build, pr_number).await
+    if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&request.branch)
+        && let Err(e) = post_pr_deployment_comment(
+            state,
+            &project,
+            &request.branch,
+            &build.commit_sha,
+            pr_number,
+        )
+        .await
     {
         tracing::warn!(pr = pr_number, error = %e, "failed to post PR deployment comment");
     }
 
-    Ok(())
+    Ok(DeployOutcome::Deployed)
 }
 
 async fn post_pr_deployment_comment(
     state: &AppState,
     project: &::entity::projects::Model,
-    build: &::entity::builds::Model,
+    branch: &str,
+    commit_sha: &str,
     pr_number: u64,
 ) -> anyhow::Result<()> {
     let Some(owner) = project.owner.as_deref() else {
@@ -161,7 +186,7 @@ async fn post_pr_deployment_comment(
     let deployments = state
         .store
         .deployments()
-        .find_by_project_branch(&project.id, &build.branch)
+        .find_by_project_branch(&project.id, branch)
         .await?;
 
     if deployments.is_empty() {
@@ -180,7 +205,7 @@ async fn post_pr_deployment_comment(
     }
     body.push_str(&format!(
         "\nLast updated for commit `{}`.\n",
-        &build.commit_sha[..build.commit_sha.len().min(7)]
+        &commit_sha[..commit_sha.len().min(7)]
     ));
 
     state
@@ -200,6 +225,7 @@ async fn deploy_static_site(
         caddy,
         project_name,
         build,
+        branch,
         branch_slug,
         environment,
     } = ctx;
@@ -213,7 +239,7 @@ async fn deploy_static_site(
     let deployment_id = match state
         .store
         .deployments()
-        .find_by_project_service_branch(&build.project_id, name, &build.branch)
+        .find_by_project_service_branch(&build.project_id, name, branch)
         .await?
     {
         Some(existing) => existing.id,
@@ -259,7 +285,7 @@ async fn deploy_static_site(
         project_id: Set(build.project_id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("static".to_string()),
-        branch: Set(build.branch.clone()),
+        branch: Set(branch.to_string()),
         branch_slug: Set(branch_slug.to_string()),
         environment: Set(environment.to_string()),
         commit_sha: Set(build.commit_sha.clone()),
@@ -287,6 +313,7 @@ async fn deploy_service(
         caddy,
         project_name,
         build,
+        branch,
         branch_slug,
         environment,
     } = ctx;
@@ -358,7 +385,7 @@ async fn deploy_service(
     let deployment_id = match state
         .store
         .deployments()
-        .find_by_project_service_branch(&build.project_id, name, &build.branch)
+        .find_by_project_service_branch(&build.project_id, name, branch)
         .await?
     {
         Some(existing) => existing.id,
@@ -407,7 +434,7 @@ async fn deploy_service(
         project_id: Set(build.project_id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("service".to_string()),
-        branch: Set(build.branch.clone()),
+        branch: Set(branch.to_string()),
         branch_slug: Set(branch_slug.to_string()),
         environment: Set(environment.to_string()),
         commit_sha: Set(build.commit_sha.clone()),
