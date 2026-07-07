@@ -230,4 +230,4 @@ Some services should never run more than one instance at a time. A Discord bot, 
 scottylabs.kennel.previewDeployments = false;
 ```
 
-It defaults to `true`. When disabled, opening or updating a pull request still evaluates the config and reports `kennel/build`, but kennel skips the preview build and deploy entirely.
+It defaults to `true`. When disabled, opening or updating a pull request still builds and reports `kennel/build`, but kennel does not deploy the preview.

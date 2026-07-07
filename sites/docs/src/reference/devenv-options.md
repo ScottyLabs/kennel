@@ -167,7 +167,7 @@ Each site accepts:
 
 ### `scottylabs.kennel.previewDeployments`
 
-Deploy a preview environment for each open pull request. Disable for singleton services such as bots, where a preview would run a second instance alongside production. When disabled, pull request commits still build and report `kennel/build`, but kennel skips the preview build and deploy.
+Deploy a preview environment for each open pull request. Disable for singleton services such as bots, where a preview would run a second instance alongside production. When disabled, pull request commits still build and report `kennel/build`, but kennel does not deploy the preview.
 
 Type: `bool`, default: `true`
 

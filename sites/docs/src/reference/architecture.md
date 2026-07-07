@@ -9,9 +9,9 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 ```
 
 1. Forgejo sends a webhook to kennel's `/webhook` endpoint.
-1. Kennel parses the repository name from the payload, verifies the HMAC signature, and creates a build record.
+1. Kennel parses the repository name from the payload, verifies the HMAC signature, ensures a build record for the commit, and records a deploy request for the branch.
 1. The build worker runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
-1. The reconciler picks up the completed build, provisions resources (database, cache, storage), resolves secrets from OpenBao, starts a systemd transient unit for services, and adds a Caddy route for each deployment.
+1. For each pending deploy request whose build has finished, the reconciler reuses the build's artifacts to provision resources (database, cache, storage), resolve secrets from OpenBao, start a systemd transient unit for services, and add a Caddy route. Requests for a preview branch are skipped when the project disables `previewDeployments`.
 1. Caddy serves traffic over HTTPS with on-demand TLS.
 
 ## Delegation
@@ -45,6 +45,7 @@ A single reconciliation loop handles all deployment convergence. It runs on star
 
 The reconciler compares desired state (deployment rows in the database) against actual state (systemd units and Caddy routes) and converges:
 
+- A pending deploy request gets deployed once its build finishes.
 - A deployment row with no running unit gets its unit started.
 - A running unit with no deployment row gets stopped.
 - All Caddy routes are re-added on each pass since Caddy config is ephemeral.
@@ -52,10 +53,11 @@ The reconciler compares desired state (deployment rows in the database) against 
 
 ## State
 
-Kennel stores state in SQLite with three tables:
+Kennel stores state in SQLite with four tables:
 
 - `projects` -- registered repositories with webhook secrets
-- `builds` -- build queue and history (queued, building, built, done, failed, cancelled), plus the captured per-phase `log` of subprocess output
+- `builds` -- per-commit build queue and history (queued, building, built, failed, cancelled), plus the captured per-phase `log` of subprocess output
+- `deploy_requests` -- per-branch deploy intents naming the commit each branch wants, with status pending/deployed/skipped/failed
 - `deployments` -- active deployments with store paths, domains, unit names, and ports
 
 Runtime process state (running, stopped, failed) is owned by systemd and queried via D-Bus. Routing state is owned by Caddy and queried via the admin API. Kennel's database only tracks intent plus the historical build artifacts (logs) systemd doesn't keep.
