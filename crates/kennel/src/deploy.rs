@@ -470,7 +470,7 @@ pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str)
     }
 }
 
-async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {
+pub(crate) async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {
     let gc_root = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR).join(name);
     let output = tokio::process::Command::new("nix-store")
         .args(["--realise", store_path, "--add-root"])

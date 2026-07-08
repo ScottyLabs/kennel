@@ -262,9 +262,19 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
     )?;
 
     if let Ok(cache_name) = std::env::var("CACHIX_CACHE_NAME") {
-        let paths: Vec<&str> = output.store_paths.values().map(String::as_str).collect();
+        let mut paths: Vec<&str> = output.store_paths.values().map(String::as_str).collect();
+        if let Some(ref config_path) = output.config_store_path {
+            paths.push(config_path.as_str());
+        }
         if let Err(e) = cachix_push(&cache_name, &paths).await {
             tracing::warn!(error = %e, "cachix push failed");
+        }
+    }
+
+    if let Some(ref config_path) = output.config_store_path {
+        let gc_name = format!("{}-config", build.id);
+        if let Err(e) = crate::deploy::add_gc_root(&gc_name, config_path).await {
+            tracing::warn!(build_id = %build.id, error = %e, "failed to pin kennel-config gc root");
         }
     }
 
