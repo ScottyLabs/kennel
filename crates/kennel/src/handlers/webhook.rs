@@ -111,6 +111,8 @@ async fn teardown_branch(
         .delete_by_project_branch(&project.id, branch)
         .await;
 
+    reap_unreferenced_builds(state, &project.id).await;
+
     let deployments = state
         .store
         .deployments()
@@ -204,6 +206,7 @@ async fn enqueue_deploy(
         Some(existing) => {
             if matches!(existing.status.as_str(), "failed" | "cancelled") {
                 state.store.builds().requeue(&existing.id).await?;
+                crate::deploy::remove_build_gc_roots(&existing.id).await;
                 tracing::info!(
                     project = %project.name,
                     commit = %commit_sha,
@@ -232,27 +235,38 @@ async fn enqueue_deploy(
         .upsert(&project.id, branch, git_ref, commit_sha)
         .await?;
 
-    let referenced = state
-        .store
-        .deploy_requests()
-        .active_commits(&project.id)
-        .await?;
-    if let Ok(cancelled) = state
-        .store
-        .builds()
-        .cancel_unreferenced(&project.id, &referenced)
-        .await
-        && cancelled > 0
-    {
-        tracing::info!(
-            project = %project.name,
-            cancelled = cancelled,
-            "cancelled superseded builds"
-        );
-    }
+    reap_unreferenced_builds(state, &project.id).await;
 
     state.signal.notify_one();
     Ok(())
+}
+
+// Cancel superseded builds and reap the gc roots pinning their outputs
+async fn reap_unreferenced_builds(state: &AppState, project_id: &str) {
+    let Ok(referenced) = state
+        .store
+        .deploy_requests()
+        .active_commits(project_id)
+        .await
+    else {
+        return;
+    };
+
+    let Ok(stale) = state
+        .store
+        .builds()
+        .cancel_unreferenced(project_id, &referenced)
+        .await
+    else {
+        return;
+    };
+    for build_id in &stale {
+        crate::deploy::remove_build_gc_roots(build_id).await;
+    }
+
+    if !stale.is_empty() {
+        tracing::info!(project = %project_id, count = stale.len(), "reaped superseded build gc roots");
+    }
 }
 
 struct ParsedEvent {

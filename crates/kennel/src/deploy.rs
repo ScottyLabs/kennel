@@ -156,6 +156,9 @@ pub async fn deploy_request(
 
     deploy_result?;
 
+    // Deployments now own the store paths, so drop the build's pins
+    remove_build_gc_roots(&build.id).await;
+
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&request.branch)
         && let Err(e) = post_pr_deployment_comment(
             state,
@@ -491,6 +494,24 @@ pub async fn remove_gc_roots(deployment_id: &str) {
     let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
     let _ = tokio::fs::remove_file(dir.join(deployment_id)).await;
     let _ = tokio::fs::remove_file(dir.join(format!("{deployment_id}-config"))).await;
+}
+
+// Drop every gc root pinned for a build's outputs (named `{build_id}-*`)
+pub async fn remove_build_gc_roots(build_id: &str) {
+    let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
+    let prefix = format!("{build_id}-");
+    let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
+        return;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        if entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(prefix.as_str())
+        {
+            let _ = tokio::fs::remove_file(entry.path()).await;
+        }
+    }
 }
 
 fn generate_domain(project: &str, service: &str, branch_slug: &str, base_domain: &str) -> String {

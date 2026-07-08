@@ -122,19 +122,31 @@ impl<'a> BuildRepository<'a> {
         Ok(())
     }
 
-    /// Cancel queued builds for commits no deploy request targets anymore
+    /// Cancel queued or built builds for commits no deploy request targets
+    /// anymore and returns the built ones so their gc roots can be reaped
     pub async fn cancel_unreferenced(
         &self,
         project_id: &str,
         referenced: &[String],
-    ) -> Result<u64, DbErr> {
-        let result = Builds::update_many()
+    ) -> Result<Vec<String>, DbErr> {
+        let stale_built: Vec<String> = Builds::find()
+            .filter(builds::Column::ProjectId.eq(project_id))
+            .filter(builds::Column::Status.eq("built"))
+            .filter(builds::Column::CommitSha.is_not_in(referenced.iter().map(String::as_str)))
+            .all(self.db)
+            .await?
+            .into_iter()
+            .map(|b| b.id)
+            .collect();
+
+        Builds::update_many()
             .col_expr(builds::Column::Status, Expr::value("cancelled"))
             .filter(builds::Column::ProjectId.eq(project_id))
-            .filter(builds::Column::Status.eq("queued"))
+            .filter(builds::Column::Status.is_in(["queued", "built"]))
             .filter(builds::Column::CommitSha.is_not_in(referenced.iter().map(String::as_str)))
             .exec(self.db)
             .await?;
-        Ok(result.rows_affected)
+
+        Ok(stale_built)
     }
 }
