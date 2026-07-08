@@ -163,6 +163,12 @@ outputs = { nixpkgs, scottylabs, ... }:
 
 A Deno or JavaScript front-end uses `buildDenoTask` the same way.
 
+A browser front-end (Vite, Svelte) also needs a root `deno.json` that excludes its directory, so the `deno check` hook skips it instead of failing on browser code. `svelte-check` type-checks the front-end.
+
+```json
+{ "exclude": ["sites/web"] }
+```
+
 Kennel builds each package with `nix build .#packages.{system}.{name}`.
 
 ### Runtime environment

@@ -50,7 +50,7 @@ Type: `listOf package`, default: `[ ]`
 
 ### `scottylabs.deno.enable`
 
-Enable the Deno/JavaScript development toolchain. Adds [Deno](https://deno.com), [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (with `--deny all`), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on every commit.
+Enable the Deno/JavaScript development toolchain. Adds [Deno](https://deno.com), [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (denying the `correctness`, `suspicious`, `pedantic`, and `perf` categories), [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on every commit.
 
 Type: `bool`, default: `false`
 
@@ -65,6 +65,12 @@ Type: `bool`, default: `false`
 Add the [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check) pre-commit hook.
 
 Type: `bool`, default: `false`
+
+### `scottylabs.deno.svelte.dir`
+
+The SvelteKit app directory, relative to the project root. When `svelte.enable` is set, `deno install` and `svelte-kit sync` run here on shell entry so `svelte-check` has `node_modules` and the generated `.svelte-kit` types available.
+
+Type: `str`, default: `"."`
 
 ## `scottylabs.python`
 
