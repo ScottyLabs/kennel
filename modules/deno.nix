@@ -21,7 +21,14 @@ in
   options.scottylabs.deno = {
     enable = lib.mkEnableOption "Deno/JavaScript development toolchain";
     react.enable = lib.mkEnableOption "Adds react + jsx-a11y plugins for oxlint";
-    svelte.enable = lib.mkEnableOption "Adds svelte-check pre-commit hook";
+    svelte = {
+      enable = lib.mkEnableOption "Adds svelte-check pre-commit hook";
+      dir = lib.mkOption {
+        type = lib.types.str;
+        default = ".";
+        description = "SvelteKit app directory, relative to the project root";
+      };
+    };
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
@@ -35,6 +42,10 @@ in
       ++ lib.optional cfg.svelte.enable svelte-check;
 
     env.DENO_DIR = "${config.devenv.root}/.devenv/state/deno";
+
+    enterShell = lib.mkIf cfg.svelte.enable ''
+      (cd ${cfg.svelte.dir} && deno install && deno run -A npm:@sveltejs/kit/svelte-kit sync)
+    '';
 
     treefmt.config.programs.oxfmt = {
       enable = true;
@@ -52,6 +63,7 @@ in
             "pedantic"
             "perf"
           ];
+          typeAware = true;
         };
       };
       svelte-check = lib.mkIf cfg.svelte.enable {
