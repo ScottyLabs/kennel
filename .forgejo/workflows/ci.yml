@@ -42,8 +42,8 @@ jobs:
         uses: https://github.com/Swatinem/rust-cache@v2
         with:
           cmd-format: "devenv shell {0}"
-      - name: Run hooks
-        run: devenv shell -- pre-commit run --all-files
+      - name: Run checks
+        run: devenv shell -- prek run --all-files
       - name: Build
         run: |
           config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')
