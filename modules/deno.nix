@@ -64,6 +64,7 @@ in
             "perf"
           ];
           typeAware = true;
+          allow = [ "prefer-readonly-parameter-types" ];
         };
       };
       svelte-check = lib.mkIf cfg.svelte.enable {
