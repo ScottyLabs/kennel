@@ -13,14 +13,12 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
-      - name: Install Lix
-        uses: https://github.com/samueldr/lix-gha-installer-action@v2026-06-15
+      - name: Install Nix
+        uses: https://github.com/cachix/install-nix-action@v31
         with:
           extra_nix_config: |
             extra-substituters = https://scottylabs.cachix.org
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
-            # The CI container forbids user namespaces so builds cannot sandbox
-            sandbox = false
       - name: Install devenv
         run: nix profile install nixpkgs#devenv
       # .devenv/state/target is handled by Swatinem/rust-cache below
