@@ -19,8 +19,8 @@ jobs:
           extra_nix_config: |
             extra-substituters = https://scottylabs.cachix.org
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
-            # Lix's remote build-hook crashes in the CI container and we use no remote builders
-            builders =
+            # The CI container forbids user namespaces so builds cannot sandbox
+            sandbox = false
       - name: Install devenv
         run: nix profile install nixpkgs#devenv
       # .devenv/state/target is handled by Swatinem/rust-cache below
