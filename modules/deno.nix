@@ -47,8 +47,10 @@ in
         settings = {
           plugins = oxlintPlugins;
           deny = [
-            "all"
-            "nursery"
+            "correctness"
+            "suspicious"
+            "pedantic"
+            "perf"
           ];
         };
       };
@@ -62,15 +64,15 @@ in
       deno-check = {
         enable = true;
         name = "deno-check";
-        entry = "deno check .";
+        entry = "deno check";
         files = "\\.(ts|tsx|mts|cts)$";
-        pass_filenames = false;
+        pass_filenames = true;
         language = "system";
       };
       deno-test = {
         enable = true;
         name = "deno-test";
-        entry = "deno test";
+        entry = "deno test --ignore=.devenv,.direnv --permit-no-files";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$";
         pass_filenames = false;
         language = "system";
