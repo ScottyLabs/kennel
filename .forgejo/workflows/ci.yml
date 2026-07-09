@@ -21,7 +21,7 @@ jobs:
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
             accept-flake-config = true
       - name: Install devenv
-        run: nix profile install nixpkgs#devenv
+        run: nix profile add nixpkgs#devenv
       - name: Clean stale build home
         run: rm -rf /homeless-shelter
       # .devenv/state/target is handled by Swatinem/rust-cache below
@@ -65,7 +65,7 @@ jobs:
             extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
             accept-flake-config = true
       - name: Install devenv
-        run: nix profile install nixpkgs#devenv
+        run: nix profile add nixpkgs#devenv
       - name: Clean stale build home
         run: rm -rf /homeless-shelter
       - name: Cache devenv state
