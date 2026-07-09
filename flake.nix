@@ -9,7 +9,7 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     devenv.url = "github:cachix/devenv";
     scottylabs = {
       url = "git+https://codeberg.org/ScottyLabs/devenv";

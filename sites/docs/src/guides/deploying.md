@@ -18,8 +18,13 @@ secretspec:
   profile: dev
 
 inputs:
+  nixpkgs:
+    url: github:nixos/nixpkgs/nixos-unstable
   scottylabs:
     url: git+https://codeberg.org/ScottyLabs/devenv
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:
@@ -33,6 +38,8 @@ inputs:
       nixpkgs:
         follows: nixpkgs
 ```
+
+This `nixpkgs` pin must match the one in `flake.nix` below, so the shell and the build resolve identical packages.
 
 Import it in your `devenv.nix`:
 
@@ -134,7 +141,7 @@ Your `flake.nix` must expose these packages, and their names must match the keys
 
 ```nix
 inputs = {
-  nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+  nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   scottylabs = {
     url = "git+https://codeberg.org/ScottyLabs/devenv";
     inputs.nixpkgs.follows = "nixpkgs";
@@ -160,6 +167,8 @@ outputs = { nixpkgs, scottylabs, ... }:
     );
   };
 ```
+
+This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages.
 
 A Deno or JavaScript front-end uses `buildDenoTask` the same way.
 
