@@ -1,4 +1,5 @@
 name: CI
+
 on:
   push:
     branches: [main, staging, dev]
@@ -6,33 +7,5 @@ on:
 
 jobs:
   check:
-    runs-on: docker
-    steps:
-      - uses: https://code.forgejo.org/actions/checkout@v4
-
-      - name: Install Nix
-        uses: https://github.com/DeterminateSystems/nix-installer-action@main
-        with:
-          extra-conf: |
-            extra-substituters = https://scottylabs.cachix.org
-            extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
-
-      - name: Install devenv
-        run: nix profile add nixpkgs#devenv
-
-      - name: Cache Rust
-        uses: https://github.com/Swatinem/rust-cache@v2
-        with:
-          cmd-format: "devenv shell {0}"
-
-      - name: Check formatting
-        run: devenv shell treefmt --fail-on-change
-
-      - name: Clippy
-        run: devenv shell cargo clippy -- -D warnings
-
-      - name: Test
-        run: devenv shell cargo test
-
-      - name: Build
-        run: nix build
+    uses: ScottyLabs/devenv/.forgejo/workflows/ci.yml@main
+    secrets: inherit
