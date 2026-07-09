@@ -37,7 +37,11 @@ in
         }
       );
       default = { };
-      description = "Backend services deployed by kennel. Keys must match devenv process names.";
+      description = ''
+        Backend services deployed by kennel. Each key must match a devenv
+        process name. Kennel builds the corresponding flake package and deploys
+        it as a systemd transient unit.
+      '';
     };
 
     sites = lib.mkOption {
@@ -59,19 +63,28 @@ in
         }
       );
       default = { };
-      description = "Static sites deployed by kennel";
+      description = ''
+        Static sites deployed by kennel. Each key names a site. Kennel builds
+        the corresponding flake package and serves it via Caddy's file server.
+      '';
     };
 
     previewDeployments = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Deploy a preview environment for each open pull request. Disable for singleton services such as bots.";
+      description = ''
+        Deploy a preview environment for each open pull request. Disable for
+        singleton services such as bots, where a preview would run a second
+        instance alongside production. When disabled, pull request commits
+        still build and report `kennel/build`, but kennel does not deploy the
+        preview.
+      '';
     };
 
     config = lib.mkOption {
       type = lib.types.package;
       readOnly = true;
-      description = "Generated kennel.json derivation for the builder to evaluate";
+      description = "The generated `kennel.json` derivation that the kennel builder evaluates at build time";
     };
   };
 

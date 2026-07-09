@@ -19,14 +19,53 @@ let
 in
 {
   options.scottylabs.deno = {
-    enable = lib.mkEnableOption "Deno/JavaScript development toolchain";
-    react.enable = lib.mkEnableOption "Adds react + jsx-a11y plugins for oxlint";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the Deno/JavaScript development toolchain. Adds
+        [Deno](https://deno.com),
+        [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (denying the
+        `correctness`, `suspicious`, `pedantic`, and `perf` categories),
+        [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and
+        [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for
+        `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on
+        every commit.
+      '';
+    };
+
+    react.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Add the
+        [`react`](https://oxc.rs/docs/guide/usage/linter/plugins#react-plugin)
+        and
+        [`jsx-a11y`](https://oxc.rs/docs/guide/usage/linter/plugins#jsx-a11y-plugin)
+        plugins to oxlint.
+      '';
+    };
+
     svelte = {
-      enable = lib.mkEnableOption "Adds svelte-check pre-commit hook";
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Add the
+          [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check)
+          pre-commit hook.
+        '';
+      };
+
       dir = lib.mkOption {
         type = lib.types.str;
         default = ".";
-        description = "SvelteKit app directory, relative to the project root";
+        description = ''
+          The SvelteKit app directory, relative to the project root. When
+          `svelte.enable` is set, `deno install` and `svelte-kit sync` run here
+          on shell entry so `svelte-check` has `node_modules` and the generated
+          `.svelte-kit` types available.
+        '';
       };
     };
   };

@@ -12,7 +12,18 @@ let
 in
 {
   options.scottylabs.python = {
-    enable = lib.mkEnableOption "Python development toolchain (uv, ruff, ty)";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the Python development toolchain. Manages a virtual environment
+        with [uv](https://docs.astral.sh/uv/) (running `uv sync` on shell entry
+        once a `pyproject.toml` exists), adds [ruff](https://docs.astral.sh/ruff/)
+        (lint pre-commit hook, formatting via treefmt's `ruff-format`) and
+        [ty](https://github.com/astral-sh/ty) (type-check pre-commit hook) on
+        `PATH`.
+      '';
+    };
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {

@@ -11,12 +11,30 @@ let
 in
 {
   options.scottylabs.rust = {
-    enable = lib.mkEnableOption "Rust development toolchain";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the Rust development toolchain. Configures nightly Rust with
+        [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift) (fast
+        debug-mode codegen), clippy, rustfmt,
+        [wild](https://github.com/davidlattimore/wild)/lld linker, and
+        [sccache](https://github.com/mozilla/sccache) backed by the org's S3
+        cache. Sets `CARGO_TARGET_DIR` to `.devenv/state/target`. Clippy and
+        `cargo test` run on every commit.
+      '';
+    };
 
     nativeBuildInputs = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       default = [ ];
-      description = "Extra native build inputs (e.g. pkg-config, openssl for crates that link C libraries)";
+      description = ''
+        Extra packages for crates that link C libraries (e.g.
+        `[ pkgs.pkg-config pkgs.openssl ]`). Prefer `rustls` over `native-tls`
+        for TLS (e.g.
+        `reqwest = { default-features = false, features = ["rustls-tls"] }`) to
+        avoid needing OpenSSL.
+      '';
     };
 
     cranelift.excludePackages = lib.mkOption {
@@ -26,7 +44,11 @@ in
         "aws-lc-rs"
         "rustls"
       ];
-      description = "Crate names forced to LLVM backend when using cranelift";
+      description = ''
+        Crate names forced to the LLVM backend instead of cranelift. Some
+        crates use features that cranelift does not support (FFI symbol
+        emission, linker sections).
+      '';
     };
   };
 

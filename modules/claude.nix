@@ -8,7 +8,10 @@ in
     enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable Claude Code integration";
+      description = ''
+        Enable Claude Code integration. Generates the `.mcp.json` configuration
+        with the devenv MCP server.
+      '';
     };
   };
 

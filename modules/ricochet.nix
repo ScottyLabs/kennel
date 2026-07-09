@@ -13,11 +13,28 @@ let
 in
 {
   options.scottylabs.ricochet = {
-    enable = lib.mkEnableOption "Local OAuth relay for development";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Run a local OAuth relay on `127.0.0.1:8090` for development, the
+        loopback callback the `dev` Keycloak client is registered against.
+        Enable it alongside `oidc_client` to complete an OAuth flow locally the
+        way production does: the IdP redirects to the relay, which forwards the
+        authorization code on to your service's own callback.
+      '';
+    };
 
     appUrl = lib.mkOption {
       type = lib.types.str;
-      description = "Public URL of this service in development, exported as APP_URL";
+      description = ''
+        Public URL the service is reached at in local development, exported as
+        `APP_URL` so it can build OAuth redirect targets and absolute links.
+        This is the development value only; deployed environments receive
+        `APP_URL` from kennel, derived from the deployment domain (see
+        [Deploying a Project](../guides/deploying.md#runtime-environment)), so
+        it is never declared in `secretspec.toml`.
+      '';
     };
   };
 

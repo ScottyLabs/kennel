@@ -11,7 +11,15 @@ let
 in
 {
   options.scottylabs.sqlite = {
-    enable = lib.mkEnableOption "SQLite for local development";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable SQLite for local development. Adds the `sqlite` package and
+        exports `DATABASE_PATH` pointing to a database file in the devenv state
+        directory.
+      '';
+    };
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {

@@ -6,18 +6,29 @@ let
 in
 {
   options.scottylabs.garage = {
-    enable = lib.mkEnableOption "Garage with ScottyLabs defaults";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable a local [Garage](https://garagehq.deuxfleurs.fr/) S3 instance
+        for development. Creates a bucket named after `scottylabs.project.name`
+        and exports `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`,
+        `S3_SECRET_KEY`, and `S3_BUCKET` into the shell environment.
+      '';
+    };
 
     accessKey = lib.mkOption {
       type = lib.types.str;
       default = projectName;
-      description = "S3 access key";
+      defaultText = lib.literalExpression "config.scottylabs.project.name";
+      description = "S3 access key for the project bucket";
     };
 
     secretKey = lib.mkOption {
       type = lib.types.str;
       default = "${projectName}admin";
-      description = "S3 secret key";
+      defaultText = lib.literalExpression ''"''${config.scottylabs.project.name}admin"'';
+      description = "S3 secret key for the project bucket";
     };
   };
 

@@ -25,17 +25,31 @@ in
   ];
 
   options.scottylabs = {
-    enable = lib.mkEnableOption "ScottyLabs shared development configuration";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable the shared ScottyLabs development configuration. Required for all
+        other `scottylabs.*` options to take effect. Also installs always-on
+        hooks: two that refresh and stage `flake.lock` (`nix flake update`) and
+        `devenv.lock` (`devenv update`) on every commit, and one that rejects
+        commits carrying AI tool co-author trailers.
+      '';
+    };
 
     project.name = lib.mkOption {
       type = lib.types.str;
-      description = "Project name, used for database naming, log filtering, and secrets path";
+      description = "Used for database naming, log filtering, and secrets path resolution";
     };
 
     conventionalCommits.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enforce Conventional Commits via the commitizen git hook";
+      description = ''
+        Enforce [Conventional Commits](https://www.conventionalcommits.org/) on
+        `git commit` via the commitizen git hook. Commit messages that do not
+        match the conventional format are rejected at commit time.
+      '';
     };
   };
 

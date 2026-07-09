@@ -47,12 +47,12 @@
         "aarch64-darwin"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-    in
-    {
-      devenvModules.default = { pkgs, ... }: {
-        imports = [ ./modules ];
-        _module.args.ricochet = ricochet.packages.${pkgs.system}.ricochet;
-      };
+      devenvModules.default =
+        { pkgs, ... }:
+        {
+          imports = [ ./modules ];
+          _module.args.ricochet = ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
+        };
 
       # build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {
@@ -74,7 +74,20 @@
           pkgs.runCommand name { nativeBuildInputs = [ pkgs.mdbook ]; } ''
             mdbook build ${src} --dest-dir "$out"
           '';
+        buildOptionsDoc = import ./lib/options-doc.nix { inherit pkgs; };
       };
+    in
+    {
+      inherit devenvModules mkLib;
+
+      packages = forAllSystems (pkgs: {
+        options-doc = (mkLib pkgs).buildOptionsDoc {
+          module = devenvModules.default;
+          subtree = options: options.scottylabs;
+          root = ./.;
+          repoUrl = "https://codeberg.org/ScottyLabs/devenv/src/branch/main";
+        };
+      });
 
       # This authenticates to OpenBao and stores CACHIX_AUTH_TOKEN in
       # ~/.config/cachix/cachix.dhall. cachix could read directly from

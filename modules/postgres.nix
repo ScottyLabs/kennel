@@ -11,11 +11,20 @@ let
 in
 {
   options.scottylabs.postgres = {
-    enable = lib.mkEnableOption "PostgreSQL with ScottyLabs defaults";
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable a local PostgreSQL 18 instance with Unix socket access. Creates
+        an initial database named after `scottylabs.project.name` and exports
+        `DATABASE_URL` into the shell environment.
+      '';
+    };
 
     extensions = lib.mkOption {
       type = lib.types.functionTo (lib.types.listOf lib.types.package);
       default = e: [ e.pg_uuidv7 ];
+      defaultText = lib.literalExpression "e: [ e.pg_uuidv7 ]";
       description = "PostgreSQL extensions as a function of the extensions set";
     };
   };
