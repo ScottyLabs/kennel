@@ -62,7 +62,7 @@ in
     treefmt = {
       enable = true;
       config.programs = {
-        nixpkgs-fmt.enable = true;
+        nixfmt.enable = true;
         mdformat.enable = true;
       };
     };
