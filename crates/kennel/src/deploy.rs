@@ -249,9 +249,6 @@ async fn deploy_static_site(
         None => uuid::Uuid::now_v7().to_string(),
     };
 
-    // Pin the store path against nix-gc before anything references it
-    add_gc_root(&deployment_id, store_path).await?;
-
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(&build.project_id)
         .join(branch_slug);
@@ -282,6 +279,9 @@ async fn deploy_static_site(
             .await?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
+
+    // Pin the store path against nix-gc once the deployment is live
+    add_gc_root(&deployment_id, store_path).await?;
 
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
@@ -395,12 +395,6 @@ async fn deploy_service(
         None => uuid::Uuid::now_v7().to_string(),
     };
 
-    // Pin the store paths against nix-gc before anything references them
-    add_gc_root(&deployment_id, store_path).await?;
-    if let Some(ref config_store_path) = build.config_store_path {
-        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
-    }
-
     let systemd = crate::systemd::SystemdClient::connect().await?;
     systemd
         .start_transient_unit(
@@ -418,6 +412,12 @@ async fn deploy_service(
         tracing::error!(service = %name, port, "healthcheck failed, stopping unit");
         let _ = systemd.stop_unit(&unit_name).await;
         anyhow::bail!("service '{name}' failed healthcheck within startup grace period");
+    }
+
+    // Pin the store paths against nix-gc once the deployment is healthy
+    add_gc_root(&deployment_id, store_path).await?;
+    if let Some(ref config_store_path) = build.config_store_path {
+        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
     }
 
     let route_id = format!("kennel-{deployment_id}");
