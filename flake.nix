@@ -18,10 +18,11 @@
   };
 
   outputs =
-    { nixpkgs
-    , devenv
-    , scottylabs
-    , ...
+    {
+      nixpkgs,
+      devenv,
+      scottylabs,
+      ...
     }:
     let
       supportedSystems = [
@@ -46,13 +47,16 @@
             buildArgs.cargoExtraArgs = "-p kennel";
           };
 
+          docsGen = import ./sites/docs/generate.nix { inherit pkgs scottylabs; };
+
           docs = (scottylabs.mkLib pkgs).buildMdbook {
-            src = ./sites/docs;
+            src = docsGen.src;
             name = "kennel-docs";
           };
         in
         {
           inherit kennel docs;
+          docs-options = docsGen.generated;
           default = kennel;
           devenv = devenv.packages.${system}.devenv;
         }

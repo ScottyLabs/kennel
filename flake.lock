@@ -772,11 +772,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1783549212,
-        "narHash": "sha256-JDG+BkpgJjqUHzHnHIZ74t0UaE6OElq4BOGhBNouPEU=",
+        "lastModified": 1783586616,
+        "narHash": "sha256-ZYrod//4HgXMk+qc7ze9RcPTRA7C+kdM8QZimhxQjmc=",
         "ref": "refs/heads/main",
-        "rev": "c77f2aabd9b88ae1c26293af186a2fcc1b8d4a1c",
-        "revCount": 69,
+        "rev": "b63d285ce16342fcb6fbd9d67efee3d8648b85e8",
+        "revCount": 71,
         "type": "git",
         "url": "https://codeberg.org/ScottyLabs/devenv"
       },

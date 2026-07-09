@@ -30,7 +30,10 @@
     migration.exec = ''sea-orm-cli migrate generate "$1" -d crates/migration'';
     migrate.exec = ''DATABASE_URL="sqlite://.devenv/state/kennel.db?mode=rwc" sea-orm-cli migrate up -d crates/migration'';
     generate-entities.exec = ''DATABASE_URL="sqlite://.devenv/state/kennel.db" sea-orm-cli generate entity -o crates/entity/src --with-serde both --lib'';
-    docs.exec = "cd sites/docs && mdbook serve";
+    docs.exec = ''
+      nix build .#docs-options --out-link sites/docs/src/reference/generated
+      cd sites/docs && mdbook serve
+    '';
     clean.exec = "rm -rf .devenv/state";
   };
 }

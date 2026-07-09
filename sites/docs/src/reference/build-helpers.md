@@ -181,3 +181,40 @@ Type: `str`, default: `"docs"`
   name = "kennel-docs";
 }
 ```
+
+## `buildOptionsDoc`
+
+Renders a module set's option declarations to a CommonMark reference with nixpkgs' `nixosOptionsDoc`, producing a single markdown file listing every option with its description, type, default, and a link to the declaring module. Both options reference pages in these docs are generated with it. Only declarations are evaluated, never the merged config, so an option whose `default` reads other config must set `defaultText`. Every documented option must have a `description`, or the build fails.
+
+### `module`
+
+Module (or import path) declaring the options.
+
+Type: `module`, required
+
+### `subtree`
+
+Selects the options to document from the evaluated options tree.
+
+Type: `function`, required
+
+### `root`
+
+Repo root. Declaration paths under it become source links relative to it.
+
+Type: `path`, required
+
+### `repoUrl`
+
+Source browser base URL the declaration links point to.
+
+Type: `str`, required
+
+```nix
+(scottylabs.mkLib pkgs).buildOptionsDoc {
+  module = ./nixos;
+  subtree = options: options.services.kennel;
+  root = ./.;
+  repoUrl = "https://codeberg.org/ScottyLabs/kennel/src/branch/main";
+}
+```

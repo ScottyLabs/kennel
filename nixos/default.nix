@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 with lib;
 
@@ -18,12 +23,19 @@ in
 
     devenvPackage = mkOption {
       type = types.package;
-      description = "The devenv package for evaluating project configs";
+      description = ''
+        The devenv package. The build worker uses `devenv build` to evaluate
+        project kennel configs from their `devenv.nix`.
+      '';
     };
 
     webhookSecretFile = mkOption {
       type = types.path;
-      description = "Path to file containing the webhook HMAC secret shared across all projects";
+      description = ''
+        Path to a file containing the HMAC secret used to verify all incoming
+        webhooks. This is a single secret shared across all projects,
+        provisioned by governance.
+      '';
     };
 
     api = {
@@ -44,20 +56,53 @@ in
       ephemeral = mkOption {
         type = types.str;
         default = "scottylabs.net";
-        description = "Base domain for auto-generated deployment URLs";
+        description = ''
+          Base domain for auto-generated deployment URLs. A wildcard DNS
+          record should point `*.{domain}` to the kennel server.
+        '';
       };
 
       cloudflare = {
         zones = mkOption {
           type = types.attrsOf types.str;
           default = { };
-          description = "Map of domain names to Cloudflare zone IDs for custom domain DNS";
+          description = ''
+            Map of domain names to Cloudflare zone IDs. When this is
+            non-empty, `publicIp` is set, and the `CLOUDFLARE_API_TOKEN`
+            environment variable is provided (typically via the
+            `environmentFile` secret), kennel automatically manages A records
+            for any custom domain whose suffix matches one of the configured
+            zones. The most specific zone wins for nested domains.
+
+            The token must have `Zone:DNS:Edit` permission on the zones
+            listed.
+
+            Records are upserted on deploy and on each reconciliation pass
+            (so they self-heal if pruned externally). Records are deleted
+            only when kennel tears the deployment down, which happens in
+            three cases:
+
+            1. The branch backing the deployment is deleted from the source
+               repo (push event with deleted=true on that ref).
+            2. The deployment is associated with a pull request and that
+               pull request is closed.
+            3. The deployment is on a `dev` or `preview` branch and exceeds
+               `DEPLOYMENT_EXPIRY_DAYS` since its last update during a
+               reconciliation pass.
+
+            Production deployments are not subject to expiry, so a record for
+            a production custom domain stays in place until the project's
+            main branch is deleted or the deployment row is removed manually.
+          '';
         };
 
         publicIp = mkOption {
           type = types.nullOr types.str;
           default = null;
-          description = "Public IPv4 to use as the A record content for managed custom domains";
+          description = ''
+            Public IPv4 used as the content of the A records that kennel
+            creates for custom domains. Required to enable DNS automation.
+          '';
         };
       };
     };
@@ -65,7 +110,11 @@ in
     domain = mkOption {
       type = types.str;
       default = "kennel.scottylabs.org";
-      description = "Public domain for the kennel API and webhook endpoint";
+      description = ''
+        Public domain for the kennel API and webhook endpoint. The module
+        configures a Caddy virtualhost with automatic TLS for this domain,
+        reverse-proxying to the API server.
+      '';
     };
 
     grafanaUrl = mkOption {
@@ -84,14 +133,17 @@ in
       type = types.nullOr types.str;
       default = null;
       example = "/run/kennel/custom-domains";
-      description = "File to write the served custom domains to, one per line";
+      description = ''
+        Writes the custom domains of all live deployments to this path, one
+        per line, refreshed on each reconciliation pass. Unset disables it.
+      '';
     };
 
     builder = {
       maxConcurrentBuilds = mkOption {
         type = types.int;
         default = 2;
-        description = "Maximum concurrent builds";
+        description = "Maximum number of concurrent nix builds";
       };
 
       workDir = mkOption {
@@ -101,7 +153,7 @@ in
       };
 
       cachix = {
-        enable = mkEnableOption "Cachix binary cache push";
+        enable = mkEnableOption "pushing build artifacts to a Cachix binary cache";
 
         cacheName = mkOption {
           type = types.nullOr types.str;
@@ -113,7 +165,15 @@ in
 
     resources = {
       postgres = {
-        enable = mkEnableOption "PostgreSQL resource provisioning";
+        enable = mkOption {
+          type = types.bool;
+          default = false;
+          description = ''
+            Whether to enable PostgreSQL resource provisioning. Kennel
+            creates a database per deployment using the specified socket
+            directory for peer authentication.
+          '';
+        };
         socketDir = mkOption {
           type = types.path;
           default = "/run/postgresql";
@@ -122,7 +182,14 @@ in
       };
 
       valkey = {
-        enable = mkEnableOption "Valkey resource provisioning";
+        enable = mkOption {
+          type = types.bool;
+          default = false;
+          description = ''
+            Whether to enable Valkey resource provisioning. Kennel allocates
+            a DB number per deployment from the shared instance.
+          '';
+        };
         socketPath = mkOption {
           type = types.path;
           default = "/run/valkey/valkey.sock";
@@ -131,7 +198,15 @@ in
       };
 
       garage = {
-        enable = mkEnableOption "Garage S3 resource provisioning";
+        enable = mkOption {
+          type = types.bool;
+          default = false;
+          description = ''
+            Whether to enable Garage S3 resource provisioning. Kennel creates
+            a bucket and API key per deployment. Requires
+            `GARAGE_ADMIN_TOKEN` in the environment file.
+          '';
+        };
         adminEndpoint = mkOption {
           type = types.str;
           default = "http://localhost:3903";
@@ -146,7 +221,7 @@ in
     };
 
     secrets = {
-      enable = mkEnableOption "secretspec/OpenBao secret resolution";
+      enable = mkEnableOption "secretspec/OpenBao secret resolution at deploy time";
       vaultEndpoint = mkOption {
         type = types.str;
         default = "vault://secrets2.scottylabs.org/secret?auth=approle";
@@ -164,9 +239,10 @@ in
       apiTokenFile = mkOption {
         type = types.path;
         description = ''
-          Path to file containing a Forgejo API token. The token requires
-          the `write:issue` scope so kennel can post and update deployment
-          comments on pull requests. Required.
+          Path to a file containing a Forgejo API token with the
+          `write:issue` scope. Kennel uses it to post and update a sticky
+          comment on each pull request listing its deployment URLs, and to
+          mark the comment torn down when the pull request is closed.
         '';
       };
     };
@@ -186,7 +262,11 @@ in
     environmentFile = mkOption {
       type = types.nullOr types.path;
       default = null;
-      description = "Path to environment file with secrets";
+      description = ''
+        Path to an environment file containing secrets like `VAULT_TOKEN`,
+        `CACHIX_AUTH_TOKEN`, and `GARAGE_ADMIN_TOKEN`. Loaded by systemd
+        before the service starts.
+      '';
     };
   };
 
@@ -230,13 +310,23 @@ in
 
     systemd.services.kennel = {
       description = "Kennel deployment platform";
-      after = [ "network.target" "caddy.service" ];
+      after = [
+        "network.target"
+        "caddy.service"
+      ];
       wants = [ "caddy.service" ];
       wantedBy = [ "multi-user.target" ];
 
-      path = [ cfg.devenvPackage ] ++ (with pkgs; [ git nix cachix ])
-        ++ optional cfg.resources.postgres.enable pkgs.postgresql
-        ++ optional cfg.resources.valkey.enable pkgs.valkey;
+      path = [
+        cfg.devenvPackage
+      ]
+      ++ (with pkgs; [
+        git
+        nix
+        cachix
+      ])
+      ++ optional cfg.resources.postgres.enable pkgs.postgresql
+      ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
       environment = {
         HOME = "/var/lib/kennel";
@@ -251,27 +341,31 @@ in
         WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
         FORGEJO_API_URL = cfg.forgejo.apiUrl;
         FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
-      } // optionalAttrs cfg.builder.cachix.enable {
+      }
+      // optionalAttrs cfg.builder.cachix.enable {
         CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
-      } // optionalAttrs cfg.resources.postgres.enable {
+      }
+      // optionalAttrs cfg.resources.postgres.enable {
         POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
-      } // optionalAttrs cfg.resources.valkey.enable {
+      }
+      // optionalAttrs cfg.resources.valkey.enable {
         VALKEY_SOCKET_PATH = cfg.resources.valkey.socketPath;
-      } // optionalAttrs cfg.resources.garage.enable {
+      }
+      // optionalAttrs cfg.resources.garage.enable {
         GARAGE_ADMIN_ENDPOINT = cfg.resources.garage.adminEndpoint;
         GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
-      } // optionalAttrs cfg.secrets.enable {
+      }
+      // optionalAttrs cfg.secrets.enable {
         VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
-      } // optionalAttrs
-        (cfg.domains.cloudflare.publicIp != null
-          && cfg.domains.cloudflare.zones != { })
-        {
-          CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
-          KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
-        }
+      }
+      // optionalAttrs (cfg.domains.cloudflare.publicIp != null && cfg.domains.cloudflare.zones != { }) {
+        CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
+        KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
+      }
       // optionalAttrs (cfg.customDomainsFile != null) {
         CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
-      } // optionalAttrs (cfg.grafanaUrl != null) {
+      }
+      // optionalAttrs (cfg.grafanaUrl != null) {
         GRAFANA_URL = cfg.grafanaUrl;
       };
 
@@ -290,7 +384,8 @@ in
           "/var/lib/kennel"
           "/run/kennel"
           "/nix/var/nix/gcroots/kennel"
-        ] ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
+        ]
+        ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
         ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
 
         Delegate = "yes";
@@ -321,7 +416,10 @@ in
     };
 
     networking.firewall = {
-      allowedTCPPorts = [ 443 80 ];
+      allowedTCPPorts = [
+        443
+        80
+      ];
     };
 
     nix.settings = {

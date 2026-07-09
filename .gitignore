@@ -22,3 +22,4 @@ rustc-ice-*.txt
 
 # Build
 sites/docs/book/
+sites/docs/src/reference/generated
