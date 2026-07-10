@@ -38,6 +38,12 @@ Package version. When unset, it is read from the `version` field of `Cargo.toml`
 
 Type: `nullOr str`, default: `null`
 
+### `paths`
+
+Scopes `src` to just these workspace-member paths plus `Cargo.toml`/`Cargo.lock`, so changes elsewhere in the workspace don't invalidate the build.
+
+Type: `nullOr (listOf str)`, default: `null`
+
 ### `nativeBuildInputs`
 
 Build-time tools, applied to both the dependency build and the final build. For example `pkg-config` or `makeWrapper`.
