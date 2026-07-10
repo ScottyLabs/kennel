@@ -20,8 +20,10 @@ in
         debug-mode codegen), clippy, rustfmt,
         [wild](https://github.com/davidlattimore/wild)/lld linker, and
         [sccache](https://github.com/mozilla/sccache) backed by the org's S3
-        cache. Sets `CARGO_TARGET_DIR` to `.devenv/state/target`. Clippy and
-        `cargo test` run on every commit.
+        cache. Sets `CARGO_TARGET_DIR` to `.devenv/state/target`. Clippy,
+        `cargo test`, and
+        [cargo-machete](https://github.com/bnjbvr/cargo-machete) (unused
+        dependencies) run on every commit.
       '';
     };
 
@@ -111,6 +113,14 @@ in
         name = "cargo-test";
         entry = "cargo test";
         files = "\\.(rs|toml)$";
+        pass_filenames = false;
+        language = "system";
+      };
+      cargo-machete = {
+        enable = true;
+        name = "cargo-machete";
+        entry = "${pkgs.cargo-machete}/bin/cargo-machete";
+        files = "Cargo\\.toml$";
         pass_filenames = false;
         language = "system";
       };

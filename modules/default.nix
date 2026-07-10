@@ -32,8 +32,10 @@ in
         Enable the shared ScottyLabs development configuration. Required for all
         other `scottylabs.*` options to take effect. Also installs always-on
         hooks: two that refresh and stage `flake.lock` (`nix flake update`) and
-        `devenv.lock` (`devenv update`) on every commit, and one that rejects
-        commits carrying AI tool co-author trailers.
+        `devenv.lock` (`devenv update`) on every commit, one that rejects
+        commits carrying AI tool co-author trailers, and one that scans staged
+        changes for secrets via
+        [gitleaks](https://github.com/gitleaks/gitleaks).
       '';
     };
 
@@ -70,6 +72,14 @@ in
     git-hooks.hooks = {
       treefmt.enable = true;
       commitizen.enable = cfg.conventionalCommits.enable;
+
+      gitleaks = {
+        enable = true;
+        name = "gitleaks";
+        entry = "${pkgs.gitleaks}/bin/gitleaks git --pre-commit --staged --redact";
+        pass_filenames = false;
+        language = "system";
+      };
 
       block-ai-coauthors = {
         enable = true;
