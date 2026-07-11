@@ -21,6 +21,7 @@ in
     ./postgres.nix
     ./sqlite.nix
     ./secrets.nix
+    ./security.nix
     ./valkey.nix
   ];
 

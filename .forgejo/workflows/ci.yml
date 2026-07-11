@@ -49,6 +49,8 @@ jobs:
         run: rm -rf /homeless-shelter
       - name: Run checks
         run: devenv shell -- prek run --all-files
+      - name: Run security scans
+        run: devenv tasks run security
   build:
     runs-on: docker
     env:
