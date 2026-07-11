@@ -19,8 +19,6 @@ A language module should:
 - Register linters and tests as `git-hooks.hooks` (these are what CI runs)
 - Avoid pulling in heavy dev tools the language runtime doesn't need (see `languages.c.enable = lib.mkForce false` in `rust.nix`)
 
-Document the new options in kennel at `sites/docs/src/reference/devenv-options.md`.
-
 ## Adding a service module
 
 Create `modules/<service>.nix` and add it to the imports in `modules/default.nix`.
