@@ -172,7 +172,7 @@ pub async fn deploy_request(
         let target_url = state.config.grafana_url.as_deref().and_then(|base| {
             kennel_config.services.keys().next().map(|service| {
                 let unit = service_unit_name(&project.name, &branch_slug, service);
-                drilldown_unit_url(base, &format!("{unit}.service"), "now-1h", "now")
+                drilldown_unit_url(base, &format!("{unit}.service"), "now-30d", "now")
             })
         });
         let posted = state
