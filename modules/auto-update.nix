@@ -8,12 +8,12 @@
 let
   # refresh each lockfile to its latest inputs on every commit
   updateHooks = {
-    flake-update = ''
-      ${lib.getExe pkgs.nix} flake update
-      git add flake.lock
-    '';
+    # flake-update = ''
+    #   ${lib.getExe pkgs.nix} flake update
+    #   git add flake.lock
+    # '';
     devenv-update = ''
-      ${lib.getExe pkgs.devenv} update
+      ${lib.getExe pkgs.devenv} update scottylabs
       git add devenv.lock
     '';
   };
