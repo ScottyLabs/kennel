@@ -71,6 +71,38 @@ Type: `attrs`, default: `{ }`
 }
 ```
 
+## `buildHaskellService`
+
+Builds a Haskell project against the org-standard GHC package set, stripped to its static executables. Library dependencies come pre-built from the binary-cached nixpkgs set rather than solved from Hackage, so a version bound is satisfied by whatever the set carries; use `overrides` for exceptions. Local packages are lifted into the set with [callCabal2nix](https://nixos.org/manual/nixpkgs/unstable/#haskell), one small import-from-derivation per package, re-evaluated only when its `.cabal` file changes.
+
+### `pname`
+
+Package name to build. Must be a key of `localPackages`; its executables become the service binaries.
+
+Type: `str`, required
+
+### `localPackages`
+
+The project's cabal packages, package name to source directory. Every package builds inside the same extended set, so intra-project dependencies resolve to each other. List the same directories as `scottylabs.haskell.localPackages` in `devenv.nix`, so the shell and the build resolve identical dependencies.
+
+Type: `attrsOf path`, required
+
+### `overrides`
+
+A final overlay over the package set, to jailbreak or pin a dependency the set's version cannot satisfy (for example `final: prev: { some-dep = pkgs.haskell.lib.doJailbreak prev.some-dep; }`).
+
+Type: `function`, default: `_final: _prev: { }`
+
+```nix
+(scottylabs.mkLib pkgs).buildHaskellService {
+  pname = "reviewd";
+  localPackages = {
+    kernel-effects = ./kernel-effects;
+    reviewd = ./reviewd;
+  };
+}
+```
+
 ## `buildDenoTask`
 
 Builds a Deno project that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.

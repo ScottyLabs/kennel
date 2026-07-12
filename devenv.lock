@@ -362,11 +362,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1783522502,
-        "narHash": "sha256-iffAls3iaNTyJC2faYcUXSI+Gp02cDjYl+MygxKl2GI=",
+        "lastModified": 1783776592,
+        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "0bb7ec54c8483066ec9d7720e780a5caa71f8612",
+        "rev": "e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3",
         "type": "github"
       },
       "original": {
@@ -518,11 +518,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783663825,
-        "narHash": "sha256-TTrNVoFdEw8j0Hn+shP1KAsimTmszTWBIIUliTaAuY0=",
+        "lastModified": 1783747106,
+        "narHash": "sha256-KlepQu/O5m11lAjcJ4ER5bc6bIzyX2UMPDARzMzQfIw=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "072adf9b18936c1062c48123a9b77891d5968f2c",
+        "rev": "e598b37857b895b81020a65a802ef55f5bbed72f",
         "type": "github"
       },
       "original": {
@@ -567,11 +567,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1783702998,
-        "narHash": "sha256-vh3mGdr0FR46DCFG9Fl10ox231UqBrB6VOSr0c8t174=",
+        "lastModified": 1783824470,
+        "narHash": "sha256-Yz79aeyNXkqATouh3mwWXn/o9PYYn1WnrS5WH/cbjjQ=",
         "ref": "refs/heads/main",
-        "rev": "1ab79cb3a50e31e994397196fd837ba1a1abeb3b",
-        "revCount": 74,
+        "rev": "37968349a0508d1dc0e4abdb31d894545f0eda26",
+        "revCount": 78,
         "type": "git",
         "url": "https://codeberg.org/ScottyLabs/devenv"
       },
