@@ -15,6 +15,7 @@ in
     ./kennel.nix
     ./rust.nix
     ./deno.nix
+    ./haskell.nix
     ./python.nix
     ./garage.nix
     ./ricochet.nix
@@ -74,6 +75,7 @@ in
       treefmt.enable = true;
       commitizen.enable = cfg.conventionalCommits.enable;
 
+      # TODO: https://github.com/cachix/git-hooks.nix/pull/642
       gitleaks = {
         enable = true;
         name = "gitleaks";

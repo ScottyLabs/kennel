@@ -58,6 +58,7 @@
       mkLib = pkgs: {
         buildDenoTask = pkgs.callPackage ./lib/build-deno-task.nix { };
         buildRustService = import ./lib/build-rust-service.nix { inherit pkgs crane; };
+        buildHaskellService = import ./lib/build-haskell-service.nix { inherit pkgs; };
         buildPythonService = import ./lib/build-python-service.nix {
           inherit
             pkgs

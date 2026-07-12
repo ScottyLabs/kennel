@@ -64,7 +64,8 @@ in
         "security:osv-scanner".exec = "${pkgs.osv-scanner}/bin/osv-scanner scan source .";
       })
       (lib.mkIf cfg.semgrep.enable {
-        "security:semgrep".exec = "${pkgs.semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
+        "security:semgrep".exec =
+          "${pkgs.semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
       })
       (lib.mkIf cfg.vulnix.enable {
         "security:vulnix".exec = "${pkgs.vulnix}/bin/vulnix${
