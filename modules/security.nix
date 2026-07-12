@@ -8,14 +8,11 @@
 let
   cfg = config.scottylabs.security;
 
-  # semgrep's own pytest suite fails with BrokenPipeError inside the Nix
-  # sandbox on some nixpkgs revs, which otherwise blocks the whole devenv
-  # shell from realizing. Skip its tests; we only need the built binary.
-  patchedPkgs = pkgs.extend (
-    final: prev: {
-      semgrep = prev.semgrep.overrideAttrs (_: { doCheck = false; });
-    }
-  );
+  # semgrep's pytest suite hits BrokenPipeError in the Nix sandbox on some
+  # nixpkgs revs and blocks shell realization. Python packages map doCheck →
+  # doInstallCheck, so overrideAttrs is a no-op here — must use
+  # overridePythonAttrs. We only need the binary.
+  semgrep = pkgs.semgrep.overridePythonAttrs (_: { doCheck = false; });
 in
 {
   options.scottylabs.security = {
@@ -65,7 +62,7 @@ in
   config = lib.mkIf config.scottylabs.enable {
     packages =
       lib.optional cfg.osvScanner.enable pkgs.osv-scanner
-      ++ lib.optional cfg.semgrep.enable patchedPkgs.semgrep
+      ++ lib.optional cfg.semgrep.enable semgrep
       ++ lib.optional cfg.vulnix.enable pkgs.vulnix;
 
     tasks = lib.mkMerge [
@@ -74,7 +71,7 @@ in
       })
       (lib.mkIf cfg.semgrep.enable {
         "security:semgrep".exec =
-          "${patchedPkgs.semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
+          "${semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
       })
       (lib.mkIf cfg.vulnix.enable {
         "security:vulnix".exec = "${pkgs.vulnix}/bin/vulnix${
