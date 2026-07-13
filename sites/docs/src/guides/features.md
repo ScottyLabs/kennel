@@ -1,6 +1,20 @@
 # Enabling Features
 
-In the ScottyLabs governance repository, add your project to its team's TOML file and list its `features`. Governance provisions everything those features imply:
+In the ScottyLabs governance repository, add your project to its team's TOML file and declare its `features` table. A feature is enabled by its presence: an empty table enables it with defaults, and a feature with settings takes them as keys.
+
+```toml
+[[team.repos]]
+name = "collie"
+
+[team.repos.features]
+kennel = {}
+sentry = {}
+
+[team.repos.features.ai_gateway]
+prod_monthly_budget = 20.0
+```
+
+Governance provisions everything those features imply:
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile
@@ -8,6 +22,8 @@ In the ScottyLabs governance repository, add your project to its team's TOML fil
 - `cdn` provisions a per-project public-read [Garage](https://garagehq.deuxfleurs.fr/) bucket and writes `CDN_S3_ENDPOINT`, `CDN_S3_BUCKET`, `CDN_ACCESS_KEY_ID`, `CDN_SECRET_ACCESS_KEY`, and `CDN_PUBLIC_URL` to Vault on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
 - `admin_client` provisions a Keycloak service-account client with the `view-users`, `manage-users`, and `view-identity-providers` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
+- `ai_gateway` mints budgeted [LiteLLM](https://docs.litellm.ai) API keys under your team and writes `LITELLM_API_KEY` and `LITELLM_BASE_URL` to Vault on every profile
+- `docs` publishes the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org)
 
 ### OIDC
 
@@ -80,6 +96,26 @@ CDN_PUBLIC_URL = { description = "Public base URL for the bucket" }
 
 Upload assets with the S3 credentials; they are publicly readable under `CDN_PUBLIC_URL` (`https://cdn.scottylabs.org/<repo>/`).
 
+### AI Gateway
+
+If your service calls language models, add `ai_gateway` to its `features` in governance. It mints two LiteLLM virtual keys under your team: one for prod, and a lower-budget key shared by staging, preview, and dev. Budgets are monthly, in USD, and configurable as feature settings:
+
+```toml
+[team.repos.features.ai_gateway]
+prod_monthly_budget = 20.0 # default
+dev_monthly_budget = 5.0   # default
+```
+
+The key and the gateway URL are written to Vault on every profile, so declare them in `default`:
+
+```toml
+[profiles.default]
+LITELLM_API_KEY = { description = "LiteLLM virtual key" }
+LITELLM_BASE_URL = { description = "LiteLLM gateway base URL" }
+```
+
+Point any OpenAI-compatible client at `LITELLM_BASE_URL` with `LITELLM_API_KEY` as the API key; the gateway routes to the models it has configured and meters spend against your key. Keys are grouped under your team in LiteLLM for spend attribution.
+
 ## Documentation
 
-Documentation is controlled separately by `docs` (boolean, default `true`), which aggregates the repository's `./docs` directory into the documentation hub.
+Add `docs` to publish the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org).
