@@ -105,13 +105,19 @@ Type: `function`, default: `_final: _prev: { }`
 
 ## `buildDenoTask`
 
-Builds a Deno project that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
+Builds a Deno project, or a single member of a Deno workspace, that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
 
 ### `src`
 
-Directory holding `deno.lock` and `deno.json`.
+Directory holding `deno.lock` and `deno.json`. In a Deno workspace this is the workspace root that holds the single `deno.lock`, and `cwd` selects the member to build.
 
 Type: `path`, required
+
+### `cwd`
+
+Subdirectory of `src` to build in, for a Deno workspace member. `"."` builds `src` itself. When set, `src` is the workspace root holding the shared `deno.lock`, and the task runs from `src/<cwd>`, so `output` and `entrypoint` resolve relative to the member.
+
+Type: `str`, default: `"."`
 
 ### `pname`
 
@@ -154,6 +160,18 @@ Type: `bool`, default: `false`
   src = ./sites/web;
   pname = "link-shortener-web";
   version = "0.1.0";
+}
+```
+
+A workspace member builds from the workspace root that holds the shared `deno.lock`, with `cwd` selecting the member:
+
+```nix
+(scottylabs.mkLib pkgs).buildDenoTask {
+  src = ./.;
+  cwd = "apps/backend";
+  pname = "housing-backend";
+  entrypoint = "src/index.ts";
+  compile = true;
 }
 ```
 
