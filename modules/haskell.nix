@@ -12,7 +12,11 @@ let
   # newest fully binary-cached set, keep in sync with build-haskell-service.nix
   hset = pkgs.haskell.packages.ghc912;
 
-  localDrvs = lib.mapAttrs (name: src: hset.callCabal2nix name src { }) cfg.localPackages;
+  extendedSet = hset.extend (
+    final: _prev: lib.mapAttrs (name: src: final.callCabal2nix name src { }) cfg.localPackages
+  );
+
+  localDrvs = lib.mapAttrs (name: _src: extendedSet.${name}) cfg.localPackages;
 
   cabalDeps =
     drv:
