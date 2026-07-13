@@ -103,7 +103,14 @@ in
             "perf"
           ];
           typeAware = true;
-          allow = [ "prefer-readonly-parameter-types" ];
+          allow = [
+            "prefer-readonly-parameter-types"
+          ]
+          ++ lib.optionals cfg.react.enable [
+            # the automatic jsx runtime needs no react import
+            "react-in-jsx-scope"
+            "jsx-uses-react"
+          ];
         };
       };
       svelte-check = lib.mkIf cfg.svelte.enable {
