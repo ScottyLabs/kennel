@@ -8,10 +8,7 @@
 let
   cfg = config.scottylabs.security;
 
-  # semgrep's pytest suite hits BrokenPipeError in the Nix sandbox on some
-  # nixpkgs revs and blocks shell realization. Python packages map doCheck →
-  # doInstallCheck, so overrideAttrs is a no-op here — must use
-  # overridePythonAttrs. We only need the binary.
+  # TODO: semgrep's pytest suite hits BrokenPipeError in the Nix sandbox
   semgrep = pkgs.semgrep.overridePythonAttrs (_: { doCheck = false; });
 in
 {
