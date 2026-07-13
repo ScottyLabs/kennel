@@ -1,4 +1,4 @@
-# Builds a deno project with npm deps from deno.lock
+# Builds a deno project (or workspace member) with npm deps from deno.lock
 {
   lib,
   stdenv,
@@ -6,10 +6,13 @@
   autoPatchelfHook,
   fetchurl,
   runCommand,
+  writeText,
 }:
 
 {
   src,
+  # workspace member subdir under src ("." for a single-project src)
+  cwd ? ".",
   pname,
   version ? "0.1.0",
   task ? "build",
@@ -33,14 +36,16 @@ let
       version = builtins.elemAt m 1;
     };
 
-  tarballs = lib.mapAttrs' (
+  npmEntries = lib.mapAttrsToList (
     key: info:
     let
       p = parse key;
       unscoped = lib.last (lib.splitString "/" p.name);
     in
-    lib.nameValuePair "${p.name}@${p.version}" {
+    {
       inherit (p) name version;
+      inherit unscoped;
+      integrity = info.integrity;
       tarball = fetchurl {
         url = "https://registry.npmjs.org/${p.name}/-/${unscoped}-${p.version}.tgz";
         hash = info.integrity;
@@ -48,15 +53,47 @@ let
     }
   ) (lock.npm or { });
 
-  # the npm cache deno reads is just the extracted tarball per version
+  # deno 2.9+ only treats a packument as cached when it carries the _deno markers
+  # so synthesize one per package from the lock beside the extracted tarballs
+  packuments = lib.mapAttrs (
+    name: entries:
+    writeText "registry.json" (
+      builtins.toJSON {
+        inherit name;
+        "dist-tags".latest = lib.last (lib.sort (a: b: a < b) (map (e: e.version) entries));
+        versions = lib.listToAttrs (
+          map (
+            e:
+            lib.nameValuePair e.version {
+              inherit (e) version;
+              dependencies = { };
+              dist = {
+                tarball = "https://registry.npmjs.org/${name}/-/${e.unscoped}-${e.version}.tgz";
+                integrity = e.integrity;
+              };
+            }
+          ) entries
+        );
+        "_deno.etag" = "W/\"nix\"";
+        "_deno.packumentFormat" = "full";
+      }
+    )
+  ) (lib.groupBy (e: e.name) npmEntries);
+
+  # the npm cache deno reads is the extracted tarball plus a packument per package
   denoCache = runCommand "${pname}-deno-cache" { } ''
     mkdir -p "$out/npm/registry.npmjs.org"
     ${lib.concatStringsSep "\n" (
-      lib.mapAttrsToList (_: p: ''
-        dest="$out/npm/registry.npmjs.org/${p.name}/${p.version}"
+      map (e: ''
+        dest="$out/npm/registry.npmjs.org/${e.name}/${e.version}"
         mkdir -p "$dest"
-        tar -xzf ${p.tarball} -C "$dest" --strip-components=1
-      '') tarballs
+        tar -xzf ${e.tarball} -C "$dest" --strip-components=1
+      '') npmEntries
+    )}
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: file: ''
+        cp ${file} "$out/npm/registry.npmjs.org/${name}/registry.json"
+      '') packuments
     )}
   '';
 
@@ -87,7 +124,7 @@ stdenv.mkDerivation {
     chmod -R u+w "$DENO_DIR"
     ${lib.optionalString compile ''export DENORT_BIN="${deno.denort}/bin/denort"''}
     deno install --cached-only --frozen${
-      lib.optionalString (entrypoint != null) " --entrypoint ${lib.escapeShellArg entrypoint}"
+      lib.optionalString (entrypoint != null) " --entrypoint ${lib.escapeShellArg "${cwd}/${entrypoint}"}"
     }
     ${patchAddons}
     runHook postConfigure
@@ -95,13 +132,13 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    deno task ${task}
+    ( cd ${lib.escapeShellArg cwd} && deno task ${task} )
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    cp -r ${output} "$out"
+    cp -r ${lib.escapeShellArg "${cwd}/${output}"} "$out"
     runHook postInstall
   '';
 }
