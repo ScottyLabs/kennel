@@ -13,7 +13,6 @@ let
 in
 {
   imports = [
-    ./auto-update.nix
     ./claude.nix
     ./kennel.nix
     ./rust.nix
@@ -36,10 +35,8 @@ in
       description = ''
         Enable the shared ScottyLabs development configuration. Required for all
         other `scottylabs.*` options to take effect. Also installs always-on
-        hooks: two that refresh and stage `flake.lock` (`nix flake update`) and
-        `devenv.lock` (`devenv update`) on every commit, one that rejects
-        commits carrying AI tool co-author trailers, and one that scans staged
-        changes for secrets via
+        hooks: one that rejects commits carrying AI tool co-author trailers, and
+        one that scans staged changes for secrets via
         [gitleaks](https://github.com/gitleaks/gitleaks).
       '';
     };
