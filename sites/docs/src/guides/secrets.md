@@ -11,6 +11,10 @@ Create a `secretspec.toml` in your project root. The `[project]` table requires 
 name = "my-project"
 revision = "1.0"
 
+[providers]
+local = "dotenv://.env"
+vault = "vault://secrets2.scottylabs.org/secret"
+
 [profiles.ci.defaults]
 required = false
 
@@ -27,42 +31,45 @@ STRIPE_KEY = { description = "Stripe API key", required = true }
 [profiles.preview]
 STRIPE_KEY = { description = "Stripe test key", required = false }
 
+[profiles.dev.defaults]
+providers = ["vault"]
+
 [profiles.dev]
 ```
 
 `[profiles.default]` holds the secrets shared across every profile; named profiles inherit from it and may override individual entries, for example making `STRIPE_KEY` optional in preview. Declare a `[profiles.<name>]` header for `dev` (used locally) and for every environment you deploy to (see the [branch-to-profile mapping](#production)); a section may be left empty to inherit `default` unchanged.
 
+The `[providers]` table names the backends once. `vault` is OpenBao, where shared secrets live, and `local` is a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` routes every dev secret without an explicit chain to OpenBao; without it, secrets inherited from `default` have no route when you enter the shell and resolution fails.
+
 The `[profiles.ci.defaults]` block makes every inherited secret optional for CI. The shared CI workflow sets `SECRETSPEC_PROFILE=ci` and `SECRETSPEC_PROVIDER=env` so that `devenv shell` does not require an OpenBao token. CI checks run without project secret values and must not depend on them. The workflow's only secrets are the org-level Cachix and sccache credentials it forwards for binary caching.
 
-## Configuring the provider
+## Enabling resolution
 
-Point secretspec at OpenBao in your `devenv.yaml`. Copy this block once per project:
+Turn secretspec on in your `devenv.yaml`:
 
 ```yaml
 secretspec:
   enable: true
-  provider: vault://secrets2.scottylabs.org/secret
   profile: dev
 ```
 
-`enable` turns on resolution, `provider` is the default backend for every secret, and `profile` selects which profile to load locally (kennel chooses the profile per branch when it deploys). The shared ScottyLabs config (`scottylabs.enable = true`) supplies the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell.
+`enable` turns on resolution and `profile` selects which profile to load locally (kennel chooses the profile per branch when it deploys). The shared ScottyLabs config (`scottylabs.enable = true`) supplies the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell.
 
 ## Per-developer secrets
 
-Some secrets differ per developer and cannot be shared, for example each person's own `DISCORD_TOKEN` while developing a bot. Source those from a gitignored `.env` instead of OpenBao: define a `local` alias in a `[providers]` table and give the secret a provider chain in the `dev` profile.
+Some secrets differ per developer and cannot be shared, for example each person's own `DISCORD_TOKEN` while developing a bot. Declare those in the profiles that use them rather than in `[profiles.default]`, and pin the `dev` entry to the `local` alias so it reads from your `.env`:
 
 ```toml
-[providers]
-local = "dotenv://.env"
-
 [profiles.prod]
 DISCORD_TOKEN = { description = "Discord bot token" }
 
 [profiles.dev]
-DISCORD_TOKEN = { providers = ["local"] }
+DISCORD_TOKEN = { description = "Discord bot token", providers = ["local"] }
 ```
 
-`prod` resolves `DISCORD_TOKEN` from OpenBao (the default provider) while `dev` reads it from your `.env`. Chains are tried in order, so `providers = ["vault", "local"]` would try OpenBao first and fall back to `.env`; every alias you name must be defined in this committed `[providers]` table. Keep `.env` gitignored.
+`prod` resolves `DISCORD_TOKEN` from OpenBao while `dev` reads it from your `.env`. Chains are tried in order, so `providers = ["vault", "local"]` would try OpenBao first and fall back to `.env`; every alias you name must be defined in the committed `[providers]` table.
+
+Commit a `.env.example` listing each personal secret as an empty `KEY=` line and point developers at it from your README (`cp .env.example .env`). A key that is present but empty counts as set, so a fresh copy enters the shell fine and real values get filled in when the code actually needs them. Without the file, entry fails on any required pinned secret. Keep `.env` itself gitignored.
 
 ## Local development
 
