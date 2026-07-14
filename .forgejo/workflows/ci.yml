@@ -50,7 +50,11 @@ jobs:
       - name: Run checks
         run: devenv shell -- prek run --all-files
       - name: Run security scans
-        run: devenv tasks run security
+        run: |
+          if ! devenv tasks run security --show-output > security-scan.log 2>&1; then
+            cat security-scan.log
+            exit 1
+          fi
   build:
     runs-on: docker
     env:
