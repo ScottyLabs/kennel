@@ -16,7 +16,7 @@ This requires the operator to configure `services.kennel.forgejo.apiTokenFile` w
 
 ## Resource isolation
 
-Each PR deployment gets:
+Each PR deployment gets, for every resource the project enables:
 
 - Its own PostgreSQL database (`kennel_{project}_{branch}`)
 - Its own Valkey DB number

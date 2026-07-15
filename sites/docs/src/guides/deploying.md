@@ -14,7 +14,6 @@ Add the ScottyLabs devenv input to your `devenv.yaml`:
 ```yaml
 secretspec:
   enable: true
-  provider: vault://secrets2.scottylabs.org/secret
   profile: dev
 
 inputs:
@@ -207,6 +206,8 @@ scottylabs.postgres.enable = true;
 This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
 
 `sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth.
+
+Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, or `garage`) is never allocated one. Provisioning also depends on keeping the shared devenv module current. Kennel stamps each `kennel.json` with a schema version and refuses any deployment whose version does not match, so run `devenv update` if a build is rejected for a version mismatch.
 
 When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
 
