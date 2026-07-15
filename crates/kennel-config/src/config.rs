@@ -14,6 +14,12 @@ pub struct KennelConfig {
 
     #[serde(default = "default_preview_deployments")]
     pub preview_deployments: bool,
+
+    #[serde(default)]
+    pub version: u32,
+
+    #[serde(default)]
+    pub resources: Vec<String>,
 }
 
 impl Default for KennelConfig {
@@ -22,7 +28,21 @@ impl Default for KennelConfig {
             services: HashMap::new(),
             static_sites: HashMap::new(),
             preview_deployments: default_preview_deployments(),
+            version: 0,
+            resources: Vec::new(),
         }
+    }
+}
+
+impl KennelConfig {
+    /// Whether this config matches the schema version kennel understands
+    pub fn is_compatible(&self) -> bool {
+        self.version == crate::constants::KENNEL_CONFIG_SCHEMA_VERSION
+    }
+
+    /// Whether the project declared the named resource provider
+    pub fn provides(&self, resource: &str) -> bool {
+        self.resources.iter().any(|r| r == resource)
     }
 }
 

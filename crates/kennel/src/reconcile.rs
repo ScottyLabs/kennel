@@ -138,13 +138,26 @@ pub async fn run_once(
                 system_user: system_user.clone(),
             };
 
-            let mut env_vars: std::collections::HashMap<String, String> =
-                std::collections::HashMap::new();
-            for provider in &state.providers {
-                if let Ok(vars) = provider.provision(&request).await {
-                    env_vars.extend(vars);
+            let Some(config_store_path) = deployment.config_store_path.as_deref() else {
+                tracing::warn!(unit = %unit_name, "no config store path, skipping restart");
+                continue;
+            };
+            let kennel_config = match deploy::read_kennel_config(config_store_path).await {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!(unit = %unit_name, error = %e, "could not read kennel config, skipping restart");
+                    continue;
                 }
-            }
+            };
+            let mut env_vars = match deploy::provision_declared(state, &kennel_config, &request)
+                .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!(unit = %unit_name, error = %e, "incompatible kennel config, skipping restart");
+                    continue;
+                }
+            };
 
             if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT")
                 && let Some(ref config_store_path) = deployment.config_store_path

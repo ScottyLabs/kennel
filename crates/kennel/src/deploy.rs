@@ -15,12 +15,51 @@ struct DeployCtx<'a> {
     branch: &'a str,
     branch_slug: &'a str,
     environment: &'a Environment,
+    kennel_config: &'a kennel_config::KennelConfig,
 }
 
 /// Result of a deploy attempt for a branch's intent
 pub enum DeployOutcome {
     Deployed,
     SkippedPreview,
+}
+
+/// Provision the resources the config declares, gated by schema version and the `resources` list
+pub async fn provision_declared(
+    state: &AppState,
+    config: &kennel_config::KennelConfig,
+    request: &ResourceRequest,
+) -> anyhow::Result<HashMap<String, String>> {
+    if !config.is_compatible() {
+        anyhow::bail!(
+            "kennel.json schema version {} does not match expected {}. Run `devenv update` and redeploy.",
+            config.version,
+            kennel_config::constants::KENNEL_CONFIG_SCHEMA_VERSION
+        );
+    }
+
+    let mut env_vars = HashMap::new();
+    for provider in &state.providers {
+        if !config.provides(provider.name()) {
+            continue;
+        }
+        match provider.provision(request).await {
+            Ok(vars) => env_vars.extend(vars),
+            Err(e) => {
+                tracing::warn!(provider = provider.name(), error = %e, "resource provision failed");
+            }
+        }
+    }
+
+    Ok(env_vars)
+}
+
+pub async fn read_kennel_config(
+    config_store_path: &str,
+) -> anyhow::Result<kennel_config::KennelConfig> {
+    let json_path = std::path::Path::new(config_store_path).join("kennel.json");
+    let content = tokio::fs::read_to_string(&json_path).await?;
+    Ok(serde_json::from_str(&content)?)
 }
 
 pub async fn deploy_request(
@@ -98,6 +137,7 @@ pub async fn deploy_request(
         branch: &request.branch,
         branch_slug: &branch_slug,
         environment: &environment,
+        kennel_config: &kennel_config,
     };
 
     let deploy_result: anyhow::Result<()> = async {
@@ -231,6 +271,7 @@ async fn deploy_static_site(
         branch,
         branch_slug,
         environment,
+        kennel_config: _,
     } = ctx;
     let domain = generate_domain(
         project_name,
@@ -319,6 +360,7 @@ async fn deploy_service(
         branch,
         branch_slug,
         environment,
+        kennel_config,
     } = ctx;
     let domain = generate_domain(
         project_name,
@@ -342,15 +384,7 @@ async fn deploy_service(
         system_user: system_user.clone(),
     };
 
-    let mut env_vars: HashMap<String, String> = HashMap::new();
-    for provider in &state.providers {
-        match provider.provision(&request).await {
-            Ok(vars) => env_vars.extend(vars),
-            Err(e) => {
-                tracing::warn!(provider = provider.name(), error = %e, "resource provision failed");
-            }
-        }
-    }
+    let mut env_vars = provision_declared(state, kennel_config, &request).await?;
 
     if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT")
         && let Some(ref config_store_path) = build.config_store_path

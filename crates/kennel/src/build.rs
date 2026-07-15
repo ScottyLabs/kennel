@@ -446,7 +446,16 @@ async fn eval_kennel_config(
 
     let json_path = PathBuf::from(store_path).join("kennel.json");
     let content = tokio::fs::read_to_string(&json_path).await?;
-    Ok((serde_json::from_str(&content)?, store_path.to_string()))
+    let config: KennelConfig = serde_json::from_str(&content)?;
+    if !config.is_compatible() {
+        anyhow::bail!(
+            "kennel.json schema version {} does not match kennel's expected {}. Run `devenv update` in the project and rebuild.",
+            config.version,
+            kennel_config::constants::KENNEL_CONFIG_SCHEMA_VERSION
+        );
+    }
+
+    Ok((config, store_path.to_string()))
 }
 
 async fn nix_build(log: &mut String, repo_path: &Path, name: &str) -> anyhow::Result<String> {
