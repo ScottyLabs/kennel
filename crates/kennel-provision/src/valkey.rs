@@ -130,7 +130,19 @@ impl ResourceProvider for ValkeyProvider {
         let db_num = if existing.status.success() {
             let out = String::from_utf8_lossy(&existing.stdout).trim().to_string();
             if !out.is_empty() && out != "(nil)" {
-                out.parse::<u32>().unwrap_or(0)
+                match out.parse::<u32>() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        tracing::error!(
+                            key = %key,
+                            value = %out,
+                            "valkey allocation holds a non-numeric DB number; refusing to provision"
+                        );
+                        return Err(anyhow::anyhow!(
+                            "valkey allocation for {key} is not a valid DB number"
+                        ));
+                    }
+                }
             } else {
                 // Find the next available DB number (1-31, DB 0 is reserved for metadata)
                 let all = tokio::process::Command::new("valkey-cli")
