@@ -2,7 +2,7 @@
   description = "ScottyLabs shared devenv configuration";
 
   inputs = {
-    nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
