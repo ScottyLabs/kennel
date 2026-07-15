@@ -30,5 +30,7 @@ in
       enable = true;
       package = pkgs.valkey;
     };
+
+    scottylabs.kennel.requestedResources = [ "valkey" ];
   };
 }

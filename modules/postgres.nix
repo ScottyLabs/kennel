@@ -45,5 +45,7 @@ in
     enterShell = ''
       export DATABASE_URL="postgresql:///${projectName}?host=$DEVENV_RUNTIME/postgres"
     '';
+
+    scottylabs.kennel.requestedResources = [ "postgres" ];
   };
 }

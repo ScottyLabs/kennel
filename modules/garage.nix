@@ -50,5 +50,7 @@ in
       S3_SECRET_KEY = cfg.secretKey;
       S3_BUCKET = projectName;
     };
+
+    scottylabs.kennel.requestedResources = [ "garage" ];
   };
 }
