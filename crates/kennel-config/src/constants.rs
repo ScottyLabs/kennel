@@ -13,6 +13,8 @@ pub const DEFAULT_DB_PATH: &str = "/var/lib/kennel/kennel.db";
 pub const SITES_BASE_DIR: &str = "/var/lib/kennel/sites";
 pub const GC_ROOTS_DIR: &str = "/nix/var/nix/gcroots/kennel";
 pub const LOGS_DIR: &str = "/var/lib/kennel/logs";
+pub const VALKEY_BACKUP_DIR: &str = "/var/lib/kennel/valkey-backups";
+pub const VALKEY_BACKUP_KEEP: usize = 20;
 
 pub const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
