@@ -100,6 +100,8 @@ in
           typeAware = true;
           allow = [
             "prefer-readonly-parameter-types"
+            # todo comments are allowed
+            "no-warning-comments"
           ]
           ++ lib.optionals cfg.react.enable [
             # the automatic jsx runtime needs no react import
