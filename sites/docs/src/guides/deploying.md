@@ -128,7 +128,7 @@ scottylabs.kennel.sites.app = {
 
 Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched routes. It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
 
-Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure).
+Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure). Kennel creates the DNS record itself for registered zones, and certificate issuance begins only once the domain resolves to kennel, so a domain whose zone is missing serves no TLS until the zone is registered.
 
 ### Health checks
 
@@ -235,10 +235,10 @@ Running `migrate` in the shell then executes that command. Scripts are a develop
 
 Kennel deploys three long-lived branches (`main`, `staging`, or `dev`). To get a preview, open a pull request and kennel builds and deploys it. Pushing any other branch is ignored.
 
-Your deployment will be available at:
+Your deployment will be available at `{project}-{service}-{branch}.scottylabs.net`, where `service` is the key from `scottylabs.kennel.services`:
 
-- `my-project-main.scottylabs.net` for the main branch
-- `my-project-pr-42.scottylabs.net` for PR #42
+- `my-project-api-main.scottylabs.net` for the `api` service on the main branch
+- `my-project-api-pr-42.scottylabs.net` for PR #42
 
 As it works, kennel reports progress back to Forgejo as commit statuses on the pushed commit. The `kennel/build` status moves from pending to success or failure as the build runs, and `kennel/deploy` reports success once the deployment passes its health check. A failed status means the commit never reached a healthy deployment; check the build log to see why.
 
