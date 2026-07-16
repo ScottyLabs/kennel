@@ -7,11 +7,6 @@
 
 let
   cfg = config.scottylabs;
-
-  # TODO: commitizen's test_invalid_command regression file lags python 3.14 argparse quoting
-  commitizen = pkgs.commitizen.overridePythonAttrs (_: {
-    doCheck = false;
-  });
 in
 {
   imports = [
@@ -75,7 +70,7 @@ in
       treefmt.enable = true;
       commitizen = {
         enable = cfg.conventionalCommits.enable;
-        package = commitizen;
+        package = pkgs.commitizen;
       };
 
       # TODO: https://github.com/cachix/git-hooks.nix/pull/642

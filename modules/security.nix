@@ -7,11 +7,6 @@
 
 let
   cfg = config.scottylabs.security;
-
-  # TODO: semgrep's pytest suite hits BrokenPipeError in the Nix sandbox
-  semgrep = pkgs.semgrep.overridePythonAttrs (_: {
-    doCheck = false;
-  });
 in
 {
   options.scottylabs.security = {
@@ -61,7 +56,7 @@ in
   config = lib.mkIf config.scottylabs.enable {
     packages =
       lib.optional cfg.osvScanner.enable pkgs.osv-scanner
-      ++ lib.optional cfg.semgrep.enable semgrep
+      ++ lib.optional cfg.semgrep.enable pkgs.semgrep
       ++ lib.optional cfg.vulnix.enable pkgs.vulnix;
 
     tasks = lib.mkMerge [
@@ -75,7 +70,7 @@ in
       })
       (lib.mkIf cfg.semgrep.enable {
         "security:semgrep".exec =
-          "${semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
+          "${pkgs.semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
       })
       (lib.mkIf cfg.vulnix.enable {
         "security:vulnix".exec = "${pkgs.vulnix}/bin/vulnix${
