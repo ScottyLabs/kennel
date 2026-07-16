@@ -116,22 +116,25 @@ in
       svelte-check = lib.mkIf cfg.svelte.enable {
         enable = true;
         entry = "${pkgs.svelte-check}/bin/svelte-check";
-        # svelte-check walks the whole project; trigger on any source change
+        # svelte-check walks the whole project
         files = "\\.(svelte|ts|js|mts|cts|mjs|cjs|tsx|jsx)$";
         pass_filenames = false;
       };
-      deno-check = {
+      # svelte-check owns all typescript in svelte repos
+      deno-check = lib.mkIf (!cfg.svelte.enable) {
         enable = true;
         name = "deno-check";
-        entry = "deno check";
+        # checks the whole graph so module augmentations apply
+        entry = "deno check .";
         files = "\\.(ts|tsx|mts|cts)$";
-        pass_filenames = true;
+        pass_filenames = false;
         language = "system";
       };
       deno-test = {
         enable = true;
         name = "deno-test";
-        entry = "deno test --ignore=.devenv,.direnv --permit-no-files";
+        # tests exercise first-party code that reads env and files at import
+        entry = "deno test -A --ignore=.devenv,.direnv --permit-no-files";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$";
         pass_filenames = false;
         language = "system";
