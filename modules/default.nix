@@ -68,6 +68,8 @@ in
 
     git-hooks.hooks = {
       treefmt.enable = true;
+      statix.enable = true;
+      deadnix.enable = true;
       commitizen = {
         enable = cfg.conventionalCommits.enable;
         # TODO: drop the override once commitizen tests pass on python 3.14
