@@ -50,6 +50,10 @@ impl CloudflareClient {
         }
     }
 
+    pub fn public_ip(&self) -> &str {
+        &self.public_ip
+    }
+
     /// Find the most specific zone that the given fqdn lives in.
     /// Returns the (zone_name, zone_id) pair, or None if no zone matches.
     fn match_zone(&self, fqdn: &str) -> Option<(String, String)> {
