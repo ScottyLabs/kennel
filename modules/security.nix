@@ -9,7 +9,9 @@ let
   cfg = config.scottylabs.security;
 
   # TODO: semgrep's pytest suite hits BrokenPipeError in the Nix sandbox
-  semgrep = pkgs.semgrep.overridePythonAttrs (_: { doCheck = false; });
+  semgrep = pkgs.semgrep.overridePythonAttrs (_: {
+    doCheck = false;
+  });
 in
 {
   options.scottylabs.security = {
@@ -64,7 +66,12 @@ in
 
     tasks = lib.mkMerge [
       (lib.mkIf cfg.osvScanner.enable {
-        "security:osv-scanner".exec = "${pkgs.osv-scanner}/bin/osv-scanner scan source .";
+        # TODO: deno.lock is unsupported
+        "security:osv-scanner".exec = ''
+          rc=0
+          ${pkgs.osv-scanner}/bin/osv-scanner scan source . || rc=$?
+          [ "$rc" -eq 0 ] || [ "$rc" -eq 128 ]
+        '';
       })
       (lib.mkIf cfg.semgrep.enable {
         "security:semgrep".exec =
