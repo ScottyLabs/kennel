@@ -71,16 +71,11 @@ in
   };
 
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
-    # tsgolint on PATH so `oxlint --type-aware` finds it
-    packages =
-      with pkgs;
-      [
-        deno
-        tsgolint
-      ]
-      ++ lib.optional cfg.svelte.enable svelte-check;
+    packages = [ pkgs.deno ] ++ lib.optional cfg.svelte.enable pkgs.svelte-check;
 
     env.DENO_DIR = "${config.devenv.root}/.devenv/state/deno";
+    # oxlint's tsgolint discovery expects a node_modules install; pin the binary instead
+    env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
 
     enterShell = lib.mkIf cfg.svelte.enable ''
       (cd ${cfg.svelte.dir} && deno install && deno run -A npm:@sveltejs/kit/svelte-kit sync)
