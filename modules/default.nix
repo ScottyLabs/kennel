@@ -70,7 +70,10 @@ in
       treefmt.enable = true;
       commitizen = {
         enable = cfg.conventionalCommits.enable;
-        package = pkgs.commitizen;
+        # TODO: drop the override once commitizen tests pass on python 3.14
+        package = pkgs.commitizen.overridePythonAttrs (_: {
+          doCheck = false;
+        });
       };
 
       # TODO: https://github.com/cachix/git-hooks.nix/pull/642
