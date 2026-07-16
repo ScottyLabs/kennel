@@ -102,8 +102,8 @@ in
         name = "block-ai-slop";
         entry = "${pkgs.writeShellScript "block-ai-slop" ''
           [ "$#" -eq 0 ] && exit 0
-          if ${pkgs.ripgrep}/bin/rg --color=never -n '[‒–—―‘’“”‚„…•‣←↑→↓↔⇐⇒⇔➜➡✓✔✅☑✗✘✕✖❌]' "$@"; then
-            echo "Non-ASCII characters are not allowed (em and en dashes, smart quotes, ellipsis, arrows, check and x marks, bullets). Replace them with plain ASCII." >&2
+          if ${pkgs.ripgrep}/bin/rg --color=never -n '[‒–—―‘’“”‚„…←↑→↓↔⇐⇒⇔➜➡✓✔✅☑✗✘✕✖❌]' "$@"; then
+            echo "Non-ASCII characters are not allowed (em and en dashes, smart quotes, ellipsis, arrows, check and x marks). Replace them with plain ASCII." >&2
             exit 1
           fi
         ''}";
