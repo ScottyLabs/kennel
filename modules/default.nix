@@ -9,7 +9,9 @@ let
   cfg = config.scottylabs;
 
   # TODO: commitizen's test_invalid_command regression file lags python 3.14 argparse quoting
-  commitizen = pkgs.commitizen.overridePythonAttrs (_: { doCheck = false; });
+  commitizen = pkgs.commitizen.overridePythonAttrs (_: {
+    doCheck = false;
+  });
 in
 {
   imports = [
@@ -34,10 +36,8 @@ in
       default = false;
       description = ''
         Enable the shared ScottyLabs development configuration. Required for all
-        other `scottylabs.*` options to take effect. Also installs always-on
-        hooks: one that rejects commits carrying AI tool co-author trailers, and
-        one that scans staged changes for secrets via
-        [gitleaks](https://github.com/gitleaks/gitleaks).
+        other `scottylabs.*` options to take effect, and installs the formatters
+        and commit-time checks shared across ScottyLabs projects.
       '';
     };
 
@@ -97,6 +97,20 @@ in
           fi
         ''}";
         stages = [ "commit-msg" ];
+      };
+
+      block-ai-slop = {
+        enable = true;
+        name = "block-ai-slop";
+        entry = "${pkgs.writeShellScript "block-ai-slop" ''
+          [ "$#" -eq 0 ] && exit 0
+          if ${pkgs.ripgrep}/bin/rg --color=never -n '[‒–—―‘’“”‚„…•‣←↑→↓↔⇐⇒⇔➜➡✓✔✅☑✗✘✕✖❌]' "$@"; then
+            echo "Non-ASCII characters are not allowed (em and en dashes, smart quotes, ellipsis, arrows, check and x marks, bullets). Replace them with plain ASCII." >&2
+            exit 1
+          fi
+        ''}";
+        types = [ "text" ];
+        language = "system";
       };
     };
   };
