@@ -20,6 +20,8 @@ Kennel delegates process supervision to systemd and HTTP routing to Caddy, keepi
 
 Systemd transient units are created via D-Bus using the zbus crate. Units are placed in the `kennel.slice` cgroup for aggregate accounting, with `CPUAccounting`, `MemoryAccounting`, `IOAccounting`, and `TasksAccounting` enabled so per-deployment resource usage is queryable from cgroup metrics by anything scraping `systemd_unit_*` or `systemd_slice_*` (e.g. `prometheus-systemd-exporter` filtered to `kennel-*` units). Each unit runs sandboxed as a `DynamicUser` with no daemon credentials, a read-only filesystem (`ProtectSystem=strict`, `ProtectHome=yes`) except a private `/tmp` (`PrivateTmp=yes`), and `NoNewPrivileges`. Transient units survive kennel crashes since they are independent of the kennel process.
 
+Units restart on failure (`Restart=on-failure`, 5s delay) but are bounded by a start limit of 5 starts per 5 minutes (`StartLimitBurst` and `StartLimitIntervalUSec`). Once systemd exhausts the limit it stops restarting and holds the unit `failed`. That crash-loop cap is durable across kennel restarts, so reconcile leaves a `failed` unit stopped.
+
 Caddy routes are managed via the [admin API](https://caddyserver.com/docs/api). Each deployment gets a route identified by `@id` for individual add/remove operations. Caddy handles TLS certificate provisioning, HTTP/3, static file serving, reverse proxying, and SPA fallback.
 
 Nix-store files carry epoch modification times, so a frozen `Last-Modified` strands proxied clients on a stale shell. Reverse-proxy routes mark `text/html` responses `Cache-Control: no-store`. Static-site routes need none, since Caddy's file server drops epoch validators itself.
@@ -46,10 +48,25 @@ A single reconciliation loop handles all deployment convergence. It runs on star
 The reconciler compares desired state (deployment rows in the database) against actual state (systemd units and Caddy routes) and converges:
 
 - A pending deploy request gets deployed once its build finishes.
-- A deployment row with no running unit gets its unit started.
+- A deployment row whose unit is not running gets it restarted, unless systemd has given up on a crash loop (`failed`), in which case it is left stopped.
 - A running unit with no deployment row gets stopped.
 - All Caddy routes are re-added on each pass since Caddy config is ephemeral.
 - The custom domains of all live deployments are written to `customDomainsFile`, if configured.
+- Each deployment's gc root is re-asserted against its recorded store path.
+- A deployment whose artifact is missing from the store is rebuilt from its recorded commit.
+
+## Artifact lifecycle and gc roots
+
+Every store path a build produces or a deployment runs is protected from `nix-gc` by a gc root under `/nix/var/nix/gcroots/kennel/`. Without a root, the nightly `nix.gc --delete-older-than` sweep would reclaim the path, including one a live service is executing, which then fails it with `203/EXEC`.
+
+Roots come in two kinds, with a handoff between them:
+
+- Build roots, named `{build_id}-{service}` per output plus `{build_id}-config`, are created when a build finishes so its outputs survive until they are deployed. `remove_build_gc_roots` drops them once the deploy request succeeds (the deployment roots have taken over), and they are reaped when a build is cancelled or superseded.
+- Deployment roots, named `{deployment_id}` plus `{deployment_id}-config`, own the artifact a deployment currently runs. A successful deploy writes them; teardown removes them.
+
+Deploys hold one invariant: the `deployments` record is committed before the deployment gc root is moved onto the new artifact. The recorded store path is therefore always rooted, by the build root before the record lands and by the deployment root after. A deploy that fails partway (a Caddy error, a database error, the process dying) leaves the previous revision's record and root intact and mutually consistent, and never advances the root off a path the record still names.
+
+Reconcile enforces the same invariant on every pass. It re-asserts each deployment's gc root against its recorded store path (a no-op `readlink` when they already agree), so drift is corrected before a sweep can act on it. If a recorded artifact is missing from the store entirely the deployment cannot run, so reconcile stops the unit and rebuilds from the recorded commit, and the normal build and deploy flow then re-pins a fresh artifact.
 
 ## State
 
@@ -61,6 +78,8 @@ Kennel stores state in SQLite with four tables:
 - `deployments` -- active deployments with store paths, domains, unit names, and ports
 
 Runtime process state (running, stopped, failed) is owned by systemd and queried via D-Bus. Routing state is owned by Caddy and queried via the admin API. Kennel's database only tracks intent plus the historical build artifacts (logs) systemd doesn't keep.
+
+Artifact retention is likewise external: gc roots under `/nix/var/nix/gcroots/kennel/`, keyed by build id and deployment id, are what stop `nix-gc` from reclaiming the store paths builds and deployments depend on.
 
 ## Crate structure
 

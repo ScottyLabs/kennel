@@ -94,6 +94,14 @@ impl SystemdClient {
             ("Slice", "kennel.slice".into()),
             ("Restart", "on-failure".into()),
             ("RestartUSec", 5_000_000u64.into()),
+            (
+                "StartLimitIntervalUSec",
+                (kennel_config::constants::UNIT_START_LIMIT_INTERVAL.as_micros() as u64).into(),
+            ),
+            (
+                "StartLimitBurst",
+                kennel_config::constants::UNIT_START_LIMIT_BURST.into(),
+            ),
             ("DynamicUser", true.into()),
             ("User", user.into()),
             ("CPUAccounting", true.into()),

@@ -28,7 +28,9 @@ pub const HEALTHCHECK_PATH: &str = "/api/health";
 pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_STARTUP_GRACE: Duration = Duration::from_secs(60);
-pub const HEALTHCHECK_FAILURE_THRESHOLD: u32 = 5;
+
+pub const UNIT_START_LIMIT_BURST: u32 = 5;
+pub const UNIT_START_LIMIT_INTERVAL: Duration = Duration::from_secs(300);
 
 pub const PORT_RANGE_START: u16 = 10000;
 pub const PORT_RANGE_SIZE: u16 = 50000;

@@ -2,7 +2,7 @@ use crate::AppState;
 use anyhow::Context as _;
 use std::os::unix::fs::PermissionsExt as _;
 
-/// Writes the custom domains kennel serves to the `CUSTOM_DOMAINS_FILE` path, one per line.
+/// Writes the custom domains kennel serves to the `CUSTOM_DOMAINS_FILE` path, one per line
 pub async fn publish(state: &AppState) -> anyhow::Result<()> {
     let Some(path) = state.config.custom_domains_file.as_deref() else {
         return Ok(());

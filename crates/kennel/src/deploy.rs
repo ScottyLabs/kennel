@@ -101,6 +101,7 @@ pub async fn deploy_request(
         .find_by_project_branch(&build.project_id, &request.branch)
         .await?;
     let systemd = crate::systemd::SystemdClient::connect().await?;
+
     for deployment in &existing {
         let still_present = match deployment.service_type.as_str() {
             "static" => kennel_config
@@ -196,7 +197,7 @@ pub async fn deploy_request(
 
     deploy_result?;
 
-    // Deployments now own the store paths, so drop the build's pins
+    // Deployment roots hold the store paths, so drop the build pins
     remove_build_gc_roots(&build.id).await;
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&request.branch)
@@ -313,16 +314,13 @@ async fn deploy_static_site(
         .add_static_route(&route_id, &domain, store_path, site_config.spa)
         .await?;
 
-    if let Some(ref custom_domain) = site_config.custom_domain {
+    if let Some(custom_domain) = &site_config.custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
             .await?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
-
-    // Pin the store path against nix-gc once the deployment is live
-    add_gc_root(&deployment_id, store_path).await?;
 
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
@@ -341,6 +339,7 @@ async fn deploy_static_site(
     };
 
     state.store.deployments().upsert(model).await?;
+    add_gc_root(&deployment_id, store_path).await?;
 
     tracing::info!(site = %name, domain = %domain, "deployed static site");
     Ok(())
@@ -448,17 +447,11 @@ async fn deploy_service(
         anyhow::bail!("service '{name}' failed healthcheck within startup grace period");
     }
 
-    // Pin the store paths against nix-gc once the deployment is healthy
-    add_gc_root(&deployment_id, store_path).await?;
-    if let Some(ref config_store_path) = build.config_store_path {
-        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
-    }
-
     let route_id = format!("kennel-{deployment_id}");
 
     caddy.add_proxy_route(&route_id, &domain, port).await?;
 
-    if let Some(ref custom_domain) = svc_config.custom_domain {
+    if let Some(custom_domain) = &svc_config.custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_proxy_route(&custom_route_id, custom_domain, port)
@@ -466,6 +459,7 @@ async fn deploy_service(
         ensure_dns_record(state, project_name, custom_domain).await;
     }
 
+    // Commit before moving the gc root so the recorded path is never unrooted
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
         project_id: Set(build.project_id.clone()),
@@ -487,11 +481,17 @@ async fn deploy_service(
 
     state.store.deployments().upsert(model).await?;
 
+    // Pin the new artifact under the deployment root
+    add_gc_root(&deployment_id, store_path).await?;
+    if let Some(config_store_path) = &build.config_store_path {
+        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
+    }
+
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");
     Ok(())
 }
 
-/// Upserts the Cloudflare A record for a custom domain.
+/// Upserts the Cloudflare A record for a custom domain
 pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str) {
     let Some(cf) = &state.cloudflare else {
         return;
@@ -522,6 +522,137 @@ pub(crate) async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<
         String::from_utf8_lossy(&output.stderr)
     );
     Ok(())
+}
+
+/// Whether a deployment's artifact is still present in the nix store
+pub async fn store_path_exists(store_path: &str) -> bool {
+    tokio::fs::metadata(store_path).await.is_ok()
+}
+
+/// Whether the gc root symlink at `root` already resolves to `target`
+async fn root_points_at(root: &std::path::Path, target: &str) -> bool {
+    tokio::fs::read_link(root)
+        .await
+        .map(|dest| dest.to_string_lossy() == target)
+        .unwrap_or(false)
+}
+
+/// Re-pin a live deployment's gc roots to its recorded store path
+pub async fn ensure_gc_root(deployment: &::entity::deployments::Model) {
+    let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
+
+    if !root_points_at(&dir.join(&deployment.id), &deployment.store_path).await
+        && let Err(e) = add_gc_root(&deployment.id, &deployment.store_path).await
+    {
+        tracing::warn!(deployment = %deployment.id, error = %e, "failed to re-pin gc root");
+    }
+
+    if let Some(config_store_path) = &deployment.config_store_path {
+        let name = format!("{}-config", deployment.id);
+        if !root_points_at(&dir.join(&name), config_store_path).await
+            && let Err(e) = add_gc_root(&name, config_store_path).await
+        {
+            tracing::warn!(deployment = %deployment.id, error = %e, "failed to re-pin config gc root");
+        }
+    }
+}
+
+/// Recover a deployment whose store path is gone by stopping its unit and rebuilding
+pub async fn recover_collected_artifact(
+    state: &AppState,
+    deployment: &::entity::deployments::Model,
+    systemd: &crate::systemd::SystemdClient,
+) {
+    if let Some(unit_name) = &deployment.unit_name {
+        let _ = systemd.stop_unit(unit_name).await;
+    }
+
+    match enqueue_rebuild(state, deployment).await {
+        Ok(true) => tracing::warn!(
+            deployment = %deployment.id,
+            store_path = %deployment.store_path,
+            commit = %deployment.commit_sha,
+            "artifact missing from store; stopped unit and queued rebuild",
+        ),
+        Ok(false) => {}
+        Err(e) => tracing::error!(
+            deployment = %deployment.id,
+            error = %e,
+            "artifact missing from store; could not queue rebuild",
+        ),
+    }
+}
+
+/// Queue a rebuild of the deployment's commit and mark its branch's request pending
+async fn enqueue_rebuild(
+    state: &AppState,
+    deployment: &::entity::deployments::Model,
+) -> anyhow::Result<bool> {
+    // The git_ref lives on the branch's request
+    let Some(request) = state
+        .store
+        .deploy_requests()
+        .find_by_project_branch(&deployment.project_id, &deployment.branch)
+        .await?
+    else {
+        anyhow::bail!(
+            "no deploy request for {}/{}",
+            deployment.project_id,
+            deployment.branch
+        );
+    };
+
+    // Only recover the running commit when it is still the branch's intent
+    if request.commit_sha != deployment.commit_sha {
+        return Ok(false);
+    }
+
+    let mut enqueued = false;
+    match state
+        .store
+        .builds()
+        .find_by_project_commit(&deployment.project_id, &deployment.commit_sha)
+        .await?
+    {
+        Some(build) => match build.status.as_str() {
+            "queued" | "building" => {}   // A rebuild is already coming
+            "failed" => return Ok(false), // Do not re-queue a build that already failed
+            _ => {
+                // Collected or cancelled build, so rebuild it
+                state.store.builds().requeue(&build.id).await?;
+                remove_build_gc_roots(&build.id).await;
+                enqueued = true;
+            }
+        },
+        None => {
+            let model = ::entity::builds::ActiveModel {
+                id: Set(uuid::Uuid::now_v7().to_string()),
+                project_id: Set(deployment.project_id.clone()),
+                branch: Set(deployment.branch.clone()),
+                git_ref: Set(request.git_ref.clone()),
+                commit_sha: Set(deployment.commit_sha.clone()),
+                status: Set("queued".to_string()),
+                ..Default::default()
+            };
+            state.store.builds().create(model).await?;
+            enqueued = true;
+        }
+    }
+
+    // Force the branch's request pending so the rebuilt artifact deploys
+    if request.status != "pending" {
+        state
+            .store
+            .deploy_requests()
+            .set_status(&request.id, "pending")
+            .await?;
+        enqueued = true;
+    }
+
+    if enqueued {
+        state.signal.notify_one();
+    }
+    Ok(enqueued)
 }
 
 pub async fn remove_gc_roots(deployment_id: &str) {
@@ -581,7 +712,7 @@ pub fn service_unit_name(project_name: &str, branch_slug: &str, service: &str) -
     )
 }
 
-/// Builds a Grafana Logs Drilldown URL scoped to a single systemd unit.
+/// Builds a Grafana Logs Drilldown URL scoped to a single systemd unit
 pub fn drilldown_unit_url(base: &str, unit: &str, from: &str, to: &str) -> String {
     let base = base.trim_end_matches('/');
     let unit_path = urlencoding::encode(unit);

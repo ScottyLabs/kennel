@@ -4,14 +4,11 @@ use crate::teardown::teardown_deployment;
 use crate::{AppState, deploy};
 use chrono::Utc;
 use kennel_provision::ResourceProvider;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
-pub async fn run_once(
-    state: &AppState,
-    restart_failures: &mut HashMap<String, u32>,
-) -> anyhow::Result<()> {
+pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     let systemd = SystemdClient::connect().await?;
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
@@ -108,101 +105,36 @@ pub async fn run_once(
         let _ = systemd.stop_unit(orphan).await;
     }
 
-    // Restart service deployments whose units are not running
+    // Re-pin each live gc root, rebuild collected artifacts, and restart down units
     for deployment in &deployments {
-        let Some(ref unit_name) = deployment.unit_name else {
+        if !deploy::store_path_exists(&deployment.store_path).await {
+            deploy::recover_collected_artifact(state, deployment, &systemd).await;
             continue;
+        }
+        deploy::ensure_gc_root(deployment).await;
+
+        let Some(unit_name) = &deployment.unit_name else {
+            continue; // Static sites are served by Caddy, no unit to supervise
         };
 
-        if !systemd.is_active(unit_name).await {
-            let fail_count = restart_failures.entry(unit_name.clone()).or_insert(0);
-            if *fail_count >= kennel_config::constants::HEALTHCHECK_FAILURE_THRESHOLD {
+        match systemd.get_health(unit_name).await {
+            // Running or starting
+            Ok(h)
+                if matches!(
+                    h.active_state.as_str(),
+                    "active" | "activating" | "reloading"
+                ) => {}
+            // Crash-looped past the StartLimit so leave it failed
+            Ok(h) if h.active_state == "failed" => {
                 tracing::warn!(
                     unit = %unit_name,
-                    failures = *fail_count,
-                    "unit crash-looping, skipping restart"
+                    result = %h.result,
+                    restarts = h.n_restarts,
+                    "unit crash-looping; leaving stopped until redeployed",
                 );
-                continue;
             }
-            *fail_count += 1;
-
-            tracing::info!(unit = %unit_name, "restarting missing unit");
-
-            let system_user = deploy::service_user(unit_name);
-            let request = kennel_provision::ResourceRequest {
-                project_name: deployment.project_id.clone(),
-                service_name: deployment.service_name.clone(),
-                branch_slug: deployment.branch_slug.clone(),
-                environment: kennel_config::Environment::from_branch(&deployment.branch)
-                    .unwrap_or(kennel_config::Environment::Dev),
-                system_user: system_user.clone(),
-            };
-
-            let Some(config_store_path) = deployment.config_store_path.as_deref() else {
-                tracing::warn!(unit = %unit_name, "no config store path, skipping restart");
-                continue;
-            };
-            let kennel_config = match deploy::read_kennel_config(config_store_path).await {
-                Ok(c) => c,
-                Err(e) => {
-                    tracing::warn!(unit = %unit_name, error = %e, "could not read kennel config, skipping restart");
-                    continue;
-                }
-            };
-            let mut env_vars = match deploy::provision_declared(state, &kennel_config, &request)
-                .await
-            {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::warn!(unit = %unit_name, error = %e, "incompatible kennel config, skipping restart");
-                    continue;
-                }
-            };
-
-            if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT")
-                && let Some(ref config_store_path) = deployment.config_store_path
-            {
-                let env_str = request.environment.to_string();
-                if let Ok(secrets) = crate::secrets::resolve(
-                    std::path::Path::new(config_store_path),
-                    &env_str,
-                    &vault_endpoint,
-                ) {
-                    env_vars.extend(secrets);
-                }
-            }
-
-            if let Some(port) = deployment.port {
-                env_vars.insert("PORT".to_string(), port.to_string());
-            }
-            env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
-
-            let app_url = format!(
-                "https://{}",
-                deployment
-                    .custom_domain
-                    .as_deref()
-                    .unwrap_or(deployment.domain.as_str())
-            );
-            env_vars.entry("APP_URL".to_string()).or_insert(app_url);
-
-            let exec = deploy::find_executable(&deployment.store_path).await;
-            if let Ok(exec_start) = exec
-                && let Err(e) = systemd
-                    .start_transient_unit(
-                        unit_name,
-                        &exec_start,
-                        &env_vars,
-                        &system_user,
-                        deployment.config_store_path.as_deref(),
-                    )
-                    .await
-            {
-                tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
-            }
-        } else {
-            // Reset the failure counter once the unit is healthy
-            restart_failures.remove(unit_name);
+            // Down for a benign reason like a reboot so restart it
+            _ => restart_service(state, &systemd, deployment).await,
         }
     }
 
@@ -295,7 +227,6 @@ pub async fn run_once(
 
 pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
     let mut interval = tokio::time::interval(kennel_config::constants::RECONCILE_INTERVAL);
-    let mut restart_failures: HashMap<String, u32> = HashMap::new();
 
     loop {
         tokio::select! {
@@ -304,8 +235,95 @@ pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
             _ = cancel.cancelled() => break,
         }
 
-        if let Err(e) = run_once(&state, &mut restart_failures).await {
+        if let Err(e) = run_once(&state).await {
             tracing::error!(error = %e, "reconciliation failed");
+        }
+    }
+}
+
+/// Relaunch a down service unit from its recorded state
+async fn restart_service(
+    state: &AppState,
+    systemd: &SystemdClient,
+    deployment: &::entity::deployments::Model,
+) {
+    let Some(unit_name) = &deployment.unit_name else {
+        return;
+    };
+
+    tracing::info!(unit = %unit_name, "restarting missing unit");
+
+    let system_user = deploy::service_user(unit_name);
+    let request = kennel_provision::ResourceRequest {
+        project_name: deployment.project_id.clone(),
+        service_name: deployment.service_name.clone(),
+        branch_slug: deployment.branch_slug.clone(),
+        environment: kennel_config::Environment::from_branch(&deployment.branch)
+            .unwrap_or(kennel_config::Environment::Dev),
+        system_user: system_user.clone(),
+    };
+
+    let Some(config_store_path) = deployment.config_store_path.as_deref() else {
+        tracing::warn!(unit = %unit_name, "no config store path, skipping restart");
+        return;
+    };
+    let kennel_config = match deploy::read_kennel_config(config_store_path).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(unit = %unit_name, error = %e, "could not read kennel config, skipping restart");
+            return;
+        }
+    };
+    let mut env_vars = match deploy::provision_declared(state, &kennel_config, &request).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(unit = %unit_name, error = %e, "incompatible kennel config, skipping restart");
+            return;
+        }
+    };
+
+    if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT") {
+        let env_str = request.environment.to_string();
+        if let Ok(secrets) = crate::secrets::resolve(
+            std::path::Path::new(config_store_path),
+            &env_str,
+            &vault_endpoint,
+        ) {
+            env_vars.extend(secrets);
+        }
+    }
+
+    if let Some(port) = deployment.port {
+        env_vars.insert("PORT".to_string(), port.to_string());
+    }
+    env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
+
+    let app_url = format!(
+        "https://{}",
+        deployment
+            .custom_domain
+            .as_deref()
+            .unwrap_or(deployment.domain.as_str())
+    );
+    env_vars.entry("APP_URL".to_string()).or_insert(app_url);
+
+    match deploy::find_executable(&deployment.store_path).await {
+        Ok(exec_start) => {
+            if let Err(e) = systemd
+                .start_transient_unit(
+                    unit_name,
+                    &exec_start,
+                    &env_vars,
+                    &system_user,
+                    deployment.config_store_path.as_deref(),
+                )
+                .await
+            {
+                tracing::error!(unit = %unit_name, error = %e, "failed to restart unit");
+            }
+        }
+        Err(e) => {
+            tracing::error!(unit = %unit_name, error = %e, "could not find executable, skipping restart");
         }
     }
 }

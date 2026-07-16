@@ -126,7 +126,7 @@ async fn main() -> Result<()> {
     // not running yet, so any such row is necessarily orphaned.
     state.store.builds().reset_stuck().await?;
 
-    reconcile::run_once(&state, &mut std::collections::HashMap::new()).await?;
+    reconcile::run_once(&state).await?;
 
     let build_handle = tokio::spawn(build::run_worker(state.clone(), cancel.clone()));
     let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));
