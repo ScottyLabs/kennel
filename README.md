@@ -1,4 +1,8 @@
-# kennel
+<div align="center">
+  <h1>
+    <pre>kennel</pre>
+  </h1>
+</div>
 
 Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). On every push it builds the project with Nix, runs its services as systemd units and static sites through [Caddy](https://caddyserver.com), provisions per-deployment resources, resolves secrets from [OpenBao](https://openbao.org), manages DNS through [Cloudflare](https://www.cloudflare.com), and serves it over HTTPS.
 
