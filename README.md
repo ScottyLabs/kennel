@@ -1,4 +1,8 @@
-# devenv
+<div align="center">
+  <h1>
+    <pre>devenv</pre>
+  </h1>
+</div>
 
 Shared [devenv](https://devenv.sh) modules and build helpers for ScottyLabs. Provides language toolchains (Rust, Deno, Python), formatting and linting via treefmt and git hooks, local database services (Postgres, SQLite, Valkey, Garage), OpenBao secrets, Cachix binary caching, and kennel deployment config.
 
