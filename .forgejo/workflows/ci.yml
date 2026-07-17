@@ -92,4 +92,8 @@ jobs:
         run: |
           config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')
           packages=$(jq -r '[(.services // {} | keys[]), (.static_sites // {} | keys[])] | .[] | ".#" + .' "$config/kennel.json")
-          [ -n "$packages" ] && devenv shell -- nix build $packages
+          if [ -z "$packages" ]; then
+            echo "No kennel services or static sites declared; skipping build."
+            exit 0
+          fi
+          devenv shell -- nix build $packages
