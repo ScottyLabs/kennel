@@ -43,12 +43,13 @@ pub async fn provision_declared(
         if !config.provides(provider.name()) {
             continue;
         }
-        match provider.provision(request).await {
-            Ok(vars) => env_vars.extend(vars),
-            Err(e) => {
-                tracing::warn!(provider = provider.name(), error = %e, "resource provision failed");
-            }
-        }
+        let vars = provider.provision(request).await.map_err(|e| {
+            anyhow::anyhow!(
+                "provisioning declared resource '{}' failed: {e:#}",
+                provider.name()
+            )
+        })?;
+        env_vars.extend(vars);
     }
 
     Ok(env_vars)

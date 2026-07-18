@@ -38,6 +38,8 @@ impl ResourceProvider for PostgresProvider {
             .args([
                 "-h",
                 &self.socket_dir,
+                "-d",
+                "postgres",
                 "-tAc",
                 &format!("SELECT 1 FROM pg_roles WHERE rolname = '{user}'"),
             ])
@@ -63,6 +65,8 @@ impl ResourceProvider for PostgresProvider {
             .args([
                 "-h",
                 &self.socket_dir,
+                "-d",
+                "postgres",
                 "-tAc",
                 &format!("SELECT 1 FROM pg_database WHERE datname = '{db_name}'"),
             ])
@@ -76,6 +80,8 @@ impl ResourceProvider for PostgresProvider {
                 .args([
                     "-h",
                     &self.socket_dir,
+                    "-d",
+                    "postgres",
                     "-c",
                     &format!("GRANT \"{user}\" TO CURRENT_USER WITH SET TRUE"),
                 ])
@@ -128,6 +134,8 @@ impl ResourceProvider for PostgresProvider {
             .args([
                 "-h",
                 &self.socket_dir,
+                "-d",
+                "postgres",
                 "-tAc",
                 "SELECT datname FROM pg_database WHERE datname LIKE 'kennel_%'",
             ])

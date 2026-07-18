@@ -277,7 +277,7 @@ async fn restart_service(
     let mut env_vars = match deploy::provision_declared(state, &kennel_config, &request).await {
         Ok(v) => v,
         Err(e) => {
-            tracing::warn!(unit = %unit_name, error = %e, "incompatible kennel config, skipping restart");
+            tracing::warn!(unit = %unit_name, error = %e, "resource provisioning failed, skipping restart");
             return;
         }
     };
