@@ -406,6 +406,11 @@ in
     services.caddy = {
       enable = true;
       globalConfig = ''
+        # TODO: https://codeberg.org/ScottyLabs/infrastructure/issues/47
+        servers {
+          protocols h1 h2
+        }
+
         on_demand_tls {
           ask http://localhost:${toString cfg.api.port}/internal/caddy/check-domain
         }
