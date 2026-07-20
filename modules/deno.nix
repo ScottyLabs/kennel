@@ -131,7 +131,7 @@ in
         enable = true;
         name = "deno-test";
         # tests exercise first-party code that reads env and files at import
-        entry = "deno test -A --ignore=.devenv,.direnv --permit-no-files";
+        entry = "deno test -A --ignore=.devenv --permit-no-files";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$";
         pass_filenames = false;
         language = "system";
