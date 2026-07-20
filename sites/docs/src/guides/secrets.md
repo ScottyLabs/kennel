@@ -83,7 +83,7 @@ A project shell resolves secrets as it loads, so it won't build without a token.
 
 The token is periodic and renews on each shell entry, so it stays valid as long as you open a project shell at least once every 90 days. You only log in again on a new machine, or after 90 days without using it.
 
-Secrets then load into your shell automatically each time direnv reloads.
+Secrets then load into your devenv shell automatically.
 
 ## Managing secrets
 

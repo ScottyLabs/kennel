@@ -5,7 +5,7 @@ This guide walks through setting up a ScottyLabs project for deployment with ken
 ## Prerequisites
 
 - A project registed in governance with an associated Codeberg repository
-- [devenv](https://devenv.sh) and [direnv](https://direnv.net/) installed locally
+- [devenv](https://devenv.sh) and its shell hooks installed locally
 
 ## 1. Import the shared module
 
@@ -56,20 +56,15 @@ Import it in your `devenv.nix`:
 
 The `secretspec` block resolves your project's secrets from OpenBao into the shell. See the [Secrets](./secrets.md) guide to declare and manage them.
 
-## 2. Set up direnv and .gitignore
+## 2. Set up devenv
 
-Create an `.envrc` to automatically activate the devenv environment when you enter the project directory:
-
-```bash
-eval "$(devenv direnvrc)"
-use devenv
-```
-
-Then allow it:
+When you first enter the project directory, allow devenv to automatically activate the shell:
 
 ```bash
-direnv allow
+devenv allow
 ```
+
+You can exit the shell with `exit` and re-enter it with `devenv shell`.
 
 If this command fails with a secret-related error, make sure you have run the one-time [OpenBao setup](./secrets.md).
 
@@ -78,28 +73,22 @@ Add a `.gitignore` for generated and local-only files:
 ```gitignore
 # Nix / devenv
 .devenv/
-.devenv.flake.nix
 .pre-commit-config.yaml
-result
-result-*
 
 # AI
 .mcp.json
 .claude
 
-# direnv
-.direnv/
-
 # Rust
 target/
 .cargo/
+rustc-ice-*.txt
 
 # Secrets
 .env
 
 # OS
 .DS_Store
-rustc-ice-*.txt
 ```
 
 Add any project-specific entries as needed (e.g., `sites/docs/book/` for mdbook output, `node_modules/` for JS projects).

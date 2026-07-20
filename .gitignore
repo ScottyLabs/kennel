@@ -9,9 +9,6 @@ result-*
 .mcp.json
 .claude
 
-# direnv
-.direnv/
-
 # Rust
 target/
 .cargo/
