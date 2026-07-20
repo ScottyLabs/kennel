@@ -13,7 +13,7 @@ revision = "1.0"
 
 [providers]
 local = "dotenv://.env"
-vault = "vault://secrets2.scottylabs.org/secret"
+vault = "vault://secrets.scottylabs.org/secret"
 
 [profiles.ci.defaults]
 required = false

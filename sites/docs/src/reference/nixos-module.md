@@ -26,7 +26,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
 
     secrets = {
       enable = true;
-      vaultEndpoint = "https://secrets2.scottylabs.org";
+      vaultEndpoint = "https://secrets.scottylabs.org";
     };
   };
 }
