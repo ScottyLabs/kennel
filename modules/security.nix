@@ -7,6 +7,15 @@
 
 let
   cfg = config.scottylabs.security;
+
+  # TODO: https://github.com/NixOS/nixpkgs/issues/543951
+  semgrepPkg =
+    if pkgs.stdenv.hostPlatform.isLinux && pkgs.stdenv.hostPlatform.isAarch64 then
+      pkgs.semgrep.overridePythonAttrs (_: {
+        doCheck = false;
+      })
+    else
+      pkgs.semgrep;
 in
 {
   options.scottylabs.security = {
@@ -56,7 +65,7 @@ in
   config = lib.mkIf config.scottylabs.enable {
     packages =
       lib.optional cfg.osvScanner.enable pkgs.osv-scanner
-      ++ lib.optional cfg.semgrep.enable pkgs.semgrep
+      ++ lib.optional cfg.semgrep.enable semgrepPkg
       ++ lib.optional cfg.vulnix.enable pkgs.vulnix;
 
     tasks = lib.mkMerge [
@@ -70,7 +79,7 @@ in
       })
       (lib.mkIf cfg.semgrep.enable {
         "security:semgrep".exec =
-          "${pkgs.semgrep}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
+          "${semgrepPkg}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
       })
       (lib.mkIf cfg.vulnix.enable {
         "security:vulnix".exec = "${pkgs.vulnix}/bin/vulnix${
