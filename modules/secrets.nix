@@ -38,7 +38,7 @@ in
     # devenv resolves secretspec into config.secretspec.secrets, put them into the shell
     # mkDefault lets explicit env vars (e.g. DATABASE_URL) win on name collisions
     env = lib.mkMerge [
-      { BAO_ADDR = "https://secrets2.scottylabs.org"; }
+      { BAO_ADDR = "https://secrets.scottylabs.org"; }
       (lib.mapAttrs (_: lib.mkDefault) config.secretspec.secrets)
     ];
 

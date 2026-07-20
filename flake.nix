@@ -100,7 +100,7 @@
         login = {
           type = "app";
           program = "${pkgs.writeShellScript "scottylabs-login" ''
-            export BAO_ADDR=https://secrets2.scottylabs.org
+            export BAO_ADDR=https://secrets.scottylabs.org
             ${pkgs.openbao}/bin/bao login -method=oidc
             ${pkgs.openbao}/bin/bao kv get -field=CACHIX_AUTH_TOKEN secret/shared/cachix \
               | ${pkgs.cachix}/bin/cachix authtoken --stdin
