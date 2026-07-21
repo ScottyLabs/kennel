@@ -50,6 +50,16 @@ in
         match the conventional format are rejected at commit time.
       '';
     };
+
+    editorconfig.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enforce [EditorConfig](https://editorconfig.org/) rules via the
+        editorconfig-checker git hook. Files violating `.editorconfig` are
+        rejected at commit time.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -63,6 +73,7 @@ in
       config.programs = {
         nixfmt.enable = true;
         mdformat.enable = true;
+        taplo.enable = true;
       };
     };
 
@@ -70,13 +81,8 @@ in
       treefmt.enable = true;
       statix.enable = true;
       deadnix.enable = true;
-      commitizen = {
-        enable = cfg.conventionalCommits.enable;
-        # TODO: drop the override once commitizen tests pass on python 3.14
-        package = pkgs.commitizen.overridePythonAttrs (_: {
-          doCheck = false;
-        });
-      };
+      editorconfig-checker.enable = cfg.editorconfig.enable;
+      commitizen.enable = cfg.conventionalCommits.enable;
 
       # TODO: https://github.com/cachix/git-hooks.nix/pull/642
       gitleaks = {
