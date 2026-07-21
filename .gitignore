@@ -1,9 +1,6 @@
 # Nix / devenv
 .devenv/
-.devenv.flake.nix
 .pre-commit-config.yaml
-result
-result-*
 
 # AI
 .mcp.json
@@ -12,11 +9,11 @@ result-*
 # Rust
 target/
 .cargo/
-
-# OS
-.DS_Store
 rustc-ice-*.txt
 
 # Build
 sites/docs/book/
 sites/docs/src/reference/generated
+
+# OS
+.DS_Store
