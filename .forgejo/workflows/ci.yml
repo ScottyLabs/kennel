@@ -5,9 +5,11 @@ on:
       build:
         type: boolean
         default: true
+
 env:
   SECRETSPEC_PROFILE: ci
   SECRETSPEC_PROVIDER: env
+
 jobs:
   check:
     runs-on: docker
@@ -18,14 +20,17 @@ jobs:
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
       - uses: ScottyLabs/devenv/.forgejo/actions/prepare@main
+
       - name: Run checks
         run: devenv shell -- prek run --all-files
+
       - name: Run security scans
         run: |
           if ! devenv -v tasks run security > security-scan.log 2>&1; then
             cat security-scan.log
             exit 1
           fi
+
   build:
     if: ${{ inputs.build }}
     runs-on: docker
@@ -36,6 +41,7 @@ jobs:
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
       - uses: ScottyLabs/devenv/.forgejo/actions/prepare@main
+
       - name: Build
         run: |
           config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')

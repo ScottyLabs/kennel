@@ -74,6 +74,10 @@ in
         nixfmt.enable = true;
         mdformat.enable = true;
         taplo.enable = true;
+        yamlfmt = {
+          enable = true;
+          settings.formatter.retain_line_breaks_single = true;
+        };
       };
     };
 
