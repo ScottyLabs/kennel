@@ -1,0 +1,7 @@
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "Marvin timing attack needs RSA private-key operations; rsa sits under secretspec"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0173"
+reason = "unmaintained advisory for proc-macro-error2, a compile-time proc macro under sea-orm-macros with no runtime exposure"

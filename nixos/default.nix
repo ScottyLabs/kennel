@@ -282,17 +282,20 @@ in
       }
     ];
 
-    users.users.${cfg.user} = mkIf (cfg.user == "kennel") {
-      isSystemUser = true;
-      group = cfg.group;
-      extraGroups = [ "kennel-builds" ];
-      description = "Kennel service user";
+    users = {
+      users.${cfg.user} = mkIf (cfg.user == "kennel") {
+        isSystemUser = true;
+        inherit (cfg) group;
+        extraGroups = [ "kennel-builds" ];
+        description = "Kennel service user";
+      };
+
+      groups = {
+        ${cfg.group} = mkIf (cfg.group == "kennel") { };
+        # Shared group so the daemon can read back the build units' work dirs
+        kennel-builds = { };
+      };
     };
-
-    users.groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
-
-    # Shared group so the daemon can read back the build units' work dirs
-    users.groups.kennel-builds = { };
 
     security.polkit.enable = true;
     security.polkit.extraConfig = ''
@@ -304,104 +307,106 @@ in
       });
     '';
 
-    systemd.slices.kennel = {
-      description = "Kennel managed deployments";
-    };
-
-    systemd.services.kennel = {
-      description = "Kennel deployment platform";
-      after = [
-        "network.target"
-        "caddy.service"
-      ];
-      wants = [ "caddy.service" ];
-      wantedBy = [ "multi-user.target" ];
-
-      path = [
-        cfg.devenvPackage
-      ]
-      ++ (with pkgs; [
-        git
-        nix
-        cachix
-      ])
-      ++ optional cfg.resources.postgres.enable pkgs.postgresql
-      ++ optional cfg.resources.valkey.enable pkgs.valkey;
-
-      environment = {
-        HOME = "/var/lib/kennel";
-        RUST_LOG = "info,sqlx=warn";
-        DATABASE_PATH = "/var/lib/kennel/kennel.db";
-        API_HOST = cfg.api.host;
-        API_PORT = toString cfg.api.port;
-        EPHEMERAL_DOMAIN = cfg.domains.ephemeral;
-        CADDY_ADMIN_URL = cfg.caddy.adminUrl;
-        MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
-        WORK_DIR = cfg.builder.workDir;
-        WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
-        FORGEJO_API_URL = cfg.forgejo.apiUrl;
-        FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
-      }
-      // optionalAttrs cfg.builder.cachix.enable {
-        CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
-      }
-      // optionalAttrs cfg.resources.postgres.enable {
-        POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
-      }
-      // optionalAttrs cfg.resources.valkey.enable {
-        VALKEY_SOCKET_PATH = cfg.resources.valkey.socketPath;
-      }
-      // optionalAttrs cfg.resources.garage.enable {
-        GARAGE_ADMIN_ENDPOINT = cfg.resources.garage.adminEndpoint;
-        GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
-      }
-      // optionalAttrs cfg.secrets.enable {
-        VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
-      }
-      // optionalAttrs (cfg.domains.cloudflare.publicIp != null && cfg.domains.cloudflare.zones != { }) {
-        CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
-        KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
-      }
-      // optionalAttrs (cfg.customDomainsFile != null) {
-        CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
-      }
-      // optionalAttrs (cfg.grafanaUrl != null) {
-        GRAFANA_URL = cfg.grafanaUrl;
+    systemd = {
+      slices.kennel = {
+        description = "Kennel managed deployments";
       };
 
-      serviceConfig = {
-        User = cfg.user;
-        Group = cfg.group;
-        ExecStart = "${cfg.package}/bin/kennel";
-        Restart = "on-failure";
-        RestartSec = 5;
+      services.kennel = {
+        description = "Kennel deployment platform";
+        after = [
+          "network.target"
+          "caddy.service"
+        ];
+        wants = [ "caddy.service" ];
+        wantedBy = [ "multi-user.target" ];
 
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        ReadWritePaths = [
-          "/var/lib/kennel"
-          "/run/kennel"
-          "/nix/var/nix/gcroots/kennel"
+        path = [
+          cfg.devenvPackage
         ]
-        ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
-        ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
+        ++ (with pkgs; [
+          git
+          nix
+          cachix
+        ])
+        ++ optional cfg.resources.postgres.enable pkgs.postgresql
+        ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
-        Delegate = "yes";
+        environment = {
+          HOME = "/var/lib/kennel";
+          RUST_LOG = "info,sqlx=warn";
+          DATABASE_PATH = "/var/lib/kennel/kennel.db";
+          API_HOST = cfg.api.host;
+          API_PORT = toString cfg.api.port;
+          EPHEMERAL_DOMAIN = cfg.domains.ephemeral;
+          CADDY_ADMIN_URL = cfg.caddy.adminUrl;
+          MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
+          WORK_DIR = cfg.builder.workDir;
+          WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
+          FORGEJO_API_URL = cfg.forgejo.apiUrl;
+          FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
+        }
+        // optionalAttrs cfg.builder.cachix.enable {
+          CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
+        }
+        // optionalAttrs cfg.resources.postgres.enable {
+          POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
+        }
+        // optionalAttrs cfg.resources.valkey.enable {
+          VALKEY_SOCKET_PATH = cfg.resources.valkey.socketPath;
+        }
+        // optionalAttrs cfg.resources.garage.enable {
+          GARAGE_ADMIN_ENDPOINT = cfg.resources.garage.adminEndpoint;
+          GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
+        }
+        // optionalAttrs cfg.secrets.enable {
+          VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
+        }
+        // optionalAttrs (cfg.domains.cloudflare.publicIp != null && cfg.domains.cloudflare.zones != { }) {
+          CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
+          KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
+        }
+        // optionalAttrs (cfg.customDomainsFile != null) {
+          CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
+        }
+        // optionalAttrs (cfg.grafanaUrl != null) {
+          GRAFANA_URL = cfg.grafanaUrl;
+        };
 
-        EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
+        serviceConfig = {
+          User = cfg.user;
+          Group = cfg.group;
+          ExecStart = "${cfg.package}/bin/kennel";
+          Restart = "on-failure";
+          RestartSec = 5;
+
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ReadWritePaths = [
+            "/var/lib/kennel"
+            "/run/kennel"
+            "/nix/var/nix/gcroots/kennel"
+          ]
+          ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
+          ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
+
+          Delegate = "yes";
+
+          EnvironmentFile = optional (cfg.environmentFile != null) cfg.environmentFile;
+        };
       };
-    };
 
-    systemd.tmpfiles.rules = [
-      "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/builds 2770 ${cfg.user} kennel-builds -"
-      "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
-      "d /nix/var/nix/gcroots/kennel 0755 ${cfg.user} ${cfg.group} -"
-      "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
-      "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
-    ];
+      tmpfiles.rules = [
+        "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
+        "d /var/lib/kennel/builds 2770 ${cfg.user} kennel-builds -"
+        "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
+        "d /nix/var/nix/gcroots/kennel 0755 ${cfg.user} ${cfg.group} -"
+        "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
+        "d /run/kennel 0755 ${cfg.user} ${cfg.group} -"
+      ];
+    };
 
     services.caddy = {
       enable = true;

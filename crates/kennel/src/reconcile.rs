@@ -59,6 +59,13 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                     .set_status(&request.id, "failed")
                     .await;
             }
+            "skipped" => {
+                let _ = state
+                    .store
+                    .deploy_requests()
+                    .set_status(&request.id, "skipped")
+                    .await;
+            }
             _ => {}
         }
     }

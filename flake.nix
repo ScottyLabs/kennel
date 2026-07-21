@@ -50,7 +50,7 @@
           docsGen = import ./sites/docs/generate.nix { inherit pkgs scottylabs; };
 
           docs = (scottylabs.mkLib pkgs).buildMdbook {
-            src = docsGen.src;
+            inherit (docsGen) src;
             name = "kennel-docs";
           };
         in

@@ -89,8 +89,11 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
 
         match outcome {
             Ok(result) => match result {
-                Ok(()) => {
-                    let description = "build succeeded";
+                Ok(build_outcome) => {
+                    let description = match build_outcome {
+                        BuildOutcome::Built => "build succeeded",
+                        BuildOutcome::Skipped => "skipped: no services or static sites defined",
+                    };
                     if let Some((ref owner, ref repo)) = owner_repo
                         && let Err(e) = state
                             .forgejo
@@ -170,6 +173,12 @@ struct BuildInput {
     commit_sha: String,
 }
 
+/// Result of a finished build for a commit
+enum BuildOutcome {
+    Built,
+    Skipped,
+}
+
 /// The isolated build hands these results back through a work-dir file.
 #[derive(Serialize, Deserialize)]
 struct BuildOutput {
@@ -198,7 +207,10 @@ fn set_group_writable(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Runs a build in a separate systemd unit and records its result.
-async fn process_build(state: &AppState, build: &::entity::builds::Model) -> anyhow::Result<()> {
+async fn process_build(
+    state: &AppState,
+    build: &::entity::builds::Model,
+) -> anyhow::Result<BuildOutcome> {
     let work_dir = PathBuf::from(&state.config.work_dir).join(&build.id);
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await?;
@@ -261,6 +273,21 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
             .map_err(|e| anyhow::anyhow!("build unit produced no result file: {e}"))?,
     )?;
 
+    if output.kennel_config.services.is_empty() && output.kennel_config.static_sites.is_empty() {
+        state
+            .store
+            .builds()
+            .set_status(&build.id, "skipped")
+            .await?;
+        state
+            .store
+            .deploy_requests()
+            .delete_by_project_branch(&build.project_id, &build.branch)
+            .await?;
+        let _ = tokio::fs::remove_dir_all(&work_dir).await;
+        return Ok(BuildOutcome::Skipped);
+    }
+
     if let Ok(cache_name) = std::env::var("CACHIX_CACHE_NAME") {
         let paths: Vec<&str> = output.store_paths.values().map(String::as_str).collect();
         if let Err(e) = cachix_push(&cache_name, &paths).await {
@@ -294,7 +321,7 @@ async fn process_build(state: &AppState, build: &::entity::builds::Model) -> any
         .await?;
 
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
-    Ok(())
+    Ok(BuildOutcome::Built)
 }
 
 /// Entry point for the `kennel build-exec <id>` subcommand.
@@ -338,7 +365,7 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
     let (kennel_config, config_store_path) = eval_kennel_config(log, &repo_path).await?;
 
     if kennel_config.services.is_empty() && kennel_config.static_sites.is_empty() {
-        anyhow::bail!("no services or static sites defined");
+        log_line(log, "no services or static sites defined, skipping deploy");
     }
 
     let mut store_paths: HashMap<String, String> = HashMap::new();
