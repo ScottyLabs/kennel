@@ -19,7 +19,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
-      - uses: ScottyLabs/devenv/.forgejo/actions/prepare@main
+      - uses: https://codeberg.org/ScottyLabs/devenv/.forgejo/actions/prepare@main
 
       - name: Run checks
         run: devenv shell -- prek run --all-files
@@ -40,7 +40,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
-      - uses: ScottyLabs/devenv/.forgejo/actions/prepare@main
+      - uses: https://codeberg.org/ScottyLabs/devenv/.forgejo/actions/prepare@main
 
       - name: Build
         run: |
