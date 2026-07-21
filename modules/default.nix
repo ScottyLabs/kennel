@@ -84,6 +84,16 @@ in
       editorconfig-checker.enable = cfg.editorconfig.enable;
       commitizen.enable = cfg.conventionalCommits.enable;
 
+      # TODO: https://github.com/cachix/git-hooks.nix/issues/728
+      taplo-check = {
+        enable = true;
+        name = "taplo-check";
+        entry = "${pkgs.taplo}/bin/taplo check";
+        types = [ "toml" ];
+        pass_filenames = true;
+        language = "system";
+      };
+
       # TODO: https://github.com/cachix/git-hooks.nix/pull/642
       gitleaks = {
         enable = true;
