@@ -10,9 +10,9 @@
   src,
   python ? pkgs.python3,
   sourcePreference ? "wheel",
-  # pick the locked dependency closure to install from the loaded workspace
+  # Pick the locked dependency closure to install from the loaded workspace
   selectDeps ? (ws: ws.deps.default),
-  # applied last, to supply system libs or build tools uv2nix can't infer
+  # Applied last, to supply system libs or build tools uv2nix can't infer
   overrides ? (_final: _prev: { }),
 }:
 
@@ -24,7 +24,7 @@ let
   workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = src; };
   overlay = workspace.mkPyprojectOverlay { inherit sourcePreference; };
 
-  # the wheel overlay avoids building the bootstrap build systems from source
+  # The wheel overlay avoids building the bootstrap build systems from source
   buildSystems =
     if sourcePreference == "wheel" then
       pyproject-build-systems.overlays.wheel

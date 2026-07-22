@@ -9,7 +9,7 @@ let
   cfg = config.scottylabs.haskell;
 
   # TODO: ghc914 once hydra caches its set
-  # newest fully binary-cached set, keep in sync with build-haskell-service.nix
+  # Newest fully binary-cached set, keep in sync with build-haskell-service.nix
   hset = pkgs.haskell.packages.ghc912;
 
   extendedSet = hset.extend (

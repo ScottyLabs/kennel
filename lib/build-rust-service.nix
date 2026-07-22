@@ -15,7 +15,7 @@ let
   craneLib = crane.mkLib pkgs;
   fromToml = craneLib.crateNameFromCargoToml { cargoToml = src + "/Cargo.toml"; };
 
-  # scope src to just these workspace members, plus the manifests they need
+  # Scope src to just these workspace members, plus the manifests they need
   scopedSrc =
     if paths == null then
       src
@@ -32,7 +32,7 @@ let
       };
 
   commonArgs = {
-    # keep secretspec.toml in the source for secretspec_derive's build-time read
+    # Keep secretspec.toml in the source for secretspec_derive's build-time read
     src = pkgs.lib.cleanSourceWith {
       src = scopedSrc;
       filter = path: type: craneLib.filterCargoSources path type || baseNameOf path == "secretspec.toml";

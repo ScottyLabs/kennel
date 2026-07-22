@@ -92,7 +92,7 @@ in
       };
     };
 
-    # fetch sccache S3 creds from OpenBao unless CI already set them
+    # Fetch sccache S3 creds from OpenBao unless CI already set them
     enterShell = ''
       if [ -z "''${AWS_ACCESS_KEY_ID:-}" ]; then
         export AWS_ACCESS_KEY_ID=$(${pkgs.openbao}/bin/bao kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache)

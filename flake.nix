@@ -54,7 +54,7 @@
           _module.args.ricochet = ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
         };
 
-      # build helpers bound to a consumer pkgs, mirroring crane.mkLib
+      # Build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {
         buildDenoTask = pkgs.callPackage ./lib/build-deno-task.nix { };
         buildRustService = import ./lib/build-rust-service.nix { inherit pkgs crane; };
@@ -76,10 +76,25 @@
             mdbook build ${src} --dest-dir "$out"
           '';
         buildOptionsDoc = import ./lib/options-doc.nix { inherit pkgs; };
+        mkAtlantisYaml = import ./lib/mk-atlantis-yaml.nix { inherit pkgs; };
+      };
+
+      # Terranix modules shared across ScottyLabs infrastructure/governance repos
+      terranixModules.s3Backend = {
+        terraform.backend.s3 = {
+          bucket = "tofu-state";
+          endpoints.s3 = "http://127.0.0.1:3900";
+          region = "us-east-1";
+          use_path_style = true;
+          skip_credentials_validation = true;
+          skip_requesting_account_id = true;
+          skip_metadata_api_check = true;
+          skip_region_validation = true;
+        };
       };
     in
     {
-      inherit devenvModules mkLib;
+      inherit devenvModules mkLib terranixModules;
 
       packages = forAllSystems (pkgs: {
         options-doc = (mkLib pkgs).buildOptionsDoc {

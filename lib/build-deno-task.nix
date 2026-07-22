@@ -11,14 +11,14 @@
 
 {
   src,
-  # workspace member subdir under src ("." for a single-project src)
+  # Workspace member subdir under src ("." for a single-project src)
   cwd ? ".",
   pname,
   version ? "0.1.0",
   task ? "build",
   output ? "dist",
   entrypoint ? null,
-  # provision denort so `deno compile` runs inside the offline sandbox
+  # Provision denort so `deno compile` runs inside the offline sandbox
   compile ? false,
 }:
 
@@ -28,7 +28,7 @@ let
   parse =
     key:
     let
-      # split name@version, bounding the version at the first "_" to drop Deno's "_peer" suffix
+      # Split name@version, bounding the version at the first "_" to drop Deno's "_peer" suffix
       m = builtins.match "(@?[^@]+)@([^_]+).*" key;
     in
     {
@@ -80,7 +80,7 @@ let
     )
   ) (lib.groupBy (e: e.name) npmEntries);
 
-  # the npm cache deno reads is the extracted tarball plus a packument per package
+  # The npm cache deno reads is the extracted tarball plus a packument per package
   denoCache = runCommand "${pname}-deno-cache" { } ''
     mkdir -p "$out/npm/registry.npmjs.org"
     ${lib.concatStringsSep "\n" (

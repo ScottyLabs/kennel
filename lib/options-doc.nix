@@ -3,9 +3,9 @@
 
 {
   module,
-  # selects the options to document, e.g. options: options.scottylabs
+  # Selects the options to document, e.g. options: options.scottylabs
   subtree,
-  # rewrite declaration links under root to the repoUrl source browser
+  # Rewrite declaration links under root to the repoUrl source browser
   root,
   repoUrl,
 }:
@@ -16,7 +16,7 @@ let
   eval = lib.evalModules {
     modules = [
       module
-      # tolerate config set on options declared elsewhere
+      # Tolerate config set on options declared elsewhere
       { config._module.check = false; }
     ];
     specialArgs = { inherit pkgs; };

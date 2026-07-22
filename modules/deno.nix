@@ -100,11 +100,11 @@ in
           typeAware = true;
           allow = [
             "prefer-readonly-parameter-types"
-            # todo comments are allowed
+            # Todo comments are allowed
             "no-warning-comments"
           ]
           ++ lib.optionals cfg.react.enable [
-            # the automatic jsx runtime needs no react import
+            # The automatic jsx runtime needs no react import
             "react-in-jsx-scope"
             "jsx-uses-react"
           ];
@@ -121,7 +121,7 @@ in
       deno-check = lib.mkIf (!cfg.svelte.enable) {
         enable = true;
         name = "deno-check";
-        # checks the whole graph so module augmentations apply
+        # Checks the whole graph so module augmentations apply
         entry = "deno check .";
         files = "\\.(ts|tsx|mts|cts)$";
         pass_filenames = false;
@@ -130,7 +130,7 @@ in
       deno-test = {
         enable = true;
         name = "deno-test";
-        # tests exercise first-party code that reads env and files at import
+        # Tests exercise first-party code that reads env and files at import
         entry = "deno test -A --ignore=.devenv --permit-no-files";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx)$";
         pass_filenames = false;
