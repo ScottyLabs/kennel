@@ -35,7 +35,7 @@ in
     services.postgres = {
       enable = true;
       package = pkgs.postgresql_18;
-      extensions = cfg.extensions;
+      inherit (cfg) extensions;
       listen_addresses = "";
       initialDatabases = [
         { name = projectName; }

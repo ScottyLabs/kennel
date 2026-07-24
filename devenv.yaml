@@ -1,8 +1,8 @@
 inputs:
   nixpkgs:
     url: github:nixos/nixpkgs/nixos-unstable
-  scottylabs:
-    url: git+https://codeberg.org/ScottyLabs/devenv
+  ricochet:
+    url: git+https://codeberg.org/anish/ricochet
     inputs:
       nixpkgs:
         follows: nixpkgs

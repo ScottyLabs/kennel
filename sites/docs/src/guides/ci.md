@@ -1,6 +1,6 @@
 # Continuous Integration
 
-ScottyLabs projects share one reusable Forgejo Actions workflow from the [devenv repo](https://codeberg.org/ScottyLabs/devenv). It runs the git hooks your `devenv.nix` enables and builds the project, matching what runs on commit.
+ScottyLabs projects share one reusable Forgejo Actions workflow from the [kennel repo](https://codeberg.org/ScottyLabs/kennel). It runs the git hooks your `devenv.nix` enables and builds the project, matching what runs on commit.
 
 ## Adding CI to a project
 
@@ -16,7 +16,7 @@ on:
 
 jobs:
   check:
-    uses: ScottyLabs/devenv/.forgejo/workflows/ci.yml@main
+    uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
     secrets: inherit
 ```
 

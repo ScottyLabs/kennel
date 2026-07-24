@@ -1,14 +1,16 @@
 # Mdbook source tree with the options references generated from module
 # declarations, pulled into the reference pages via {{#include}}
-{ pkgs, scottylabs }:
+{
+  pkgs,
+  mkLib,
+  devenvOptionsMd,
+}:
 
 let
-  slib = scottylabs.mkLib pkgs;
-
-  devenvOptionsMd = scottylabs.packages.${pkgs.stdenv.hostPlatform.system}.options-doc;
+  slib = mkLib pkgs;
 
   nixosOptionsMd = slib.buildOptionsDoc {
-    module = ../../nixos;
+    module = ../../nix/nixos.nix;
     subtree = options: options.services.kennel;
     root = ../..;
     repoUrl = "https://codeberg.org/ScottyLabs/kennel/src/branch/main";

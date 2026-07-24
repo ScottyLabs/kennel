@@ -76,7 +76,7 @@ Commit a `.env.example` listing each personal secret as an empty `KEY=` line and
 Log in to OpenBao and configure Cachix once per machine:
 
 ```bash
-nix run git+https://codeberg.org/ScottyLabs/devenv#login
+nix run git+https://codeberg.org/ScottyLabs/kennel#login
 ```
 
 A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above. It also stores your Cachix auth token so devenv pulls from and pushes to the shared binary cache.
@@ -129,5 +129,6 @@ Runtime `load()` reads `secretspec.toml` from disk, not only at build time. Kenn
 - [Rust](https://secretspec.dev/sdk/rust/)
 - [TypeScript](https://secretspec.dev/sdk/nodejs/)
 - [Python](https://secretspec.dev/sdk/python/)
+- [Haskell](https://secretspec.dev/sdk/haskell/)
 
 See the [SDK overview](https://secretspec.dev/sdk/overview/) for the full list of supported languages.

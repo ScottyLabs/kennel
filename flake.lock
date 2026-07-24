@@ -36,24 +36,20 @@
     "cachix_2": {
       "inputs": {
         "devenv": [
-          "scottylabs",
           "ricochet",
           "devenv"
         ],
         "flake-compat": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "flake-compat"
         ],
         "git-hooks": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "git-hooks"
         ],
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
@@ -76,11 +72,11 @@
     },
     "crane": {
       "locked": {
-        "lastModified": 1781825982,
-        "narHash": "sha256-SlXKwIRIhrOSAcTjCB3ftPLzJWZStQIPS7J1FlZPnKk=",
+        "lastModified": 1784564969,
+        "narHash": "sha256-TkTWNhJV/8Wk3czlbz4bwHZkFCaCHPsOy+oJe4PUiXg=",
         "owner": "ipetkov",
         "repo": "crane",
-        "rev": "469fd08d0bcf6926321fa973c6777fbc87785dd7",
+        "rev": "7930f6c291de6f83c257839d434592aa085f290a",
         "type": "github"
       },
       "original": {
@@ -152,11 +148,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1783911906,
-        "narHash": "sha256-VKpbIaPO4OkONY88DQHD/nOPSkV6o4wWMra7E4faaXU=",
+        "lastModified": 1784920213,
+        "narHash": "sha256-WIMZ5kzwq/46HV0winBiX8WpNgjumph0Xq5g040fLbc=",
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "407080febcc800abfd0fd688a0d513884aad620c",
+        "rev": "af76dd4256aae05e6c4836b4a3faa26cc68e4d54",
         "type": "github"
       },
       "original": {
@@ -248,7 +244,6 @@
     "flake-parts_2": {
       "inputs": {
         "nixpkgs-lib": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
@@ -271,11 +266,11 @@
     "ghostty": {
       "flake": false,
       "locked": {
-        "lastModified": 1782866021,
-        "narHash": "sha256-BOLtzL5iAHmtCOg9/DXtcfw+K86QWol088K72chJB04=",
+        "lastModified": 1784602798,
+        "narHash": "sha256-298x90knBUWX5GHGXh2SKsAKvStjU2ri9UgOGoF79/8=",
         "owner": "ghostty-org",
         "repo": "ghostty",
-        "rev": "e1d31deaaed21aa9225afca78d778fb373c95852",
+        "rev": "88b4cd047fa627cdca6781bc7e7dc8b75a2cecb9",
         "type": "github"
       },
       "original": {
@@ -328,14 +323,12 @@
     "git-hooks_2": {
       "inputs": {
         "flake-compat": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "flake-compat"
         ],
         "gitignore": "gitignore",
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
@@ -358,7 +351,6 @@
     "gitignore": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "git-hooks",
@@ -422,36 +414,30 @@
     "nix_2": {
       "inputs": {
         "flake-compat": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "flake-compat"
         ],
         "flake-parts": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "flake-parts"
         ],
         "git-hooks-nix": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "git-hooks"
         ],
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
         ],
         "nixpkgs-23-11": [
-          "scottylabs",
           "ricochet",
           "devenv"
         ],
         "nixpkgs-regression": [
-          "scottylabs",
           "ricochet",
           "devenv"
         ]
@@ -484,11 +470,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1780381423,
-        "narHash": "sha256-S1BIJiQF4lRtJUKak0e97JwNvbe69/LW78YJJuB18Qk=",
+        "lastModified": 1783935112,
+        "narHash": "sha256-IAQ14nteIKXAz4cd75UcZrsHGEVJ7QNrkUwX9rmeZ/Y=",
         "owner": "nix-community",
         "repo": "nixd",
-        "rev": "0e07c08c448a2995e7793d1098437b29bbe80b02",
+        "rev": "a64cd33e53b316b6b092ea0a966640cd2309bf3d",
         "type": "github"
       },
       "original": {
@@ -500,13 +486,11 @@
     "nixd_2": {
       "inputs": {
         "flake-parts": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "flake-parts"
         ],
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
@@ -582,11 +566,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1783776592,
-        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
+        "lastModified": 1784796856,
+        "narHash": "sha256-wWFrV5/Qbm+lyt5x20E/bSbfJiGKMo4RCxZV8cl/WZI=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3",
+        "rev": "e2587caef70cea85dd97d7daab492899902dbf5d",
         "type": "github"
       },
       "original": {
@@ -618,24 +602,21 @@
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "nixpkgs"
         ],
         "pyproject-nix": [
-          "scottylabs",
           "pyproject-nix"
         ],
         "uv2nix": [
-          "scottylabs",
           "uv2nix"
         ]
       },
       "locked": {
-        "lastModified": 1782093830,
-        "narHash": "sha256-6gmEVe69+KlRkZD4PEEV5xAlB9CB0Y9TiuEgQjDrKTQ=",
+        "lastModified": 1784580899,
+        "narHash": "sha256-65qjoshs2FUkt+3NzaVutCWjydUpiHElXLo+0SGuvPk=",
         "owner": "pyproject-nix",
         "repo": "build-system-pkgs",
-        "rev": "430680a19bc85a3bda55f12e4cc1a1aadcf2e478",
+        "rev": "5c4cc964cfb1e3cab9134dabe2d86bc4858f3867",
         "type": "github"
       },
       "original": {
@@ -647,16 +628,15 @@
     "pyproject-nix": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1782089418,
-        "narHash": "sha256-LRD1SuQWr49fGq3A+8GLXfsLE2xqIpQA440YDZwms3M=",
+        "lastModified": 1784591072,
+        "narHash": "sha256-zP/WaDxrRu8GANZM61+V2LT/7ycEEdoyLWn7M6WzU7M=",
         "owner": "pyproject-nix",
         "repo": "pyproject.nix",
-        "rev": "43f0b40edd0a74c63f66b7b48d969ae6b740d611",
+        "rev": "e3b599ca2e7fcf93d4edf65d7f19bbf6491724f3",
         "type": "github"
       },
       "original": {
@@ -670,7 +650,6 @@
         "crane": "crane_2",
         "devenv": "devenv_2",
         "nixpkgs": [
-          "scottylabs",
           "nixpkgs"
         ]
       },
@@ -690,9 +669,14 @@
     },
     "root": {
       "inputs": {
+        "crane": "crane",
         "devenv": "devenv",
         "nixpkgs": "nixpkgs_2",
-        "scottylabs": "scottylabs"
+        "pyproject-build-systems": "pyproject-build-systems",
+        "pyproject-nix": "pyproject-nix",
+        "ricochet": "ricochet",
+        "treefmt-nix": "treefmt-nix_3",
+        "uv2nix": "uv2nix"
       }
     },
     "rust-overlay": {
@@ -719,7 +703,6 @@
     "rust-overlay_2": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixpkgs"
@@ -737,32 +720,6 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "type": "github"
-      }
-    },
-    "scottylabs": {
-      "inputs": {
-        "crane": "crane",
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "pyproject-build-systems": "pyproject-build-systems",
-        "pyproject-nix": "pyproject-nix",
-        "ricochet": "ricochet",
-        "treefmt-nix": "treefmt-nix_3",
-        "uv2nix": "uv2nix"
-      },
-      "locked": {
-        "lastModified": 1784599734,
-        "narHash": "sha256-itZSYSG+tfrPckLjqcNiCNQOb6uiGmXr7fYWCDZ7VKM=",
-        "ref": "refs/heads/main",
-        "rev": "479fb34ca3cccfe45eb3b97f5f05b7b4795cbdf3",
-        "revCount": 106,
-        "type": "git",
-        "url": "https://codeberg.org/ScottyLabs/devenv"
-      },
-      "original": {
-        "type": "git",
-        "url": "https://codeberg.org/ScottyLabs/devenv"
       }
     },
     "treefmt-nix": {
@@ -790,7 +747,6 @@
     "treefmt-nix_2": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "ricochet",
           "devenv",
           "nixd",
@@ -814,16 +770,15 @@
     "treefmt-nix_3": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1780220602,
-        "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
+        "lastModified": 1784369104,
+        "narHash": "sha256-47cxbcZODibHv3rELFQ9vZly0vUNkND/atn/U7HLeb0=",
         "owner": "numtide",
         "repo": "treefmt-nix",
-        "rev": "db947814a175b7ca6ded66e21383d938df01c227",
+        "rev": "df3c0640565d04a0261253cdd89fce78ec50168a",
         "type": "github"
       },
       "original": {
@@ -835,20 +790,18 @@
     "uv2nix": {
       "inputs": {
         "nixpkgs": [
-          "scottylabs",
           "nixpkgs"
         ],
         "pyproject-nix": [
-          "scottylabs",
           "pyproject-nix"
         ]
       },
       "locked": {
-        "lastModified": 1782100052,
-        "narHash": "sha256-UfyLY3Hfwb3JqxCcj0953GxTFI5dEL85EKEe6DAFiVs=",
+        "lastModified": 1784582828,
+        "narHash": "sha256-uPeuFNSYO429IEiud3iJKWIpN/xrH2CANj1uYNiDxqc=",
         "owner": "pyproject-nix",
         "repo": "uv2nix",
-        "rev": "920fc6dfaf9f10ec56de93b184055e1a9f380d5e",
+        "rev": "49dac8d206c42175b069b7c6050ba27060a21106",
         "type": "github"
       },
       "original": {

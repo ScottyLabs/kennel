@@ -1,7 +1,12 @@
 { pkgs, inputs, ... }:
 
 {
-  imports = [ inputs.scottylabs.devenvModules.default ];
+  imports = [ ./nix/modules ];
+
+  _module.args.ricochet = inputs.ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
+
+  # hook should not scan its own glyph blocklist source
+  git-hooks.hooks.block-ai-slop.excludes = [ "^nix/modules/default\\.nix$" ];
 
   scottylabs = {
     enable = true;
@@ -34,6 +39,5 @@
       nix build .#docs-options --out-link sites/docs/src/reference/generated
       cd sites/docs && mdbook serve
     '';
-    clean.exec = "rm -rf .devenv/state";
   };
 }

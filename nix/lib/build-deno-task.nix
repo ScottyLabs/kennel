@@ -45,7 +45,7 @@ let
     {
       inherit (p) name version;
       inherit unscoped;
-      integrity = info.integrity;
+      inherit (info) integrity;
       tarball = fetchurl {
         url = "https://registry.npmjs.org/${p.name}/-/${unscoped}-${p.version}.tgz";
         hash = info.integrity;
@@ -69,7 +69,7 @@ let
               dependencies = { };
               dist = {
                 tarball = "https://registry.npmjs.org/${name}/-/${e.unscoped}-${e.version}.tgz";
-                integrity = e.integrity;
+                inherit (e) integrity;
               };
             }
           ) entries

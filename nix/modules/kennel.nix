@@ -17,7 +17,7 @@ let
 
     static_sites = lib.mapAttrs (name: site: {
       package_attr = name;
-      spa = site.spa;
+      inherit (site) spa;
       custom_domain = site.customDomain;
     }) cfg.sites;
 

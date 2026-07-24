@@ -1,11 +1,11 @@
 # Build Helpers
 
-These builders come from the [shared ScottyLabs devenv flake](https://codeberg.org/ScottyLabs/devenv) as `mkLib`, a function applied to a `pkgs` set (the same shape as `crane.mkLib`). Add the flake as an input, then call a helper per system:
+These builders come from the [shared ScottyLabs flake](https://codeberg.org/ScottyLabs/kennel) as `mkLib`, a function applied to a `pkgs` set (the same shape as `crane.mkLib`). Add the flake as an input, then call a helper per system:
 
 ```nix
 # flake.nix inputs
 scottylabs = {
-  url = "git+https://codeberg.org/ScottyLabs/devenv";
+  url = "git+https://codeberg.org/ScottyLabs/kennel";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 
