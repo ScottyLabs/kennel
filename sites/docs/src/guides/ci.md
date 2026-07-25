@@ -25,6 +25,19 @@ It installs Lix and devenv, then:
 - runs every git hook your modules enable (formatting, linting, type-checking, tests, commit message checks) with `devenv shell -- pre-commit run --all-files`
 - builds every service and site declared in `scottylabs.kennel.services` and `scottylabs.kennel.sites` with `nix build`, the same set kennel deploys
 
+## Options
+
+The workflow takes one input, `build` (boolean, default `true`), which gates the build job. A project with nothing for kennel to build, or whose build is too expensive to run per commit, can keep the checks and skip it:
+
+```yaml
+jobs:
+  check:
+    uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
+    secrets: inherit
+    with:
+      build: false
+```
+
 ## Caching
 
 - Cachix (`scottylabs`) as a substituter for pulls and a push target for Nix store paths.
