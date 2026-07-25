@@ -8,7 +8,7 @@ Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). On e
 
 Every branch and open pull request gets its own deployment at `{project}-{branch}.scottylabs.net`, redeployed on every push and torn down when the branch or PR closes.
 
-A project's `devenv.nix`, built on the shared [ScottyLabs devenv module](https://codeberg.org/scottylabs/devenv), defines its local development environment, its CI, and its production deployment. The daemon and the module are versioned together.
+A project's `devenv.nix`, built on the shared ScottyLabs devenv modules in this repo (`nix/modules`), defines its local development environment, its CI, and its production deployment. The daemon and the modules are versioned together.
 
 Internally, kennel is a single daemon that takes git webhooks, builds, deploys, and reconciles running state against declared intent. It keeps intent and build history in SQLite and leaves runtime state to systemd, Caddy, and Nix.
 
@@ -20,8 +20,12 @@ Kennel can also publish the hosts of its live deployments to a file. [ricochet](
 - `crates/kennel-config`: shared types and the devenv config contract
 - `crates/kennel-provision`: resource provisioning (PostgreSQL, Valkey, Garage)
 - `crates/entity`, `crates/migration`: SQLite schema and SeaORM entities
-- `nixos/`: NixOS module to run it on a host
+- `nix/modules`: the shared devenv modules projects build on
+- `nix/lib`: Nix build helpers (`mkLib`)
+- `nix/nixos.nix`: NixOS module to run the daemon on a host
 - `sites/docs`: documentation (mdBook)
+
+Adding modules, checks, or build helpers is documented in [`nix/README.md`](nix/README.md).
 
 ## License
 

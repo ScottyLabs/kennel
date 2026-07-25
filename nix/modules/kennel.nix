@@ -38,15 +38,25 @@ in
     # kennel now requires or reads differently so an old config would be
     # handled wrong. Additive, backward-compatible fields do not need a bump.
     #
-    # A bump must ship with a matching kennel release. Release this module
-    # first, then bump every project's devenv.lock and rebuild, then deploy
-    # kennel.
+    # A bump ships as one change, since the daemon and this module share
+    # KENNEL_CONFIG_SCHEMA_VERSION and move together. After the new kennel
+    # is deployed, projects still on an older pin are refused until they run
+    # `devenv update` and redeploy.
     #
     # History:
     # 1. Provision a resource only when the project lists it in `resources`.
     schemaVersion = lib.mkOption {
       type = lib.types.int;
-      default = 1;
+      default =
+        let
+          line =
+            lib.findFirst (l: lib.hasInfix "KENNEL_CONFIG_SCHEMA_VERSION" l)
+              (throw "KENNEL_CONFIG_SCHEMA_VERSION not found in constants.rs")
+              (lib.splitString "\n" (builtins.readFile ../../crates/kennel-config/src/constants.rs));
+        in
+        lib.toInt (
+          lib.elemAt (builtins.match "pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = ([0-9]+);" line) 0
+        );
       readOnly = true;
       description = "Version of the kennel.json contract emitted by this module.";
     };
