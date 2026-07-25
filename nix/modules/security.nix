@@ -34,7 +34,7 @@ in
       default = true;
       description = ''
         Run [semgrep](https://semgrep.dev)'s default (`auto`) ruleset for
-        common security footguns, excluding `.forgejo/workflows`.
+        common security footguns, excluding `.forgejo`.
       '';
     };
 
@@ -78,8 +78,7 @@ in
         '';
       })
       (lib.mkIf cfg.semgrep.enable {
-        "security:semgrep".exec =
-          "${semgrepPkg}/bin/semgrep --config auto --error --exclude '.forgejo/workflows' .";
+        "security:semgrep".exec = "${semgrepPkg}/bin/semgrep --config auto --error --exclude '.forgejo' .";
       })
       (lib.mkIf cfg.vulnix.enable {
         "security:vulnix".exec = "${pkgs.vulnix}/bin/vulnix${
