@@ -172,7 +172,7 @@ pub async fn deploy_request(
         let target_url = state.config.grafana_url.as_deref().and_then(|base| {
             kennel_config.services.keys().next().map(|service| {
                 let unit = service_unit_name(&project.name, &branch_slug, service);
-                drilldown_unit_url(base, &format!("{unit}.service"), "now-30d", "now")
+                drilldown_unit_url(base, &format!("{unit}.service"), "now-180d", "now")
             })
         });
         let posted = state
@@ -189,6 +189,7 @@ pub async fn deploy_request(
                 },
             )
             .await;
+
         if deploy_result.is_ok() {
             posted?;
         } else if let Err(post_err) = posted {
