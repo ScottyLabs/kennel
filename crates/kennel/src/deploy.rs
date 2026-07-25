@@ -282,6 +282,11 @@ async fn deploy_static_site(
         &state.config.ephemeral_domain,
     );
 
+    let custom_domain = site_config
+        .custom_domain
+        .as_deref()
+        .filter(|_| *environment == Environment::Prod);
+
     let deployment_id = match state
         .store
         .deployments()
@@ -315,7 +320,7 @@ async fn deploy_static_site(
         .add_static_route(&route_id, &domain, store_path, site_config.spa)
         .await?;
 
-    if let Some(custom_domain) = &site_config.custom_domain {
+    if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
@@ -334,7 +339,7 @@ async fn deploy_static_site(
         commit_sha: Set(build.commit_sha.clone()),
         store_path: Set(store_path.to_string()),
         domain: Set(domain.clone()),
-        custom_domain: Set(site_config.custom_domain.clone()),
+        custom_domain: Set(custom_domain.map(str::to_string)),
         spa: Set(site_config.spa),
         ..Default::default()
     };
@@ -368,6 +373,11 @@ async fn deploy_service(
         branch_slug,
         &state.config.ephemeral_domain,
     );
+
+    let custom_domain = svc_config
+        .custom_domain
+        .as_deref()
+        .filter(|_| *environment == Environment::Prod);
     let unit_name = format!(
         "kennel-{}-{}-{}",
         sanitize(project_name),
@@ -410,13 +420,7 @@ async fn deploy_service(
     env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
 
     // Public URL of this deployment
-    let app_url = format!(
-        "https://{}",
-        svc_config
-            .custom_domain
-            .as_deref()
-            .unwrap_or(domain.as_str())
-    );
+    let app_url = format!("https://{}", custom_domain.unwrap_or(domain.as_str()));
     env_vars.entry("APP_URL".to_string()).or_insert(app_url);
 
     let deployment_id = match state
@@ -452,7 +456,7 @@ async fn deploy_service(
 
     caddy.add_proxy_route(&route_id, &domain, port).await?;
 
-    if let Some(custom_domain) = &svc_config.custom_domain {
+    if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_proxy_route(&custom_route_id, custom_domain, port)
@@ -472,7 +476,7 @@ async fn deploy_service(
         commit_sha: Set(build.commit_sha.clone()),
         store_path: Set(store_path.to_string()),
         domain: Set(domain.clone()),
-        custom_domain: Set(svc_config.custom_domain.clone()),
+        custom_domain: Set(custom_domain.map(str::to_string)),
         spa: Set(false),
         unit_name: Set(Some(unit_name)),
         port: Set(Some(port as i32)),
