@@ -29,7 +29,12 @@ in
     services.redis = {
       enable = true;
       package = pkgs.valkey;
+      port = 0;
     };
+
+    enterShell = ''
+      export VALKEY_URL="redis+unix://$REDIS_UNIX_SOCKET?db=0"
+    '';
 
     scottylabs.kennel.requestedResources = [ "valkey" ];
   };
