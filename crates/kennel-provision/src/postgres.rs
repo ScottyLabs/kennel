@@ -17,6 +17,25 @@ impl PostgresProvider {
             request.branch_slug.replace('-', "_"),
         )
     }
+
+    fn owner_role(request: &ResourceRequest) -> String {
+        format!("{}_owner", Self::db_name(request))
+    }
+
+    async fn psql(&self, db: &str, sql: &str) -> anyhow::Result<String> {
+        let out = tokio::process::Command::new("psql")
+            .args(["-h", &self.socket_dir, "-d", db, "-tAc", sql])
+            .output()
+            .await?;
+
+        anyhow::ensure!(
+            out.status.success(),
+            "psql failed [{sql}]: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    }
 }
 
 impl ResourceProvider for PostgresProvider {
@@ -30,23 +49,30 @@ impl ResourceProvider for PostgresProvider {
     ) -> anyhow::Result<HashMap<String, String>> {
         let db_name = Self::db_name(request);
         let user = &request.system_user;
+        let owner = Self::owner_role(request);
 
-        // Ensure the login role exists so the unit can reach postgres over the
-        // socket by peer auth. The role owns its database below, so it needs no
-        // further grants.
-        let role = tokio::process::Command::new("psql")
-            .args([
-                "-h",
-                &self.socket_dir,
-                "-d",
+        if self
+            .psql(
                 "postgres",
-                "-tAc",
-                &format!("SELECT 1 FROM pg_roles WHERE rolname = '{user}'"),
-            ])
-            .output()
-            .await?;
+                &format!("SELECT 1 FROM pg_roles WHERE rolname = '{owner}'"),
+            )
+            .await?
+            .is_empty()
+        {
+            self.psql("postgres", &format!("CREATE ROLE \"{owner}\" NOLOGIN"))
+                .await?;
 
-        if String::from_utf8_lossy(&role.stdout).trim().is_empty() {
+            tracing::info!(role = %owner, "created owner role");
+        }
+
+        if self
+            .psql(
+                "postgres",
+                &format!("SELECT 1 FROM pg_roles WHERE rolname = '{user}'"),
+            )
+            .await?
+            .is_empty()
+        {
             let create = tokio::process::Command::new("createuser")
                 .args(["-h", &self.socket_dir, user])
                 .output()
@@ -61,41 +87,30 @@ impl ResourceProvider for PostgresProvider {
             tracing::info!(user = %user, "created role");
         }
 
-        let output = tokio::process::Command::new("psql")
-            .args([
-                "-h",
-                &self.socket_dir,
-                "-d",
+        // Members inherit CREATE on public via pg_database_owner
+        self.psql(
+            "postgres",
+            &format!("GRANT \"{owner}\" TO \"{user}\" WITH INHERIT TRUE"),
+        )
+        .await?;
+
+        if self
+            .psql(
                 "postgres",
-                "-tAc",
                 &format!("SELECT 1 FROM pg_database WHERE datname = '{db_name}'"),
-            ])
-            .output()
+            )
+            .await?
+            .is_empty()
+        {
+            // createdb -O owner requires the caller to be able to SET ROLE to the owner
+            self.psql(
+                "postgres",
+                &format!("GRANT \"{owner}\" TO CURRENT_USER WITH SET TRUE"),
+            )
             .await?;
 
-        if String::from_utf8_lossy(&output.stdout).trim().is_empty() {
-            // Creating a database owned by another role requires the caller to SET ROLE to it.
-            // The createuser auto-grant gives ADMIN on the role but not SET so add SET here.
-            let grant = tokio::process::Command::new("psql")
-                .args([
-                    "-h",
-                    &self.socket_dir,
-                    "-d",
-                    "postgres",
-                    "-c",
-                    &format!("GRANT \"{user}\" TO CURRENT_USER WITH SET TRUE"),
-                ])
-                .output()
-                .await?;
-
-            anyhow::ensure!(
-                grant.status.success(),
-                "grant set role failed: {}",
-                String::from_utf8_lossy(&grant.stderr)
-            );
-
             let create = tokio::process::Command::new("createdb")
-                .args(["-h", &self.socket_dir, "-O", user, &db_name])
+                .args(["-h", &self.socket_dir, "-O", &owner, &db_name])
                 .output()
                 .await?;
 

@@ -50,6 +50,7 @@
   outputs =
     {
       nixpkgs,
+      devenv,
       crane,
       treefmt-nix,
       ricochet,
@@ -133,6 +134,7 @@
         in
         {
           inherit kennel docs options-doc;
+          devenv = devenv.packages.${system}.devenv;
           docs-options = docsGen.generated;
         }
       );
