@@ -28,9 +28,11 @@ in
         [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (denying the
         `correctness`, `suspicious`, `pedantic`, and `perf` categories),
         [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and
-        [tsgolint](https://github.com/typescript-eslint/tsgolint) on `PATH` for
+        [tsgolint](https://github.com/oxc-project/tsgolint) on `PATH` for
         `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on
-        every commit.
+        every commit. Tool versions (`deno`, `oxlint`, `tsgolint`, ...) come
+        from the consuming project's own `nixpkgs` pin, not kennel's; bump
+        the consumer's flake input to pick up newer tool releases.
       '';
     };
 
