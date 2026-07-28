@@ -40,9 +40,9 @@ pub async fn teardown_deployment(
             tracing::warn!(route = %custom_route_id, error = %e, "failed to remove custom caddy route");
         }
         if let Some(cf) = &state.cloudflare
-            && let Err(e) = cf.delete_a_record(custom_domain).await
+            && let Err(e) = cf.delete_record(custom_domain).await
         {
-            tracing::warn!(fqdn = %custom_domain, error = %e, "failed to delete cloudflare A record");
+            tracing::warn!(fqdn = %custom_domain, error = %e, "failed to delete cloudflare record");
         }
     }
 

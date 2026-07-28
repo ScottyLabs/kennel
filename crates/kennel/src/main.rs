@@ -156,7 +156,7 @@ fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
     let Ok(zones_json) = std::env::var("CLOUDFLARE_ZONES_JSON") else {
         return Ok(None);
     };
-    let Ok(public_ip) = std::env::var("KENNEL_PUBLIC_IP") else {
+    let Ok(tunnel_id) = std::env::var("KENNEL_TUNNEL_ID") else {
         return Ok(None);
     };
 
@@ -171,8 +171,8 @@ fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
         return Ok(None);
     }
 
-    tracing::info!(zones = zones.len(), public_ip = %public_ip, "cloudflare DNS automation enabled");
-    Ok(Some(CloudflareClient::new(token, zones, public_ip)))
+    tracing::info!(zones = zones.len(), tunnel = %tunnel_id, "cloudflare DNS automation enabled");
+    Ok(Some(CloudflareClient::new(token, zones, tunnel_id)))
 }
 
 fn build_forgejo_client() -> Result<ForgejoClient> {

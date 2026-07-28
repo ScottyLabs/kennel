@@ -117,7 +117,7 @@ scottylabs.kennel.sites.app = {
 
 Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched routes. It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
 
-Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure). Kennel creates the DNS record itself for registered zones, and certificate issuance begins only once the domain resolves to kennel, so a domain whose zone is missing serves no TLS until the zone is registered.
+Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure). Kennel creates the DNS record itself for registered zones, routing the domain through Cloudflare, so a domain whose zone is missing does not resolve until the zone is registered.
 
 ### Health checks
 

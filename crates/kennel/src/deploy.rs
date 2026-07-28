@@ -497,18 +497,19 @@ async fn deploy_service(
     Ok(())
 }
 
-/// Upserts the Cloudflare A record for a custom domain
+/// Upserts the proxied Cloudflare CNAME routing a custom domain through the tunnel
 pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str) {
     let Some(cf) = &state.cloudflare else {
         return;
     };
-    match cf.upsert_a_record(project_name, fqdn).await {
+
+    match cf.upsert_record(project_name, fqdn).await {
         Ok(true) => {}
         Ok(false) => {
-            tracing::debug!(fqdn = %fqdn, "no cloudflare zone configured for domain");
+            tracing::warn!(fqdn = %fqdn, "custom domain outside configured cloudflare zones, it will not resolve");
         }
         Err(e) => {
-            tracing::warn!(fqdn = %fqdn, error = %e, "failed to upsert cloudflare A record");
+            tracing::warn!(fqdn = %fqdn, error = %e, "failed to upsert cloudflare record");
         }
     }
 }

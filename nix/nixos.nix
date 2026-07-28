@@ -68,10 +68,11 @@ in
           default = { };
           description = ''
             Map of domain names to Cloudflare zone IDs. When this is
-            non-empty, `publicIp` is set, and the `CLOUDFLARE_API_TOKEN`
+            non-empty, `tunnelId` is set, and the `CLOUDFLARE_API_TOKEN`
             environment variable is provided (typically via the
-            `environmentFile` secret), kennel automatically manages A records
-            for any custom domain whose suffix matches one of the configured
+            `environmentFile` secret), kennel automatically manages proxied
+            CNAME records pointing custom domains at the host's Cloudflare
+            Tunnel, for any domain whose suffix matches one of the configured
             zones. The most specific zone wins for nested domains.
 
             The token must have `Zone:DNS:Edit` permission on the zones
@@ -96,12 +97,13 @@ in
           '';
         };
 
-        publicIp = mkOption {
+        tunnelId = mkOption {
           type = types.nullOr types.str;
           default = null;
           description = ''
-            Public IPv4 used as the content of the A records that kennel
-            creates for custom domains. Required to enable DNS automation.
+            Cloudflare Tunnel ID used as the CNAME target of the records that
+            kennel creates for custom domains. Required to enable DNS
+            automation.
           '';
         };
       };
@@ -362,9 +364,9 @@ in
         // optionalAttrs cfg.secrets.enable {
           VAULT_ENDPOINT = cfg.secrets.vaultEndpoint;
         }
-        // optionalAttrs (cfg.domains.cloudflare.publicIp != null && cfg.domains.cloudflare.zones != { }) {
+        // optionalAttrs (cfg.domains.cloudflare.tunnelId != null && cfg.domains.cloudflare.zones != { }) {
           CLOUDFLARE_ZONES_JSON = builtins.toJSON cfg.domains.cloudflare.zones;
-          KENNEL_PUBLIC_IP = cfg.domains.cloudflare.publicIp;
+          KENNEL_TUNNEL_ID = cfg.domains.cloudflare.tunnelId;
         }
         // optionalAttrs (cfg.customDomainsFile != null) {
           CUSTOM_DOMAINS_FILE = cfg.customDomainsFile;
@@ -415,21 +417,10 @@ in
         servers {
           protocols h1 h2
         }
-
-        on_demand_tls {
-          ask http://localhost:${toString cfg.api.port}/internal/caddy/check-domain
-        }
       '';
       virtualHosts.${cfg.domain}.extraConfig = ''
         reverse_proxy localhost:${toString cfg.api.port}
       '';
-    };
-
-    networking.firewall = {
-      allowedTCPPorts = [
-        443
-        80
-      ];
     };
 
     nix.settings = {

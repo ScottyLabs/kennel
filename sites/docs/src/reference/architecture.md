@@ -12,7 +12,7 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 1. Kennel parses the repository name from the payload, verifies the HMAC signature, ensures a build record for the commit, and records a deploy request for the branch.
 1. The build worker runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
 1. For each pending deploy request whose build has finished, the reconciler reuses the build's artifacts to provision resources (database, cache, storage), resolve secrets from OpenBao, start a systemd transient unit for services, and add a Caddy route. Requests for a preview branch are skipped when the project disables `previewDeployments`.
-1. Caddy serves traffic over HTTPS with on-demand TLS.
+1. Cloudflare's edge terminates public TLS and routes each request through the host's tunnel to Caddy.
 
 ## Delegation
 
@@ -22,7 +22,7 @@ Systemd transient units are created via D-Bus using the zbus crate. Units are pl
 
 Units restart on failure (`Restart=on-failure`, 5s delay) but are bounded by a start limit of 5 starts per 5 minutes (`StartLimitBurst` and `StartLimitIntervalUSec`). Once systemd exhausts the limit it stops restarting and holds the unit `failed`. That crash-loop cap is durable across kennel restarts, so reconcile leaves a `failed` unit stopped.
 
-Caddy routes are managed via the [admin API](https://caddyserver.com/docs/api). Each deployment gets a route identified by `@id` for individual add/remove operations. Caddy handles TLS certificate provisioning, HTTP/3, static file serving, reverse proxying, and SPA fallback.
+Caddy routes are managed via the [admin API](https://caddyserver.com/docs/api). Each deployment gets a route identified by `@id` for individual add/remove operations. Caddy handles static file serving, reverse proxying, and SPA fallback; public TLS and HTTP/3 terminate at Cloudflare's edge.
 
 Nix-store files carry epoch modification times, so a frozen `Last-Modified` strands proxied clients on a stale shell. Reverse-proxy routes mark `text/html` responses `Cache-Control: no-store`. Static-site routes need none, since Caddy's file server drops epoch validators itself.
 
@@ -35,7 +35,6 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
 | GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects` gauges. |
 | GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/api/health`) from the unit's D-Bus properties. |
-| GET | `/internal/caddy/check-domain` | Used by Caddy's on-demand TLS to validate a hostname is a registered deployment before acquiring a cert. |
 
 All endpoints other than `/webhook` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
 
