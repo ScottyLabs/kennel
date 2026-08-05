@@ -1,25 +1,9 @@
 name: Prepare
-description: Install Nix and devenv and restore the shared build caches.
+description: Restore the shared build caches
 
 runs:
   using: composite
   steps:
-    - name: Install Nix
-      uses: https://github.com/cachix/install-nix-action@v31
-      with:
-        extra_nix_config: |
-          extra-substituters = https://scottylabs.cachix.org
-          extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg=
-          accept-flake-config = true
-
-    - name: Install devenv
-      shell: bash
-      run: nix profile add nixpkgs#devenv
-
-    - name: Clean stale build home
-      shell: bash
-      run: rm -rf /homeless-shelter
-
     - name: Cache devenv state
       uses: https://code.forgejo.org/actions/cache@v6
       with:
@@ -40,7 +24,3 @@ runs:
       uses: https://github.com/Swatinem/rust-cache@v2
       with:
         cmd-format: "devenv shell {0}"
-
-    - name: Clean stale build home
-      shell: bash
-      run: rm -rf /homeless-shelter

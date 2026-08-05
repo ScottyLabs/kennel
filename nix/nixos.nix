@@ -234,7 +234,7 @@ in
     forgejo = {
       apiUrl = mkOption {
         type = types.str;
-        default = "https://codeberg.org/api/v1";
+        default = "https://git.cmu.dev/api/v1";
         description = "Forgejo API base URL used to post PR deployment comments";
       };
 

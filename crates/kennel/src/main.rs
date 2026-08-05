@@ -183,7 +183,7 @@ fn build_forgejo_client() -> Result<ForgejoClient> {
         .trim()
         .to_string();
     let api_base =
-        std::env::var("FORGEJO_API_URL").unwrap_or_else(|_| "https://codeberg.org/api/v1".into());
+        std::env::var("FORGEJO_API_URL").unwrap_or_else(|_| "https://git.cmu.dev/api/v1".into());
     Ok(ForgejoClient::new(api_base, token))
 }
 
