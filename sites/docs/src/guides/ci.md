@@ -16,7 +16,7 @@ on:
 
 jobs:
   check:
-    uses: https://git.cmu.dev/ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
+    uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
     enable-openid-connect: true
 ```
 
@@ -32,7 +32,7 @@ The workflow takes one input, `build` (boolean, default `true`), which gates the
 ```yaml
 jobs:
   check:
-    uses: https://git.cmu.dev/ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
+    uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
     enable-openid-connect: true
     with:
       build: false
