@@ -413,7 +413,7 @@ in
     services.caddy = {
       enable = true;
       globalConfig = ''
-        # TODO: https://codeberg.org/ScottyLabs/infrastructure/issues/47
+        # TODO: https://git.cmu.dev/ScottyLabs/infrastructure/issues/47
         servers {
           protocols h1 h2
         }

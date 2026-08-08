@@ -1,3 +1,7 @@
+secretspec:
+  enable: true
+  profile: dev
+
 inputs:
   nixpkgs:
     url: github:nixos/nixpkgs/nixos-unstable

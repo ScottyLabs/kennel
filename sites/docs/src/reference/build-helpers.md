@@ -1,11 +1,11 @@
 # Build Helpers
 
-These builders come from the [shared ScottyLabs flake](https://codeberg.org/ScottyLabs/kennel) as `mkLib`, a function applied to a `pkgs` set (the same shape as `crane.mkLib`). Add the flake as an input, then call a helper per system:
+These builders come from the [shared ScottyLabs flake](https://git.cmu.dev/ScottyLabs/kennel) as `mkLib`, a function applied to a `pkgs` set (the same shape as `crane.mkLib`). Add the flake as an input, then call a helper per system:
 
 ```nix
 # flake.nix inputs
 scottylabs = {
-  url = "git+https://codeberg.org/ScottyLabs/kennel";
+  url = "git+https://git.cmu.dev/ScottyLabs/kennel";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 
@@ -271,6 +271,6 @@ Type: `str`, required
   module = ./nixos;
   subtree = options: options.services.kennel;
   root = ./.;
-  repoUrl = "https://codeberg.org/ScottyLabs/kennel/src/branch/main";
+  repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
 }
 ```

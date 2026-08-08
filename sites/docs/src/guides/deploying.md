@@ -20,7 +20,7 @@ inputs:
   nixpkgs:
     url: github:nixos/nixpkgs/nixos-unstable
   scottylabs:
-    url: git+https://codeberg.org/ScottyLabs/kennel
+    url: git+https://git.cmu.dev/ScottyLabs/kennel
     inputs:
       nixpkgs:
         follows: nixpkgs
@@ -117,7 +117,7 @@ scottylabs.kennel.sites.app = {
 
 Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched routes. It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
 
-Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://codeberg.org/scottylabs/infrastructure). Kennel creates the DNS record itself for registered zones, routing the domain through Cloudflare, so a domain whose zone is missing does not resolve until the zone is registered.
+Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://git.cmu.dev/ScottyLabs/infrastructure). Kennel creates the DNS record itself for registered zones, routing the domain through Cloudflare, so a domain whose zone is missing does not resolve until the zone is registered.
 
 ### Health checks
 
@@ -131,7 +131,7 @@ Your `flake.nix` must expose these packages, and their names must match the keys
 inputs = {
   nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   scottylabs = {
-    url = "git+https://codeberg.org/ScottyLabs/kennel";
+    url = "git+https://git.cmu.dev/ScottyLabs/kennel";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 };

@@ -13,17 +13,16 @@ revision = "1.0"
 
 [providers]
 local = "dotenv://.env"
-vault = "vault://secrets.scottylabs.org/secret"
-
-[profiles.ci.defaults]
-required = false
+openbao = "openbao://secrets.scottylabs.org/secret"
+openbao-ci = "openbao://secrets.scottylabs.org/secret?auth=jwt&role=ci&audience=openbao"
 
 [profiles.default]
-JWT_SECRET = { description = "JWT signing key", required = true }
-STRIPE_KEY = { description = "Stripe API key", required = true }
+AWS_ACCESS_KEY_ID = { description = "sccache S3 access key ID", ref = { item = "shared/sccache", field = "AWS_ACCESS_KEY_ID" } }
+AWS_SECRET_ACCESS_KEY = { description = "sccache S3 secret access key", ref = { item = "shared/sccache", field = "AWS_SECRET_ACCESS_KEY" } }
+CACHIX_AUTH_TOKEN = { description = "Cachix auth token", ref = { item = "shared/cachix", field = "CACHIX_AUTH_TOKEN" } }
+JWT_SECRET = { description = "JWT signing key" }
+STRIPE_KEY = { description = "Stripe API key" }
 
-# Declare all profiles, even if you only use default
-# default secrets can only be substituted into existing profiles
 [profiles.prod]
 
 [profiles.staging]
@@ -32,16 +31,22 @@ STRIPE_KEY = { description = "Stripe API key", required = true }
 STRIPE_KEY = { description = "Stripe test key", required = false }
 
 [profiles.dev.defaults]
-providers = ["vault"]
+providers = ["openbao"]
 
 [profiles.dev]
+
+[profiles.ci.defaults]
+required = false
+providers = ["openbao-ci"]
+
+[profiles.ci]
 ```
 
-`[profiles.default]` holds the secrets shared across every profile; named profiles inherit from it and may override individual entries, for example making `STRIPE_KEY` optional in preview. Declare a `[profiles.<name>]` header for `dev` (used locally) and for every environment you deploy to (see the [branch-to-profile mapping](#production)); a section may be left empty to inherit `default` unchanged.
+`[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for `dev` and for every environment you deploy to; a section left empty inherits `default` unchanged.
 
-The `[providers]` table names the backends once. `vault` is OpenBao, where shared secrets live, and `local` is a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` routes every dev secret without an explicit chain to OpenBao; without it, secrets inherited from `default` have no route when you enter the shell and resolution fails.
+The `[providers]` table names the backends once: `openbao` logs in with your local `bao` token, `openbao-ci` is the same backend reached with a CI job's OIDC token, and `local` is a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` routes dev resolution through `openbao` and `[profiles.ci.defaults]` routes CI through `openbao-ci`; without a profile's `providers`, its secrets have no route and resolution fails.
 
-The `[profiles.ci.defaults]` block makes every inherited secret optional for CI. The shared CI workflow sets `SECRETSPEC_PROFILE=ci` and `SECRETSPEC_PROVIDER=env` so that `devenv shell` does not require an OpenBao token. CI checks run without project secret values and must not depend on them. The workflow's only secrets are the org-level Cachix and sccache credentials it forwards for binary caching.
+`[profiles.ci.defaults]` sets `required = false`, so the runtime secrets inherited from `default` are optional in CI while the shared caches still resolve because they are available. CI signs in through `openbao-ci` with the job's Forgejo Actions OIDC token, so nothing is passed into the workflow.
 
 ## Enabling resolution
 
@@ -67,19 +72,19 @@ DISCORD_TOKEN = { description = "Discord bot token" }
 DISCORD_TOKEN = { description = "Discord bot token", providers = ["local"] }
 ```
 
-`prod` resolves `DISCORD_TOKEN` from OpenBao while `dev` reads it from your `.env`. Chains are tried in order, so `providers = ["vault", "local"]` would try OpenBao first and fall back to `.env`; every alias you name must be defined in the committed `[providers]` table.
+`prod` resolves `DISCORD_TOKEN` from OpenBao while `dev` reads it from your `.env`. Chains are tried in order, so `providers = ["openbao", "local"]` would try OpenBao first and fall back to `.env`; every alias you name must be defined in the committed `[providers]` table.
 
 Commit a `.env.example` listing each personal secret as an empty `KEY=` line and point developers at it from your README (`cp .env.example .env`). A key that is present but empty counts as set, so a fresh copy enters the shell fine and real values get filled in when the code actually needs them. Without the file, entry fails on any required pinned secret. Keep `.env` itself gitignored.
 
 ## Local development
 
-Log in to OpenBao and configure Cachix once per machine:
+Log in to OpenBao once per machine:
 
 ```bash
-nix run git+https://codeberg.org/ScottyLabs/kennel#login
+nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
 ```
 
-A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above. It also stores your Cachix auth token so devenv pulls from and pushes to the shared binary cache.
+A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above. Cachix and the rest resolve from OpenBao when the shell loads.
 
 The token is periodic and renews on each shell entry, so it stays valid as long as you open a project shell at least once every 90 days. You only log in again on a new machine, or after 90 days without using it.
 

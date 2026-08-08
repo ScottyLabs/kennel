@@ -119,7 +119,7 @@
             module = devenvModules.default;
             subtree = options: options.scottylabs;
             root = ./.;
-            repoUrl = "https://codeberg.org/ScottyLabs/kennel/src/branch/main";
+            repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
           };
 
           docsGen = import ./sites/docs/generate.nix {
@@ -154,8 +154,6 @@
             program = "${pkgs.writeShellScript "scottylabs-login" ''
               export BAO_ADDR=https://secrets.scottylabs.org
               ${pkgs.openbao}/bin/bao login -method=oidc
-              ${pkgs.openbao}/bin/bao kv get -field=CACHIX_AUTH_TOKEN secret/shared/cachix \
-                | ${pkgs.cachix}/bin/cachix authtoken --stdin
             ''}";
           };
         }

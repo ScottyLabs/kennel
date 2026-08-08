@@ -13,7 +13,7 @@ let
     module = ../../nix/nixos.nix;
     subtree = options: options.services.kennel;
     root = ../..;
-    repoUrl = "https://codeberg.org/ScottyLabs/kennel/src/branch/main";
+    repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
   };
 in
 rec {
