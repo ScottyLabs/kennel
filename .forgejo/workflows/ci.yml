@@ -5,9 +5,12 @@ on:
       build:
         type: boolean
         default: true
+      secretspec-profile:
+        type: string
+        default: ci
 
 env:
-  SECRETSPEC_PROFILE: ci
+  SECRETSPEC_PROFILE: ${{ inputs.secretspec-profile }}
 
 enable-openid-connect: true
 
