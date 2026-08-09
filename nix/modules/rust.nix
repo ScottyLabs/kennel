@@ -58,6 +58,8 @@ in
     packages = [ pkgs.sccache ] ++ cfg.nativeBuildInputs;
 
     env = {
+      # CI jobs share $HOME and rust-cache prunes the registry
+      CARGO_HOME = "${config.devenv.root}/.devenv/state/cargo";
       CARGO_PROFILE_DEV_DEBUG = "0";
       CARGO_TARGET_DIR = "${config.devenv.root}/.devenv/state/target";
       RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
