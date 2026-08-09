@@ -24,3 +24,5 @@ runs:
       uses: https://github.com/Swatinem/rust-cache@v2
       with:
         cmd-format: "devenv shell {0}"
+        # Matches CARGO_TARGET_DIR from nix/modules/rust.nix
+        workspaces: ". -> .devenv/state/target"
