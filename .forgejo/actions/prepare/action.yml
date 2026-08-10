@@ -22,10 +22,9 @@ runs:
 
     - name: Cache Rust
       uses: https://github.com/Swatinem/rust-cache@v2
-      env:
-        # Matches CARGO_HOME from nix/modules/rust.nix
-        CARGO_HOME: ${{ github.workspace }}/.devenv/state/cargo
       with:
         cmd-format: "devenv shell {0}"
+        # Jobs share one registry, keep rust-cache from deleting crate sources from it
+        cache-all-crates: true
         # Matches CARGO_TARGET_DIR from nix/modules/rust.nix
         workspaces: ". -> .devenv/state/target"
