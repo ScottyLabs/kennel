@@ -98,7 +98,7 @@ in
     enterShell = ''
       if [ -z "''${AWS_ACCESS_KEY_ID:-}" ]; then
         export AWS_ACCESS_KEY_ID=GK86a1015b84fc446d260e66b9
-        export AWS_SECRET_ACCESS_KEY=298e02b2ee7eb97c8112ee97876feea9894e7916457efee2fbf255ffdb676b38 # gitleaks:allow
+        export AWS_SECRET_ACCESS_KEY=298e02b2ee7eb97c8112ee97876feea9894e7916457efee2fbf255ffdb676b38 # gitleaks:allow nosemgrep: detected-aws-secret-access-key
         if _ak=$(${pkgs.openbao}/bin/bao kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache 2>/dev/null); then
           export AWS_ACCESS_KEY_ID=$_ak
           export AWS_SECRET_ACCESS_KEY=$(${pkgs.openbao}/bin/bao kv get -field=AWS_SECRET_ACCESS_KEY secret/shared/sccache)
