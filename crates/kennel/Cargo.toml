@@ -28,8 +28,8 @@ sea-orm-migration = { version = "1.1.20", features = [
   "sqlx-sqlite",
 ] }
 secrecy = "0.10.3"
-secretspec = { version = "0.9.1", features = [
-  "vault",
+secretspec = { version = "0.18.0", features = [
+  "openbao",
 ], default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
