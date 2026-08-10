@@ -163,9 +163,6 @@ impl SystemdClient {
         let _: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
             .call("StopUnit", &(service_unit.as_str(), "replace"))
             .await;
-        let _: Result<(), zbus::Error> = proxy
-            .call("ResetFailedUnit", &(service_unit.as_str(),))
-            .await;
 
         let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
         let exec_start: Vec<(String, Vec<String>, bool)> =
@@ -175,6 +172,7 @@ impl SystemdClient {
             ("Description", format!("Kennel build: {unit_name}").into()),
             ("Slice", "kennel.slice".into()),
             ("Type", "oneshot".into()),
+            ("CollectMode", "inactive-or-failed".into()),
             ("DynamicUser", true.into()),
             ("SupplementaryGroups", vec![group.to_string()].into()),
             ("WorkingDirectory", working_dir.into()),
