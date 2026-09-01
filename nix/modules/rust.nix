@@ -58,7 +58,7 @@ in
     packages = [ pkgs.sccache ] ++ cfg.nativeBuildInputs;
 
     env = {
-      CARGO_PROFILE_DEV_DEBUG = "0";
+      CARGO_INCREMENTAL = "0"; # sccache requires incremental compilation to be off
       CARGO_TARGET_DIR = "${config.devenv.root}/.devenv/state/target";
       RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
       RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
