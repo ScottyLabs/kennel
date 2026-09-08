@@ -93,6 +93,11 @@ impl ResourceProvider for PostgresProvider {
             &format!("GRANT \"{owner}\" TO \"{user}\" WITH INHERIT TRUE"),
         )
         .await?;
+        self.psql(
+            "postgres",
+            &format!("GRANT CREATE ON DATABASE \"{db_name}\" TO \"{owner}\""),
+        )
+        .await?;
 
         if self
             .psql(
