@@ -87,10 +87,15 @@ impl ResourceProvider for PostgresProvider {
             tracing::info!(user = %user, "created role");
         }
 
-        // Members inherit CREATE on public via pg_database_owner
+        // Members inherit CREATE on public via pg_database_owner.
         self.psql(
             "postgres",
             &format!("GRANT \"{owner}\" TO \"{user}\" WITH INHERIT TRUE"),
+        )
+        .await?;
+        self.psql(
+            "postgres",
+            &format!("GRANT CREATE ON DATABASE \"{db_name}\" TO \"{owner}\""),
         )
         .await?;
 
