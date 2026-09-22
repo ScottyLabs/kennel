@@ -1,6 +1,6 @@
 # Enabling Features
 
-In the ScottyLabs governance repository, add your project to its team's TOML file and declare its `features` table. A feature is enabled by its presence: an empty table enables it with defaults, and a feature with settings takes them as keys.
+In the ScottyLabs governance repository, add your project to its team's TOML file and list the features you want in its `features` table. Give a feature an empty table to use its defaults, or set its options as keys.
 
 ```toml
 [[team.repos]]
@@ -14,16 +14,16 @@ sentry = {}
 prod_monthly_budget = 20.0
 ```
 
-Governance provisions everything those features imply:
-
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile; set `platform` (for example `rust`, `deno`, or `python`) to label the project's SDK
 - `posthog` creates a PostHog project and writes its key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile
 - `cdn` provisions a per-project public-read [Garage](https://garagehq.deuxfleurs.fr/) bucket and writes `CDN_S3_ENDPOINT`, `CDN_S3_BUCKET`, `CDN_ACCESS_KEY_ID`, `CDN_SECRET_ACCESS_KEY`, and `CDN_PUBLIC_URL` to Vault on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
 - `oidc_client` with `admin = true` also provisions a service-account client with the `view-users`, `manage-users`, and `view-identity-providers` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
+- `oidc_client` with `groups` also creates extra Keycloak groups under the project group, left empty for you to manage
 - `ai_gateway` mints budgeted [LiteLLM](https://docs.litellm.ai) API keys under your team and writes `LITELLM_API_KEY` and `LITELLM_BASE_URL` to Vault on every profile
 - `docs` publishes the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org)
+- `google_play` grants your team access to an existing Play Console app by `app_id`
 
 ### OIDC
 
@@ -57,6 +57,19 @@ PROJECT_ADMIN_GROUP = { description = "Keycloak project admin group path" }
 Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/devenv-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).
 
 The OIDC client also adds the user's group memberships to the token as a `groups` claim, in full-path form like `/projects/<slug>`. Match it against `PROJECT_GROUP` and `PROJECT_ADMIN_GROUP` to grant enhanced permissions.
+
+### Keycloak Groups
+
+If your app needs roles beyond members and admins, list them as `groups` on `oidc_client`. Governance creates each one under the project group and leaves its membership to you:
+
+```toml
+[team.repos.features.oidc_client]
+groups = ["staff"]
+```
+
+For a project named `quest`, that creates `/projects/quest/staff` as an empty group. Add members in the [Keycloak admin console](https://idp.scottylabs.org/admin/master/console/#/scottylabs/groups) afterwards.
+
+These groups appear in the OIDC `groups` claim like any other, so the app can authorize against `<PROJECT_GROUP>/staff`. Unlike the project's own groups, they don't give members access to any secrets in OpenBao.
 
 ### Sentry
 
@@ -117,6 +130,21 @@ LITELLM_BASE_URL = { description = "LiteLLM gateway base URL" }
 ```
 
 Point any OpenAI-compatible client at `LITELLM_BASE_URL` with `LITELLM_API_KEY` as the API key; the gateway routes to the models it has configured and meters spend against your key. Keys are grouped under your team in LiteLLM for spend attribution.
+
+### Google Play
+
+Play Console apps cannot be created through any API, so create the app in the [Play Console](https://play.google.com/console) first, then add `google_play` with its package name:
+
+```toml
+[team.repos.features.google_play]
+app_id = "quest.cmu.twa"
+```
+
+Governance then grants your team access to the app:
+
+- members release to testing tracks, edit tester lists, and read crash and vitals data
+- leads additionally release to production, manage the store listing and policy pages, and reply to reviews
+- since the provider rejects users with no account-level permissions, everyone holds account-wide read on non-financial data
 
 ## Documentation
 
