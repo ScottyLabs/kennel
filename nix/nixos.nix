@@ -316,10 +316,21 @@ in
 
       services.kennel = {
         description = "Kennel deployment platform";
+        # socket dirs in ReadWritePaths must exist before namespace setup
         after = [
           "network.target"
           "caddy.service"
-        ];
+        ]
+        ++ optional (
+          cfg.resources.postgres.enable && config.services.postgresql.enable
+        ) "postgresql.service"
+        ++ optionals cfg.resources.valkey.enable (
+          mapAttrsToList (name: _: "redis-${name}.service") (
+            filterAttrs (
+              _: s: s.enable && s.unixSocket == cfg.resources.valkey.socketPath
+            ) config.services.redis.servers
+          )
+        );
         wants = [ "caddy.service" ];
         wantedBy = [ "multi-user.target" ];
 
