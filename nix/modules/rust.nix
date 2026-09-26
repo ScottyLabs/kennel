@@ -60,6 +60,7 @@ in
     env = {
       CARGO_PROFILE_DEV_DEBUG = "0";
       CARGO_TARGET_DIR = "${config.devenv.root}/.devenv/state/target";
+      CARGO_UNSTABLE_CODEGEN_BACKEND = "true";
       RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
       RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
       SCCACHE_BUCKET = "sccache";
@@ -115,7 +116,7 @@ in
       cargo-test = {
         enable = true;
         name = "cargo-test";
-        entry = "cargo test";
+        entry = "env RUSTC=${config.languages.rust.toolchainPackage}/bin/rustc CARGO_TARGET_DIR=${config.devenv.root}/.devenv/state/hook-target ${config.languages.rust.toolchainPackage}/bin/cargo test --all-targets";
         files = "\\.(rs|toml)$";
         pass_filenames = false;
         language = "system";
