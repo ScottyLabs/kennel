@@ -265,7 +265,7 @@ async fn reap_unreferenced_builds(state: &AppState, project_id: &str) {
     }
 
     if !stale.is_empty() {
-        tracing::info!(project = %project_id, count = stale.len(), "reaped superseded build gc roots");
+        tracing::info!(project_id = %project_id, count = stale.len(), "reaped superseded build gc roots");
     }
 }
 

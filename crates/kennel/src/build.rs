@@ -48,13 +48,7 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
         let build_log_url: Option<String> =
             match (state.config.grafana_url.as_deref(), project.as_ref()) {
                 (Some(base), Some(p)) => {
-                    let unit = format!(
-                        "{}.service",
-                        crate::deploy::build_unit_name(&p.name, &build.branch)
-                    );
-                    Some(crate::deploy::drilldown_unit_url(
-                        base, &unit, "now-3h", "now",
-                    ))
+                    Some(crate::deploy::build_logs_url(base, &p.name, &build.id))
                 }
                 _ => None,
             };
@@ -80,7 +74,7 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
             continue;
         }
 
-        tracing::info!(build_id = %build.id, project = %build.project_id, "processing build");
+        tracing::info!(build_id = %build.id, project_id = %build.project_id, "processing build");
 
         let task_state = state.clone();
         let task_build = build.clone();
@@ -251,8 +245,7 @@ async fn process_build(
             &argv,
             &work_dir.to_string_lossy(),
             &env,
-            kennel_config::constants::KENNEL_BUILD_GROUP,
-            kennel_config::constants::BUILD_TIMEOUT,
+            &crate::deploy::build_log_fields(&project.name, &build.id),
         )
         .await?;
 

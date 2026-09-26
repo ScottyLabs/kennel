@@ -274,6 +274,24 @@ async fn restart_service(
         tracing::warn!(unit = %unit_name, "no config store path, skipping restart");
         return;
     };
+
+    let project_name = match state
+        .store
+        .projects()
+        .find_by_id(&deployment.project_id)
+        .await
+    {
+        Ok(Some(project)) => project.name,
+        Ok(None) => {
+            tracing::warn!(unit = %unit_name, "project not found, skipping restart");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(unit = %unit_name, error = %e, "could not load project, skipping restart");
+            return;
+        }
+    };
+
     let kennel_config = match deploy::read_kennel_config(config_store_path).await {
         Ok(c) => c,
         Err(e) => {
@@ -323,6 +341,11 @@ async fn restart_service(
                     &env_vars,
                     &system_user,
                     deployment.config_store_path.as_deref(),
+                    &deploy::deploy_log_fields(
+                        &project_name,
+                        &deployment.branch,
+                        &deployment.commit_sha,
+                    ),
                 )
                 .await
             {

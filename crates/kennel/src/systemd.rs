@@ -60,6 +60,7 @@ impl SystemdClient {
         env: &HashMap<String, String>,
         user: &str,
         working_dir: Option<&str>,
+        log_fields: &[String],
     ) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
@@ -130,6 +131,7 @@ impl SystemdClient {
         let exec_start_value: Vec<(String, Vec<String>, bool)> =
             vec![(exec_start.to_string(), vec![exec_start.to_string()], false)];
         properties.push(("ExecStart", exec_start_value.into()));
+        properties.push(("LogExtraFields", log_extra_fields(log_fields)));
 
         let _: zbus::zvariant::OwnedObjectPath = proxy
             .call(
@@ -153,8 +155,7 @@ impl SystemdClient {
         argv: &[String],
         working_dir: &str,
         env: &HashMap<String, String>,
-        group: &str,
-        timeout: std::time::Duration,
+        log_fields: &[String],
     ) -> anyhow::Result<bool> {
         let proxy = self.manager_proxy().await?;
         let service_unit = format!("{unit_name}.service");
@@ -174,7 +175,10 @@ impl SystemdClient {
             ("Type", "oneshot".into()),
             ("CollectMode", "inactive-or-failed".into()),
             ("DynamicUser", true.into()),
-            ("SupplementaryGroups", vec![group.to_string()].into()),
+            (
+                "SupplementaryGroups",
+                vec![kennel_config::constants::KENNEL_BUILD_GROUP.to_string()].into(),
+            ),
             ("WorkingDirectory", working_dir.into()),
             ("Environment", env_strings.into()),
             ("NoNewPrivileges", true.into()),
@@ -183,6 +187,7 @@ impl SystemdClient {
             ("PrivateTmp", true.into()),
             ("ReadWritePaths", vec![working_dir.to_string()].into()),
             ("ExecStart", exec_start.into()),
+            ("LogExtraFields", log_extra_fields(log_fields)),
         ];
 
         let start_job: zbus::zvariant::OwnedObjectPath = proxy
@@ -199,7 +204,7 @@ impl SystemdClient {
 
         tracing::info!(unit = %unit_name, "started build unit");
 
-        let waited = tokio::time::timeout(timeout, async {
+        let waited = tokio::time::timeout(kennel_config::constants::BUILD_TIMEOUT, async {
             while let Some(signal) = job_removed.next().await {
                 if let Ok((_, removed, _, result)) =
                     signal
@@ -323,6 +328,15 @@ impl SystemdClient {
             .map(|(name, ..)| name.trim_end_matches(".service").to_string())
             .collect())
     }
+}
+
+/// `KEY=VALUE` fields as the `aay` systemd expects
+fn log_extra_fields(fields: &[String]) -> zbus::zvariant::Value<'static> {
+    fields
+        .iter()
+        .map(|field| field.as_bytes().to_vec())
+        .collect::<Vec<Vec<u8>>>()
+        .into()
 }
 
 fn valkey_supplementary_group(env: &HashMap<String, String>) -> Option<String> {

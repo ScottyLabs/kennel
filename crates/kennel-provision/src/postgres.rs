@@ -93,11 +93,6 @@ impl ResourceProvider for PostgresProvider {
             &format!("GRANT \"{owner}\" TO \"{user}\" WITH INHERIT TRUE"),
         )
         .await?;
-        self.psql(
-            "postgres",
-            &format!("GRANT CREATE ON DATABASE \"{db_name}\" TO \"{owner}\""),
-        )
-        .await?;
 
         if self
             .psql(
@@ -127,6 +122,12 @@ impl ResourceProvider for PostgresProvider {
 
             tracing::info!(db = %db_name, "created database");
         }
+
+        self.psql(
+            "postgres",
+            &format!("GRANT CREATE ON DATABASE \"{db_name}\" TO \"{owner}\""),
+        )
+        .await?;
 
         let mut env = HashMap::new();
         env.insert(

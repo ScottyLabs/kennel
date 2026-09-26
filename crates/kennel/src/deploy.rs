@@ -164,17 +164,31 @@ pub async fn deploy_request(
     }
     .await;
 
+    // Pre-start failures have no unit logs of their own
+    if let Err(e) = &deploy_result {
+        tracing::error!(
+            project = %project.name,
+            branch = %request.branch,
+            commit = %build.commit_sha,
+            error = %format!("{e:#}"),
+            "deploy failed",
+        );
+    }
+
     if let Some(owner) = project.owner.as_deref() {
         let (status, description) = match &deploy_result {
             Ok(()) => ("success", "deployment healthy".to_string()),
             Err(e) => ("failure", format!("{e:#}")),
         };
-        let target_url = state.config.grafana_url.as_deref().and_then(|base| {
-            kennel_config.services.keys().next().map(|service| {
-                let unit = service_unit_name(&project.name, &branch_slug, service);
-                drilldown_unit_url(base, &format!("{unit}.service"), "now-180d", "now")
-            })
-        });
+        // Static sites write no logs
+        let has_logs = !kennel_config.services.is_empty() || deploy_result.is_err();
+        let target_url = state
+            .config
+            .grafana_url
+            .as_deref()
+            .filter(|_| has_logs)
+            .map(|base| deploy_logs_url(base, &project.name, &request.branch, &build.commit_sha));
+
         let posted = state
             .forgejo
             .create_commit_status(
@@ -379,12 +393,7 @@ async fn deploy_service(
         .custom_domain
         .as_deref()
         .filter(|_| *environment == Environment::Prod);
-    let unit_name = format!(
-        "kennel-{}-{}-{}",
-        sanitize(project_name),
-        branch_slug,
-        sanitize(name)
-    );
+    let unit_name = service_unit_name(project_name, branch_slug, name);
     let system_user = service_user(&unit_name);
 
     let request = ResourceRequest {
@@ -442,6 +451,7 @@ async fn deploy_service(
             &env_vars,
             &system_user,
             build.config_store_path.as_deref(),
+            &deploy_log_fields(project_name, branch, &build.commit_sha),
         )
         .await?;
 
@@ -719,15 +729,54 @@ pub fn service_unit_name(project_name: &str, branch_slug: &str, service: &str) -
     )
 }
 
-/// Builds a Grafana Logs Drilldown URL scoped to a single systemd unit
-pub fn drilldown_unit_url(base: &str, unit: &str, from: &str, to: &str) -> String {
-    let base = base.trim_end_matches('/');
-    let unit_path = urlencoding::encode(unit);
-    let filter = format!("unit|=|{unit}");
-    let unit_filter = urlencoding::encode(&filter);
-    format!(
-        "{base}/a/grafana-lokiexplore-app/explore/unit/{unit_path}/logs?patterns=%5B%5D&var-ds=loki&var-filters={unit_filter}&from={from}&to={to}"
+/// Loki's full 720h retention
+const LOG_RANGE_PARAMS: &str = "&from=now-30d&to=now";
+
+/// `LogExtraFields` for a build unit
+pub fn build_log_fields(project_name: &str, build_id: &str) -> Vec<String> {
+    vec![
+        format!("KENNEL_PROJECT={project_name}"),
+        format!("KENNEL_BUILD_ID={build_id}"),
+    ]
+}
+
+/// `LogExtraFields` for a service unit, kept across restarts
+pub fn deploy_log_fields(project_name: &str, branch: &str, commit_sha: &str) -> Vec<String> {
+    vec![
+        format!("KENNEL_PROJECT={project_name}"),
+        format!("KENNEL_BRANCH={branch}"),
+        format!("KENNEL_COMMIT={commit_sha}"),
+    ]
+}
+
+pub fn build_logs_url(base: &str, project_name: &str, build_id: &str) -> String {
+    drilldown_project_url(base, project_name, &[("build_id", build_id)])
+}
+
+pub fn deploy_logs_url(base: &str, project_name: &str, branch: &str, commit_sha: &str) -> String {
+    drilldown_project_url(
+        base,
+        project_name,
+        &[("branch", branch), ("commit", commit_sha)],
     )
+}
+
+/// Filters on the `project` label and per-line metadata Alloy extracts from `KENNEL_*` fields
+fn drilldown_project_url(base: &str, project_name: &str, metadata: &[(&str, &str)]) -> String {
+    let base = base.trim_end_matches('/');
+    let project_path = urlencoding::encode(project_name);
+    let project_filter = urlencoding::encode(&format!("project|=|{project_name}")).into_owned();
+
+    let mut url = format!(
+        "{base}/a/grafana-lokiexplore-app/explore/project/{project_path}/logs?patterns=%5B%5D&var-ds=loki&var-filters={project_filter}"
+    );
+    for (key, value) in metadata {
+        url.push_str("&var-metadata=");
+        url.push_str(&urlencoding::encode(&format!("{key}|=|{value}")));
+    }
+
+    url.push_str(LOG_RANGE_PARAMS);
+    url
 }
 
 /// Stable login name for a unit. The unit runs under this name as a `DynamicUser`
