@@ -4,6 +4,7 @@
   uv2nix,
   pyproject-nix,
   pyproject-build-systems,
+  buildEnv,
 }:
 
 {
@@ -31,10 +32,23 @@ let
     else
       pyproject-build-systems.overlays.default;
 
+  # Applied only to the project package so dependencies are not rebuilt
+  projectEnv =
+    _final: prev:
+    let
+      key = pyproject-nix.lib.pypa.normalizePackageName pname;
+    in
+    lib.optionalAttrs (buildEnv != { }) {
+      ${key} = prev.${key}.overrideAttrs (old: {
+        env = (old.env or { }) // buildEnv;
+      });
+    };
+
   pythonSet = (pkgs.callPackage pyproject-nix.build.packages { inherit python; }).overrideScope (
     lib.composeManyExtensions [
       buildSystems
       overlay
+      projectEnv
       overrides
     ]
   );

@@ -22,7 +22,11 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         let Some(build) = state
             .store
             .builds()
-            .find_by_project_commit(&request.project_id, &request.commit_sha)
+            .find_by_project_branch_commit(
+                &request.project_id,
+                &request.branch,
+                &request.commit_sha,
+            )
             .await?
         else {
             continue;
@@ -313,6 +317,7 @@ async fn restart_service(
             std::path::Path::new(config_store_path),
             &env_str,
             &vault_endpoint,
+            None,
         ) {
             env_vars.extend(secrets);
         }
@@ -323,14 +328,9 @@ async fn restart_service(
     }
     env_vars.insert("COMMIT_HASH".to_string(), deployment.commit_sha.clone());
 
-    let app_url = format!(
-        "https://{}",
-        deployment
-            .custom_domain
-            .as_deref()
-            .unwrap_or(deployment.domain.as_str())
-    );
-    env_vars.entry("APP_URL".to_string()).or_insert(app_url);
+    env_vars.entry("APP_URL".to_string()).or_insert_with(|| {
+        deploy::app_url(&deployment.domain, deployment.custom_domain.as_deref())
+    });
 
     match deploy::find_executable(&deployment.store_path).await {
         Ok(exec_start) => {

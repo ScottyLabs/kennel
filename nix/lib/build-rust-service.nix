@@ -1,5 +1,9 @@
 # Builds a rust crate with crane, caching deps separately from the build
-{ pkgs, crane }:
+{
+  pkgs,
+  crane,
+  buildEnv,
+}:
 
 {
   src,
@@ -45,6 +49,7 @@ let
 
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
+# Kept out of commonArgs so changing buildEnv does not rebuild the deps
 craneLib.buildPackage (
   commonArgs
   // {
@@ -52,4 +57,7 @@ craneLib.buildPackage (
     doCheck = false;
   }
   // buildArgs
+  // {
+    env = buildEnv // (buildArgs.env or { });
+  }
 )

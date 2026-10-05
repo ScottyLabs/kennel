@@ -9,8 +9,8 @@ Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
 ```
 
 1. Forgejo sends a webhook to kennel's `/webhook` endpoint.
-1. Kennel parses the repository name from the payload, verifies the HMAC signature, ensures a build record for the commit, and records a deploy request for the branch.
-1. The build worker runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
+1. Kennel parses the repository name from the payload, verifies the HMAC signature, ensures a build record for the branch's commit, and records a deploy request for the branch. When the same commit is on more than one branch, such as after fast-forwarding `main` to `staging`, kennel builds it once per branch, because the [build environment](../guides/deploying.md#build-environment) differs between branches.
+1. The build worker resolves the project's secretspec `build` scope from OpenBao, when it declares one, then runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The resolved values reach each package through `--override-input` on the kennel flake's `build-env` input. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
 1. For each pending deploy request whose build has finished, the reconciler reuses the build's artifacts to provision resources (database, cache, storage), resolve secrets from OpenBao, start a systemd transient unit for services, and add a Caddy route. Requests for a preview branch are skipped when the project disables `previewDeployments`.
 1. Cloudflare's edge terminates public TLS and routes each request through the host's tunnel to Caddy.
 
@@ -72,7 +72,7 @@ Reconcile enforces the same invariant on every pass. It re-asserts each deployme
 Kennel stores state in SQLite with four tables:
 
 - `projects` -- registered repositories with webhook secrets
-- `builds` -- per-commit build queue and history (queued, building, built, failed, cancelled), plus the captured per-phase `log` of subprocess output
+- `builds` -- per-branch-and-commit build queue and history (queued, building, built, failed, cancelled), plus the captured per-phase `log` of subprocess output
 - `deploy_requests` -- per-branch deploy intents naming the commit each branch wants, with status pending/deployed/skipped/failed
 - `deployments` -- active deployments with store paths, domains, unit names, and ports
 

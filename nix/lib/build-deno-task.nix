@@ -7,6 +7,8 @@
   fetchurl,
   runCommand,
   writeText,
+  # Environment variables from mkLib
+  buildEnv ? { },
 }:
 
 {
@@ -107,6 +109,7 @@ let
 in
 stdenv.mkDerivation {
   inherit pname version src;
+  env = buildEnv;
 
   nativeBuildInputs = [ deno ] ++ lib.optional stdenv.isLinux autoPatchelfHook;
   buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];

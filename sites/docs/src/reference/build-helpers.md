@@ -16,6 +16,8 @@ kennel = (scottylabs.mkLib pkgs).buildRustService { ... };
 
 Each helper takes the consumer's `pkgs`, so packages build against your nixpkgs pin rather than the shared flake's.
 
+Under kennel, every helper exports the project's [build environment](../guides/deploying.md#build-environment) into the build of the project's own package, leaving dependency builds and their cache untouched. The values are also available as `(scottylabs.mkLib pkgs).buildEnv` for a derivation built without the helpers, and are empty outside kennel. `buildRustService` merges `buildArgs.env` over them.
+
 ## `buildRustService`
 
 Builds a Rust crate with [crane](https://crane.dev), caching dependencies separately from the build.

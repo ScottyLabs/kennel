@@ -1,6 +1,7 @@
 use crate::AppState;
 use crate::forgejo::CommitStatus;
-use kennel_config::KennelConfig;
+use kennel_config::constants::{BUILD_SCOPE, KENNEL_FLAKE_INPUT};
+use kennel_config::{Environment, KennelConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -165,6 +166,11 @@ struct BuildInput {
     repo_url: String,
     git_ref: String,
     commit_sha: String,
+    project_name: String,
+    branch_slug: String,
+    environment: Environment,
+    ephemeral_domain: String,
+    build_env: Option<HashMap<String, String>>,
 }
 
 /// Result of a finished build for a commit
@@ -216,10 +222,20 @@ async fn process_build(
         .await?
         .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
 
+    let environment = Environment::from_branch(&build.branch).unwrap_or(Environment::Dev);
+    let build_env = resolve_build_env(state, &project, build, environment, &work_dir)
+        .await
+        .map_err(|e| anyhow::anyhow!("build scope resolution failed: {e:#}"))?;
+
     let input = BuildInput {
         repo_url: project.repo_url.clone(),
         git_ref: build.git_ref.clone(),
         commit_sha: build.commit_sha.clone(),
+        project_name: project.name.clone(),
+        branch_slug: crate::deploy::sanitize(&build.branch),
+        environment,
+        ephemeral_domain: state.config.ephemeral_domain.clone(),
+        build_env,
     };
     tokio::fs::write(work_dir.join(INPUT_FILE), serde_json::to_vec(&input)?).await?;
 
@@ -317,6 +333,35 @@ async fn process_build(
     Ok(BuildOutcome::Built)
 }
 
+/// Resolves the project's secretspec build scope
+async fn resolve_build_env(
+    state: &AppState,
+    project: &::entity::projects::Model,
+    build: &::entity::builds::Model,
+    environment: Environment,
+    work_dir: &Path,
+) -> anyhow::Result<Option<HashMap<String, String>>> {
+    let (Some(owner), Ok(vault_endpoint)) =
+        (project.owner.as_deref(), std::env::var("VAULT_ENDPOINT"))
+    else {
+        return Ok(None);
+    };
+
+    let Some(contents) = state
+        .forgejo
+        .raw_file(owner, &project.name, "secretspec.toml", &build.commit_sha)
+        .await?
+    else {
+        return Ok(None);
+    };
+
+    let spec_dir = work_dir.join("secretspec");
+    tokio::fs::create_dir_all(&spec_dir).await?;
+    tokio::fs::write(spec_dir.join("secretspec.toml"), contents).await?;
+
+    crate::secrets::resolve_build_env(&spec_dir, &environment.to_string(), &vault_endpoint)
+}
+
 /// Entry point for the `kennel build-exec <id>` subcommand.
 pub async fn build_exec(build_id: &str) -> anyhow::Result<()> {
     let work_root = std::env::var("WORK_DIR")
@@ -361,13 +406,38 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
         log_line(log, "no services or static sites defined, skipping deploy");
     }
 
-    let mut store_paths: HashMap<String, String> = HashMap::new();
-    for name in kennel_config.services.keys() {
-        store_paths.insert(name.clone(), nix_build(log, &repo_path, name).await?);
+    if let Some(values) = &input.build_env {
+        ensure_build_env_input(&repo_path).await?;
+        let mut names: Vec<&str> = values.keys().map(String::as_str).collect();
+        names.sort_unstable();
+        log_line(log, &format!("injecting build scope: {}", names.join(", ")));
+
+        tokio::fs::create_dir_all(work_dir.join("build-env")).await?;
     }
-    for (name, site_config) in &kennel_config.static_sites {
-        let attr = site_config.package_attr.as_deref().unwrap_or(name.as_str());
-        store_paths.insert(name.clone(), nix_build(log, &repo_path, attr).await?);
+
+    let services = kennel_config
+        .services
+        .iter()
+        .map(|(name, svc)| (name, name.as_str(), svc.custom_domain.as_deref()));
+    let sites = kennel_config.static_sites.iter().map(|(name, site)| {
+        let attr = site.package_attr.as_deref().unwrap_or(name.as_str());
+        (name, attr, site.custom_domain.as_deref())
+    });
+
+    let mut store_paths: HashMap<String, String> = HashMap::new();
+    for (name, attr, custom_domain) in services.chain(sites) {
+        let build_env_file = match &input.build_env {
+            Some(values) => {
+                let file = work_dir.join("build-env").join(format!("{name}.json"));
+                let env = package_build_env(&input, values, name, custom_domain);
+                tokio::fs::write(&file, serde_json::to_vec(&env)?).await?;
+                Some(file)
+            }
+            None => None,
+        };
+
+        let store_path = nix_build(log, &repo_path, attr, build_env_file).await?;
+        store_paths.insert(name.clone(), store_path);
     }
 
     Ok(BuildOutput {
@@ -478,17 +548,72 @@ async fn eval_kennel_config(
     Ok((config, store_path.to_string()))
 }
 
-async fn nix_build(log: &mut String, repo_path: &Path, name: &str) -> anyhow::Result<String> {
+async fn nix_build(
+    log: &mut String,
+    repo_path: &Path,
+    name: &str,
+    build_env_file: Option<PathBuf>,
+) -> anyhow::Result<String> {
     let system = format!("{}-linux", std::env::consts::ARCH);
     let flake_ref = format!(".#packages.{system}.{name}");
 
     let mut cmd = Command::new("nix");
     cmd.args(["build", &flake_ref, "--no-link", "--print-out-paths"])
         .current_dir(repo_path);
+    if let Some(file) = build_env_file {
+        cmd.arg("--override-input")
+            .arg(format!("{KENNEL_FLAKE_INPUT}/build-env"))
+            .arg(format!("path:{}", file.display()));
+    }
+
     let phase = run_streamed(log, &format!("nix-build:{name}"), &mut cmd).await?;
 
     anyhow::ensure!(phase.status.success(), "nix build failed for {name}");
     Ok(phase.stdout.trim().to_string())
+}
+
+/// Checks that flake.lock has the kennel flake's build-env input. Nix only warns
+/// when `--override-input` names an input that does not exist.
+async fn ensure_build_env_input(repo_path: &Path) -> anyhow::Result<()> {
+    let lock: serde_json::Value = match tokio::fs::read(repo_path.join("flake.lock")).await {
+        Ok(bytes) => serde_json::from_slice(&bytes)?,
+        Err(_) => serde_json::Value::Null,
+    };
+
+    let nodes = &lock["nodes"];
+    let root = lock["root"].as_str().unwrap_or("root");
+    let has_input = nodes[root]["inputs"][KENNEL_FLAKE_INPUT]
+        .as_str()
+        .is_some_and(|key| nodes[key]["inputs"].get("build-env").is_some());
+
+    anyhow::ensure!(
+        has_input,
+        "secretspec.toml declares [scopes.{BUILD_SCOPE}] but flake.lock has no `{KENNEL_FLAKE_INPUT}/build-env` input. Import the kennel flake as `{KENNEL_FLAKE_INPUT}` and update it."
+    );
+    Ok(())
+}
+
+/// Adds `APP_URL` and `COMMIT_HASH` to the build scope for one package
+fn package_build_env(
+    input: &BuildInput,
+    values: &HashMap<String, String>,
+    name: &str,
+    custom_domain: Option<&str>,
+) -> HashMap<String, String> {
+    let (domain, custom_domain) = crate::deploy::deployment_domains(
+        &input.project_name,
+        name,
+        &input.branch_slug,
+        &input.ephemeral_domain,
+        custom_domain,
+        &input.environment,
+    );
+
+    let mut env = values.clone();
+    env.entry("APP_URL".to_string())
+        .or_insert_with(|| crate::deploy::app_url(&domain, custom_domain));
+    env.insert("COMMIT_HASH".to_string(), input.commit_sha.clone());
+    env
 }
 
 async fn run_cmd(

@@ -90,14 +90,14 @@ impl<'a> DeployRequestRepository<'a> {
         Ok(res.rows_affected)
     }
 
-    /// Commits currently targeted by a deploy request in this project
-    pub async fn active_commits(&self, project_id: &str) -> Result<Vec<String>, DbErr> {
+    /// (branch, commit) pairs currently targeted by a deploy request in this project
+    pub async fn active_targets(&self, project_id: &str) -> Result<Vec<(String, String)>, DbErr> {
         Ok(DeployRequests::find()
             .filter(deploy_requests::Column::ProjectId.eq(project_id))
             .all(self.db)
             .await?
             .into_iter()
-            .map(|r| r.commit_sha)
+            .map(|r| (r.branch, r.commit_sha))
             .collect())
     }
 }

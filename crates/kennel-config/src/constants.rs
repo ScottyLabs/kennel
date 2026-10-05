@@ -17,6 +17,8 @@ pub const VALKEY_BACKUP_DIR: &str = "/var/lib/kennel/valkey-backups";
 pub const VALKEY_BACKUP_KEEP: usize = 20;
 
 pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = 1;
+pub const KENNEL_FLAKE_INPUT: &str = "scottylabs";
+pub const BUILD_SCOPE: &str = "build";
 
 pub const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);

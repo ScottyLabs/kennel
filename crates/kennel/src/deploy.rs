@@ -290,17 +290,14 @@ async fn deploy_static_site(
         environment,
         kennel_config: _,
     } = ctx;
-    let domain = generate_domain(
+    let (domain, custom_domain) = deployment_domains(
         project_name,
         name,
         branch_slug,
         &state.config.ephemeral_domain,
+        site_config.custom_domain.as_deref(),
+        environment,
     );
-
-    let custom_domain = site_config
-        .custom_domain
-        .as_deref()
-        .filter(|_| *environment == Environment::Prod);
 
     let deployment_id = match state
         .store
@@ -382,17 +379,14 @@ async fn deploy_service(
         environment,
         kennel_config,
     } = ctx;
-    let domain = generate_domain(
+    let (domain, custom_domain) = deployment_domains(
         project_name,
         name,
         branch_slug,
         &state.config.ephemeral_domain,
+        svc_config.custom_domain.as_deref(),
+        environment,
     );
-
-    let custom_domain = svc_config
-        .custom_domain
-        .as_deref()
-        .filter(|_| *environment == Environment::Prod);
     let unit_name = service_unit_name(project_name, branch_slug, name);
     let system_user = service_user(&unit_name);
 
@@ -414,6 +408,7 @@ async fn deploy_service(
             std::path::Path::new(config_store_path),
             &env_str,
             &vault_endpoint,
+            None,
         ) {
             Ok(secrets) => env_vars.extend(secrets),
             Err(e) => {
@@ -429,9 +424,9 @@ async fn deploy_service(
     env_vars.insert("PORT".to_string(), port.to_string());
     env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
 
-    // Public URL of this deployment
-    let app_url = format!("https://{}", custom_domain.unwrap_or(domain.as_str()));
-    env_vars.entry("APP_URL".to_string()).or_insert(app_url);
+    env_vars
+        .entry("APP_URL".to_string())
+        .or_insert_with(|| app_url(&domain, custom_domain));
 
     let deployment_id = match state
         .store
@@ -628,7 +623,11 @@ async fn enqueue_rebuild(
     match state
         .store
         .builds()
-        .find_by_project_commit(&deployment.project_id, &deployment.commit_sha)
+        .find_by_project_branch_commit(
+            &deployment.project_id,
+            &deployment.branch,
+            &deployment.commit_sha,
+        )
         .await?
     {
         Some(build) => match build.status.as_str() {
@@ -696,8 +695,23 @@ pub async fn remove_build_gc_roots(build_id: &str) {
     }
 }
 
-fn generate_domain(project: &str, service: &str, branch_slug: &str, base_domain: &str) -> String {
-    format!("{project}-{service}-{branch_slug}.{base_domain}")
+/// Generated domain of a deployment, and its custom domain if it is in prod
+pub fn deployment_domains<'a>(
+    project: &str,
+    service: &str,
+    branch_slug: &str,
+    base_domain: &str,
+    custom_domain: Option<&'a str>,
+    environment: &Environment,
+) -> (String, Option<&'a str>) {
+    let domain = format!("{project}-{service}-{branch_slug}.{base_domain}");
+    let custom_domain = custom_domain.filter(|_| *environment == Environment::Prod);
+    (domain, custom_domain)
+}
+
+/// Public URL of a deployment, set as `APP_URL` in builds and services
+pub fn app_url(domain: &str, custom_domain: Option<&str>) -> String {
+    format!("https://{}", custom_domain.unwrap_or(domain))
 }
 
 pub fn sanitize(s: &str) -> String {

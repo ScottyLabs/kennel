@@ -93,13 +93,15 @@ impl<'a> BuildRepository<'a> {
         Ok(())
     }
 
-    pub async fn find_by_project_commit(
+    pub async fn find_by_project_branch_commit(
         &self,
         project_id: &str,
+        branch: &str,
         commit_sha: &str,
     ) -> Result<Option<builds::Model>, DbErr> {
         Builds::find()
             .filter(builds::Column::ProjectId.eq(project_id))
+            .filter(builds::Column::Branch.eq(branch))
             .filter(builds::Column::CommitSha.eq(commit_sha))
             .one(self.db)
             .await
@@ -122,31 +124,40 @@ impl<'a> BuildRepository<'a> {
         Ok(())
     }
 
-    /// Cancel queued or built builds for commits no deploy request targets
-    /// anymore and returns the built ones so their gc roots can be reaped
+    /// Cancel queued or built builds for (branch, commit) pairs no deploy request
+    /// targets anymore and returns the built ones so their gc roots can be reaped
     pub async fn cancel_unreferenced(
         &self,
         project_id: &str,
-        referenced: &[String],
+        referenced: &[(String, String)],
     ) -> Result<Vec<String>, DbErr> {
-        let stale_built: Vec<String> = Builds::find()
+        let stale: Vec<builds::Model> = Builds::find()
             .filter(builds::Column::ProjectId.eq(project_id))
-            .filter(builds::Column::Status.eq("built"))
-            .filter(builds::Column::CommitSha.is_not_in(referenced.iter().map(String::as_str)))
+            .filter(builds::Column::Status.is_in(["queued", "built"]))
             .all(self.db)
             .await?
             .into_iter()
-            .map(|b| b.id)
+            .filter(|b| {
+                !referenced
+                    .iter()
+                    .any(|(branch, sha)| *branch == b.branch && *sha == b.commit_sha)
+            })
             .collect();
+
+        if stale.is_empty() {
+            return Ok(Vec::new());
+        }
 
         Builds::update_many()
             .col_expr(builds::Column::Status, Expr::value("cancelled"))
-            .filter(builds::Column::ProjectId.eq(project_id))
-            .filter(builds::Column::Status.is_in(["queued", "built"]))
-            .filter(builds::Column::CommitSha.is_not_in(referenced.iter().map(String::as_str)))
+            .filter(builds::Column::Id.is_in(stale.iter().map(|b| b.id.as_str())))
             .exec(self.db)
             .await?;
 
-        Ok(stale_built)
+        Ok(stale
+            .into_iter()
+            .filter(|b| b.status == "built")
+            .map(|b| b.id)
+            .collect())
     }
 }

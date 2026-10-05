@@ -156,11 +156,11 @@ outputs = { nixpkgs, scottylabs, ... }:
   };
 ```
 
-This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages.
+This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages. The kennel input must be named `scottylabs`.
 
-A Deno or JavaScript front-end uses `buildDenoTask` the same way.
+A Deno or JavaScript frontend uses `buildDenoTask` the same way.
 
-A browser front-end (Vite, Svelte) also needs a root `deno.json` that excludes its directory, so the `deno check` hook skips it instead of failing on browser code. Replace `sites/web` with your front-end's path:
+A browser frontend (Vite, Svelte) also needs a root `deno.json` that excludes its directory, so the `deno check` hook skips it instead of failing on browser code. Replace `sites/web` with your frontend's path:
 
 ```json
 {
@@ -183,6 +183,26 @@ Kennel injects these variables into every backend service it deploys:
 Resolved secrets from your `secretspec.toml` are injected alongside these.
 
 Kennel runs each service from a working directory that contains your `secretspec.toml`, so the [secretspec SDK's runtime `load()`](./secrets.md#runtime-loading) finds it automatically. The filesystem is read-only apart from a private `/tmp`, so keep persistent state in a provisioned database or object store.
+
+### Build environment
+
+Some frontends read configuration at build time, such as Vite replacing `import.meta.env.VITE_*` with its value. List those variables in a `build` scope in your `secretspec.toml`:
+
+```toml
+[profiles.default]
+VITE_API_URL = { description = "API base URL", default = "http://localhost:3000" }
+POSTHOG_KEY = { description = "PostHog project key" }
+
+[profiles.prod]
+VITE_API_URL = { description = "API base URL", default = "https://api.my-project.scottylabs.org" }
+
+[scopes.build]
+secrets = ["VITE_API_URL", "POSTHOG_KEY"]
+```
+
+Kennel resolves the scope with the profile matching the branch and exports the values, plus `APP_URL` and `COMMIT_HASH`, into every package built with the [build helpers](../reference/build-helpers.md). A package built without the helpers can opt in with `env = (scottylabs.mkLib pkgs).buildEnv;`.
+
+Only list values that are safe to make public. They can end up in the build output, which is downloadable from the shared binary cache and, for a website, readable by anyone who visits it. Changing a value in OpenBao only takes effect from your next push.
 
 ## 4. Enable infrastructure
 

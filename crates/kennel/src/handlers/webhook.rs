@@ -196,11 +196,10 @@ async fn enqueue_deploy(
     git_ref: &str,
     commit_sha: &str,
 ) -> anyhow::Result<()> {
-    // One build per commit is reused across every branch
     match state
         .store
         .builds()
-        .find_by_project_commit(&project.id, commit_sha)
+        .find_by_project_branch_commit(&project.id, branch, commit_sha)
         .await?
     {
         Some(existing) => {
@@ -246,7 +245,7 @@ async fn reap_unreferenced_builds(state: &AppState, project_id: &str) {
     let Ok(referenced) = state
         .store
         .deploy_requests()
-        .active_commits(project_id)
+        .active_targets(project_id)
         .await
     else {
         return;

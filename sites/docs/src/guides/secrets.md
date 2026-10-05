@@ -125,6 +125,8 @@ Kennel authenticates to OpenBao with a service token provided via `VAULT_TOKEN` 
 
 If a required secret cannot be resolved, the deployment fails. Deployed services also receive `PORT`, `COMMIT_HASH`, and `APP_URL` (see [Deploying a Project](./deploying.md#runtime-environment)).
 
+Values a frontend needs at build time go in a `[scopes.build]` table, which kennel resolves with the same profile and exports into the build. Only public values belong there (see [Build environment](./deploying.md#build-environment)).
+
 ## Runtime loading
 
 Use the typed secretspec SDKs to load secrets in your application code. Environment variables work but lose type safety and expose every secret to every process. The SDKs generate typed accessors from your `secretspec.toml` at build time.

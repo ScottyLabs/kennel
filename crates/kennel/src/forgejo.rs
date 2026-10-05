@@ -121,6 +121,37 @@ impl ForgejoClient {
         }
         Ok(())
     }
+
+    /// Contents of `path` at commit `sha`
+    pub async fn raw_file(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        sha: &str,
+    ) -> Result<Option<String>> {
+        let url = format!(
+            "{}/repos/{owner}/{repo}/raw/{path}?ref={sha}",
+            self.api_base
+        );
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("token {}", self.token))
+            .send()
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !resp.status().is_success() {
+            let code = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!("raw file API returned {code}: {text}");
+        }
+
+        Ok(Some(resp.text().await?))
+    }
 }
 
 pub fn pr_number_from_branch(branch: &str) -> Option<u64> {

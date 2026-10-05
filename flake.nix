@@ -45,6 +45,12 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    # Overridden by kennel with the build environment as JSON
+    build-env = {
+      url = "file+file:///dev/null";
+      flake = false;
+    };
   };
 
   outputs =
@@ -57,6 +63,7 @@
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
+      build-env,
       ...
     }:
     let
@@ -77,17 +84,26 @@
           _module.args.ricochet = ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
         };
 
-      # build helpers bound to a consumer pkgs, mirroring crane.mkLib
+      # Environment variables kennel sets for helper builds
+      buildEnv =
+        let
+          raw = builtins.readFile build-env;
+        in
+        if raw == "" then { } else builtins.fromJSON raw;
+
+      # Build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {
-        buildDenoTask = pkgs.callPackage ./nix/lib/build-deno-task.nix { };
-        buildRustService = import ./nix/lib/build-rust-service.nix { inherit pkgs crane; };
-        buildHaskellService = import ./nix/lib/build-haskell-service.nix { inherit pkgs; };
+        inherit buildEnv;
+        buildDenoTask = pkgs.callPackage ./nix/lib/build-deno-task.nix { inherit buildEnv; };
+        buildRustService = import ./nix/lib/build-rust-service.nix { inherit pkgs crane buildEnv; };
+        buildHaskellService = import ./nix/lib/build-haskell-service.nix { inherit pkgs buildEnv; };
         buildPythonService = import ./nix/lib/build-python-service.nix {
           inherit
             pkgs
             uv2nix
             pyproject-nix
             pyproject-build-systems
+            buildEnv
             ;
         };
         buildMdbook =
@@ -95,9 +111,14 @@
             src,
             name ? "docs",
           }:
-          pkgs.runCommand name { nativeBuildInputs = [ pkgs.mdbook ]; } ''
-            mdbook build ${src} --dest-dir "$out"
-          '';
+          pkgs.runCommand name
+            {
+              nativeBuildInputs = [ pkgs.mdbook ];
+              env = buildEnv;
+            }
+            ''
+              mdbook build ${src} --dest-dir "$out"
+            '';
         buildOptionsDoc = import ./nix/lib/options-doc.nix { inherit pkgs; };
       };
     in

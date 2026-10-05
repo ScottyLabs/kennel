@@ -1,5 +1,17 @@
 {
   "nodes": {
+    "build-env": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-d6xi4mKdjkX2JFicDIv5niSzpyI0m/Hnm8GGAIU04kY=",
+        "type": "file",
+        "url": "file:///dev/null"
+      },
+      "original": {
+        "type": "file",
+        "url": "file:///dev/null"
+      }
+    },
     "cachix": {
       "inputs": {
         "devenv": [
@@ -670,6 +682,7 @@
     },
     "root": {
       "inputs": {
+        "build-env": "build-env",
         "crane": "crane",
         "devenv": "devenv",
         "nixpkgs": "nixpkgs_2",

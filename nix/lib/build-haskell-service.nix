@@ -1,5 +1,5 @@
 # Builds a Haskell service with callCabal2nix, every dep from the binary-cached nixpkgs set
-{ pkgs }:
+{ pkgs, buildEnv }:
 
 {
   # Package name to build, must be a key of localPackages
@@ -20,4 +20,11 @@ let
   # Newest fully binary-cached set, keep in sync with modules/haskell.nix
   hset = pkgs.haskell.packages.ghc912.extend (lib.composeExtensions localOverlay overrides);
 in
-pkgs.haskell.lib.justStaticExecutables hset.${pname}
+pkgs.haskell.lib.justStaticExecutables (
+  if buildEnv == { } then
+    hset.${pname}
+  else
+    pkgs.haskell.lib.overrideCabal hset.${pname} (old: {
+      env = (old.env or { }) // buildEnv;
+    })
+)
