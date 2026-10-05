@@ -8,7 +8,7 @@
 let
   cfg = config.scottylabs.security;
 
-  # TODO: https://github.com/NixOS/nixpkgs/issues/543951
+  # TODO: https://github.com/NixOS/nixpkgs/pull/569851
   semgrepPkg =
     if pkgs.stdenv.hostPlatform.isLinux && pkgs.stdenv.hostPlatform.isAarch64 then
       pkgs.semgrep.overridePythonAttrs (_: {
