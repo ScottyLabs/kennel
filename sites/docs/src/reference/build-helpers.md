@@ -75,7 +75,7 @@ Type: `attrs`, default: `{ }`
 
 ## `buildHaskellService`
 
-Builds a Haskell project against the org-standard GHC package set, stripped to its static executables. Library dependencies come pre-built from the binary-cached nixpkgs set rather than solved from Hackage, so a version bound is satisfied by whatever the set carries; use `overrides` for exceptions. Local packages are lifted into the set with [callCabal2nix](https://nixos.org/manual/nixpkgs/unstable/#haskell), one small import-from-derivation per package, re-evaluated only when its `.cabal` file changes.
+Builds a Haskell project with GHC 9.14 and strips it to its static executables. Dependencies come from the nixpkgs Haskell package set rather than Hackage, so version bounds must accept the versions nixpkgs has. Use `overrides` for exceptions.
 
 ### `pname`
 

@@ -8,9 +8,8 @@
 let
   cfg = config.scottylabs.haskell;
 
-  # TODO: ghc914 once hydra caches its set
-  # Newest fully binary-cached set, keep in sync with build-haskell-service.nix
-  hset = pkgs.haskell.packages.ghc912;
+  # Keep in sync with build-haskell-service.nix
+  hset = pkgs.haskell.packages.ghc914;
 
   extendedSet = hset.extend (
     final: _prev: lib.mapAttrs (name: src: final.callCabal2nix name src { }) cfg.localPackages
@@ -40,9 +39,7 @@ in
         [HLS](https://github.com/haskell/haskell-language-server), and
         [hlint](https://github.com/ndmitchell/hlint), with
         [fourmolu](https://github.com/fourmolu/fourmolu) formatting via
-        treefmt. Library dependencies come pre-built from the binary-cached
-        nixpkgs package set, so `cabal build` compiles only the project's own
-        modules. Runs hlint on every commit.
+        treefmt. Runs hlint on every commit.
       '';
     };
 

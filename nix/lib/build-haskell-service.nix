@@ -1,4 +1,4 @@
-# Builds a Haskell service with callCabal2nix, every dep from the binary-cached nixpkgs set
+# Builds a Haskell service with callCabal2nix, every dep from the nixpkgs Haskell set
 { pkgs, buildEnv }:
 
 {
@@ -16,9 +16,8 @@ let
   localOverlay =
     final: _prev: builtins.mapAttrs (name: src: final.callCabal2nix name src { }) localPackages;
 
-  # TODO: ghc914 once hydra caches its set
-  # Newest fully binary-cached set, keep in sync with modules/haskell.nix
-  hset = pkgs.haskell.packages.ghc912.extend (lib.composeExtensions localOverlay overrides);
+  # Keep in sync with modules/haskell.nix
+  hset = pkgs.haskell.packages.ghc914.extend (lib.composeExtensions localOverlay overrides);
 in
 pkgs.haskell.lib.justStaticExecutables (
   if buildEnv == { } then
