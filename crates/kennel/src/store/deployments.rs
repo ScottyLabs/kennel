@@ -24,6 +24,7 @@ impl<'a> DeploymentRepository<'a> {
         {
             let mut update = model;
             update.id = Set(existing.id);
+            update.updated_at = Set(chrono::Utc::now());
             update.update(self.db).await
         } else {
             model.insert(self.db).await
