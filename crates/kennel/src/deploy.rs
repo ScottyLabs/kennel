@@ -24,18 +24,96 @@ pub enum DeployOutcome {
     SkippedPreview,
 }
 
+/// Step of a deploy that failed, exported as the `stage` label of `kennel_deploy_failures`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailureStage {
+    /// The commit's build failed or was cancelled
+    Build,
+    /// The `kennel.json` schema version does not match this kennel
+    Config,
+    /// Creating the postgres, valkey, or garage resources the project declares
+    Provision,
+    /// Resolving the project's secrets from OpenBao
+    Secrets,
+    /// Starting the service's transient systemd unit
+    Systemd,
+    /// The service did not pass its health check within the startup grace period
+    Healthcheck,
+    /// Adding the deployment's caddy routes
+    Routing,
+    /// Kennel's own bookkeeping such as its database, gc roots, and site links
+    Internal,
+}
+
+impl FailureStage {
+    pub const ALL: [Self; 8] = [
+        Self::Build,
+        Self::Config,
+        Self::Provision,
+        Self::Secrets,
+        Self::Systemd,
+        Self::Healthcheck,
+        Self::Routing,
+        Self::Internal,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Config => "config",
+            Self::Provision => "provision",
+            Self::Secrets => "secrets",
+            Self::Systemd => "systemd",
+            Self::Healthcheck => "healthcheck",
+            Self::Routing => "routing",
+            Self::Internal => "internal",
+        }
+    }
+}
+
+/// Deploy error tagged with the stage that produced it
+#[derive(Debug)]
+pub struct StageError {
+    pub stage: FailureStage,
+    error: anyhow::Error,
+}
+
+impl std::fmt::Display for StageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#}", self.error)
+    }
+}
+
+impl std::error::Error for StageError {}
+
+trait AtStage<T> {
+    fn at(self, stage: FailureStage) -> Result<T, StageError>;
+}
+
+impl<T, E: Into<anyhow::Error>> AtStage<T> for Result<T, E> {
+    fn at(self, stage: FailureStage) -> Result<T, StageError> {
+        self.map_err(|e| StageError {
+            stage,
+            error: e.into(),
+        })
+    }
+}
+
 /// Provision the resources the config declares, gated by schema version and the `resources` list
 pub async fn provision_declared(
     state: &AppState,
     config: &kennel_config::KennelConfig,
     request: &ResourceRequest,
-) -> anyhow::Result<HashMap<String, String>> {
+) -> Result<HashMap<String, String>, StageError> {
     if !config.is_compatible() {
-        anyhow::bail!(
-            "kennel.json schema version {} does not match expected {}. Run `devenv update` and redeploy.",
-            config.version,
-            kennel_config::constants::KENNEL_CONFIG_SCHEMA_VERSION
-        );
+        return Err(StageError {
+            stage: FailureStage::Config,
+            error: anyhow::anyhow!(
+                "kennel.json schema version {} does not match expected {}. Run `devenv update` and redeploy.",
+                config.version,
+                kennel_config::constants::KENNEL_CONFIG_SCHEMA_VERSION
+            ),
+        });
     }
 
     let mut env_vars = HashMap::new();
@@ -43,12 +121,17 @@ pub async fn provision_declared(
         if !config.provides(provider.name()) {
             continue;
         }
-        let vars = provider.provision(request).await.map_err(|e| {
-            anyhow::anyhow!(
-                "provisioning declared resource '{}' failed: {e:#}",
-                provider.name()
-            )
-        })?;
+
+        let vars = provider
+            .provision(request)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "provisioning declared resource '{}' failed: {e:#}",
+                    provider.name()
+                )
+            })
+            .at(FailureStage::Provision)?;
         env_vars.extend(vars);
     }
 
@@ -142,7 +225,7 @@ pub async fn deploy_request(
         kennel_config: &kennel_config,
     };
 
-    let deploy_result: anyhow::Result<()> = async {
+    let deploy_result: Result<(), StageError> = async {
         for (name, site_config) in &kennel_config.static_sites {
             let Some(store_path) = store_paths.get(name) else {
                 tracing::warn!(site = %name, "no store path, skipping");
@@ -170,6 +253,7 @@ pub async fn deploy_request(
             project = %project.name,
             branch = %request.branch,
             commit = %build.commit_sha,
+            stage = e.stage.as_str(),
             error = %format!("{e:#}"),
             "deploy failed",
         );
@@ -279,7 +363,7 @@ async fn deploy_static_site(
     name: &str,
     store_path: &str,
     site_config: &kennel_config::StaticSiteConfig,
-) -> anyhow::Result<()> {
+) -> Result<(), StageError> {
     let &DeployCtx {
         state,
         caddy,
@@ -303,7 +387,8 @@ async fn deploy_static_site(
         .store
         .deployments()
         .find_by_project_service_branch(&build.project_id, name, branch)
-        .await?
+        .await
+        .at(FailureStage::Internal)?
     {
         Some(existing) => existing.id,
         None => uuid::Uuid::now_v7().to_string(),
@@ -312,31 +397,41 @@ async fn deploy_static_site(
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(&build.project_id)
         .join(branch_slug);
-    tokio::fs::create_dir_all(&site_dir).await?;
+    tokio::fs::create_dir_all(&site_dir)
+        .await
+        .at(FailureStage::Internal)?;
 
     let link = site_dir.join(name);
     let temp = site_dir.join(format!("{name}.new"));
     let _ = tokio::fs::remove_file(&temp).await;
 
     #[cfg(unix)]
-    tokio::fs::symlink(store_path, &temp).await?;
+    tokio::fs::symlink(store_path, &temp)
+        .await
+        .at(FailureStage::Internal)?;
 
     if link.exists() {
-        tokio::fs::remove_file(&link).await?;
+        tokio::fs::remove_file(&link)
+            .await
+            .at(FailureStage::Internal)?;
     }
-    tokio::fs::rename(&temp, &link).await?;
+    tokio::fs::rename(&temp, &link)
+        .await
+        .at(FailureStage::Internal)?;
 
     let route_id = format!("kennel-{deployment_id}");
 
     caddy
         .add_static_route(&route_id, &domain, store_path, site_config.spa)
-        .await?;
+        .await
+        .at(FailureStage::Routing)?;
 
     if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
-            .await?;
+            .await
+            .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
 
@@ -356,8 +451,15 @@ async fn deploy_static_site(
         ..Default::default()
     };
 
-    state.store.deployments().upsert(model).await?;
-    add_gc_root(&deployment_id, store_path).await?;
+    state
+        .store
+        .deployments()
+        .upsert(model)
+        .await
+        .at(FailureStage::Internal)?;
+    add_gc_root(&deployment_id, store_path)
+        .await
+        .at(FailureStage::Internal)?;
 
     tracing::info!(site = %name, domain = %domain, "deployed static site");
     Ok(())
@@ -368,7 +470,7 @@ async fn deploy_service(
     name: &str,
     store_path: &str,
     svc_config: &kennel_config::ServiceConfig,
-) -> anyhow::Result<()> {
+) -> Result<(), StageError> {
     let &DeployCtx {
         state,
         caddy,
@@ -412,14 +514,17 @@ async fn deploy_service(
         ) {
             Ok(secrets) => env_vars.extend(secrets),
             Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "secret resolution failed for service '{name}': {e}"
-                ));
+                return Err(StageError {
+                    stage: FailureStage::Secrets,
+                    error: anyhow::anyhow!("secret resolution failed for service '{name}': {e}"),
+                });
             }
         }
     }
 
-    let exec_start = find_executable(store_path).await?;
+    let exec_start = find_executable(store_path)
+        .await
+        .at(FailureStage::Internal)?;
     let port = allocate_port(&unit_name);
     env_vars.insert("PORT".to_string(), port.to_string());
     env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
@@ -432,13 +537,16 @@ async fn deploy_service(
         .store
         .deployments()
         .find_by_project_service_branch(&build.project_id, name, branch)
-        .await?
+        .await
+        .at(FailureStage::Internal)?
     {
         Some(existing) => existing.id,
         None => uuid::Uuid::now_v7().to_string(),
     };
 
-    let systemd = crate::systemd::SystemdClient::connect().await?;
+    let systemd = crate::systemd::SystemdClient::connect()
+        .await
+        .at(FailureStage::Systemd)?;
     systemd
         .start_transient_unit(
             &unit_name,
@@ -448,25 +556,35 @@ async fn deploy_service(
             build.config_store_path.as_deref(),
             &deploy_log_fields(project_name, branch, &build.commit_sha),
         )
-        .await?;
+        .await
+        .at(FailureStage::Systemd)?;
 
     // Wait for the service to become healthy before routing traffic
     let healthy = wait_for_healthy(port).await;
     if !healthy {
         tracing::error!(service = %name, port, "healthcheck failed, stopping unit");
         let _ = systemd.stop_unit(&unit_name).await;
-        anyhow::bail!("service '{name}' failed healthcheck within startup grace period");
+        return Err(StageError {
+            stage: FailureStage::Healthcheck,
+            error: anyhow::anyhow!(
+                "service '{name}' failed healthcheck within startup grace period"
+            ),
+        });
     }
 
     let route_id = format!("kennel-{deployment_id}");
 
-    caddy.add_proxy_route(&route_id, &domain, port).await?;
+    caddy
+        .add_proxy_route(&route_id, &domain, port)
+        .await
+        .at(FailureStage::Routing)?;
 
     if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
             .add_proxy_route(&custom_route_id, custom_domain, port)
-            .await?;
+            .await
+            .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
 
@@ -490,12 +608,21 @@ async fn deploy_service(
         ..Default::default()
     };
 
-    state.store.deployments().upsert(model).await?;
+    state
+        .store
+        .deployments()
+        .upsert(model)
+        .await
+        .at(FailureStage::Internal)?;
 
     // Pin the new artifact under the deployment root
-    add_gc_root(&deployment_id, store_path).await?;
+    add_gc_root(&deployment_id, store_path)
+        .await
+        .at(FailureStage::Internal)?;
     if let Some(config_store_path) = &build.config_store_path {
-        add_gc_root(&format!("{deployment_id}-config"), config_store_path).await?;
+        add_gc_root(&format!("{deployment_id}-config"), config_store_path)
+            .await
+            .at(FailureStage::Internal)?;
     }
 
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");

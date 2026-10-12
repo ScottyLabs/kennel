@@ -7,6 +7,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 
 use crate::AppState;
+use crate::deploy::FailureStage;
 
 pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, StatusCode> {
     let build_counts = state
@@ -17,6 +18,12 @@ pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoRespo
         .map_err(internal)?;
     let deployments_count = state.store.deployments().count().await.map_err(internal)?;
     let projects_count = state.store.projects().count().await.map_err(internal)?;
+    let failed_by_stage = state
+        .store
+        .deploy_requests()
+        .count_failed_by_stage()
+        .await
+        .map_err(internal)?;
 
     let mut out = String::new();
 
@@ -41,6 +48,22 @@ pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoRespo
     .ok();
     writeln!(out, "# TYPE kennel_projects gauge").ok();
     writeln!(out, "kennel_projects {projects_count}").ok();
+
+    writeln!(
+        out,
+        "# HELP kennel_deploy_failures Deploy requests currently failed, by the stage that failed"
+    )
+    .ok();
+    writeln!(out, "# TYPE kennel_deploy_failures gauge").ok();
+    // Every stage is emitted so an alert on one stage never sees missing data
+    for stage in FailureStage::ALL {
+        let label = stage.as_str();
+        let count = failed_by_stage
+            .iter()
+            .find(|(s, _)| s == label)
+            .map_or(0, |(_, n)| *n);
+        writeln!(out, "kennel_deploy_failures{{stage=\"{label}\"}} {count}").ok();
+    }
 
     let mut headers = HeaderMap::new();
     headers.insert(

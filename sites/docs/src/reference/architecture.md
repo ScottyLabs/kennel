@@ -33,12 +33,27 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | Method | Path | Purpose |
 | ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
-| GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects` gauges. |
+| GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects`, and `kennel_deploy_failures{stage=...}` gauges. |
 | GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/api/health`) from the unit's D-Bus properties. |
 
 All endpoints other than `/webhook` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
 
 Routes are mounted in `http.rs`; per-resource handlers live under `handlers/`.
+
+`kennel_deploy_failures` is the number of deploy requests currently marked failed, with a `stage` label for where the deploy stopped:
+
+| Stage | Failed while |
+| ----- | ------------ |
+| `build` | building the commit |
+| `config` | checking the `kennel.json` schema version |
+| `provision` | creating postgres, valkey, or garage resources |
+| `secrets` | resolving secrets from OpenBao |
+| `systemd` | starting the service's unit |
+| `healthcheck` | waiting for the service to pass its health check |
+| `routing` | adding Caddy routes |
+| `internal` | updating kennel's database, gc roots, or site links |
+
+A request stops counting once it is redeployed or its branch is closed. Stages with no failures are exported as `0`.
 
 ## Reconciliation
 

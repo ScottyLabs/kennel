@@ -1,3 +1,4 @@
+use crate::deploy::FailureStage;
 use ::entity::deploy_requests::{self, Entity as DeployRequests};
 use sea_orm::*;
 
@@ -27,6 +28,7 @@ impl<'a> DeployRequestRepository<'a> {
             model.commit_sha = Set(commit_sha.to_string());
             if !already_deployed {
                 model.status = Set("pending".to_string());
+                model.failure_stage = Set(None);
             }
             model.updated_at = Set(chrono::Utc::now());
             model.update(self.db).await
@@ -40,6 +42,7 @@ impl<'a> DeployRequestRepository<'a> {
                 status: Set("pending".to_string()),
                 created_at: Set(chrono::Utc::now()),
                 updated_at: Set(chrono::Utc::now()),
+                failure_stage: Set(None),
             };
             model.insert(self.db).await
         }
@@ -66,15 +69,44 @@ impl<'a> DeployRequestRepository<'a> {
     }
 
     pub async fn set_status(&self, id: &str, status: &str) -> Result<(), DbErr> {
+        self.transition(id, status, None).await
+    }
+
+    pub async fn set_failed(&self, id: &str, stage: FailureStage) -> Result<(), DbErr> {
+        self.transition(id, "failed", Some(stage)).await
+    }
+
+    async fn transition(
+        &self,
+        id: &str,
+        status: &str,
+        stage: Option<FailureStage>,
+    ) -> Result<(), DbErr> {
         let mut model: deploy_requests::ActiveModel = DeployRequests::find_by_id(id)
             .one(self.db)
             .await?
             .ok_or(DbErr::RecordNotFound(id.to_string()))?
             .into();
+
         model.status = Set(status.to_string());
+        model.failure_stage = Set(stage.map(|s| s.as_str().to_string()));
         model.updated_at = Set(chrono::Utc::now());
+
         model.update(self.db).await?;
         Ok(())
+    }
+
+    /// Counts failed requests per failure stage
+    pub async fn count_failed_by_stage(&self) -> Result<Vec<(String, i64)>, DbErr> {
+        DeployRequests::find()
+            .select_only()
+            .column(deploy_requests::Column::FailureStage)
+            .column_as(deploy_requests::Column::Id.count(), "count")
+            .filter(deploy_requests::Column::Status.eq("failed"))
+            .group_by(deploy_requests::Column::FailureStage)
+            .into_tuple()
+            .all(self.db)
+            .await
     }
 
     pub async fn delete_by_project_branch(

@@ -48,11 +48,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                         .await;
                 }
                 Err(e) => {
-                    tracing::error!(request_id = %request.id, error = %e, "deploy failed during reconciliation");
+                    // Failures before any deploy step carry no stage and count as kennel's own
+                    let stage = e
+                        .downcast_ref::<deploy::StageError>()
+                        .map_or(deploy::FailureStage::Internal, |s| s.stage);
+                    tracing::error!(request_id = %request.id, stage = stage.as_str(), error = %e, "deploy failed during reconciliation");
+
                     let _ = state
                         .store
                         .deploy_requests()
-                        .set_status(&request.id, "failed")
+                        .set_failed(&request.id, stage)
                         .await;
                 }
             },
@@ -60,7 +65,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                 let _ = state
                     .store
                     .deploy_requests()
-                    .set_status(&request.id, "failed")
+                    .set_failed(&request.id, deploy::FailureStage::Build)
                     .await;
             }
             "skipped" => {
