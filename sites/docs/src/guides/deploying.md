@@ -223,7 +223,7 @@ scottylabs.postgres.extensions = e: [
 ];
 ```
 
-Kennel creates the same extensions in your deployed database. The default is `e: [ e.pg_uuidv7 ]`.
+Kennel creates the same extensions in your deployed database, defaulting to `e: [ e.pg_uuidv7 ]`. It can only create extensions that the host's NixOS configuration installs as trusted, so a new one has to be added there first (see [PostgreSQL extensions](../reference/nixos-module.md#postgresql-extensions)).
 
 `sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth.
 
