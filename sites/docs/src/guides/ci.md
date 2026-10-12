@@ -48,3 +48,5 @@ jobs:
 ## Secrets
 
 The reusable signs in to OpenBao with the job's Forgejo Actions OIDC token and reads the shared Cachix token and sccache S3 keys from there to reach the binary caches. A project's own secrets are optional under the `ci` profile.
+
+Forgejo does not issue that OIDC token for pull requests from forks, so those runs resolve secrets from the environment instead and build without the shared caches. Keep every `ci` profile secret optional (`[profiles.ci.defaults] required = false`), or fork pull requests fail before any check runs.

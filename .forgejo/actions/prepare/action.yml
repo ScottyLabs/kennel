@@ -4,6 +4,14 @@ description: Restore the shared build caches
 runs:
   using: composite
   steps:
+    - name: Fall back to env secrets without an OIDC token
+      shell: bash
+      run: |
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+          echo "::notice::No Actions OIDC token (fork pull request), resolving secrets from the environment; Cachix and sccache are unavailable"
+          echo "SECRETSPEC_PROVIDER=env" >> "$GITHUB_ENV"
+        fi
+
     - name: Cache devenv state
       uses: https://code.forgejo.org/actions/cache@v6
       with:
