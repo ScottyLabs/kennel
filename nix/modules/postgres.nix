@@ -8,6 +8,12 @@
 let
   cfg = config.scottylabs.postgres;
   projectName = config.scottylabs.project.name;
+
+  # Extensions whose SQL name is not their package name
+  sqlNames = {
+    pgvector = "vector";
+  };
+  sqlName = pkg: sqlNames.${lib.getName pkg} or (lib.getName pkg);
 in
 {
   options.scottylabs.postgres = {
@@ -25,7 +31,7 @@ in
       type = lib.types.functionTo (lib.types.listOf lib.types.package);
       default = e: [ e.pg_uuidv7 ];
       defaultText = lib.literalExpression "e: [ e.pg_uuidv7 ]";
-      description = "PostgreSQL extensions as a function of the extensions set";
+      description = "PostgreSQL extensions as a function of the extensions set, used locally and in deployed databases";
     };
   };
 
@@ -47,5 +53,6 @@ in
     '';
 
     scottylabs.kennel.requestedResources = [ "postgres" ];
+    scottylabs.kennel.postgresExtensions = map sqlName (cfg.extensions pkgs.postgresql_18.pkgs);
   };
 }

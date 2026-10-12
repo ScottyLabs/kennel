@@ -110,6 +110,7 @@ impl ResourceProvider for ValkeyProvider {
     async fn provision(
         &self,
         request: &ResourceRequest,
+        _config: &kennel_config::KennelConfig,
     ) -> anyhow::Result<HashMap<String, String>> {
         let key = Self::allocation_key(request);
 

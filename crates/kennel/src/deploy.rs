@@ -123,7 +123,7 @@ pub async fn provision_declared(
         }
 
         let vars = provider
-            .provision(request)
+            .provision(request, config)
             .await
             .map_err(|e| {
                 anyhow::anyhow!(

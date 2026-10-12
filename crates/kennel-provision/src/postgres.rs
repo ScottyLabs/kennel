@@ -1,4 +1,5 @@
 use crate::{ResourceProvider, ResourceRequest};
+use kennel_config::KennelConfig;
 use std::collections::HashMap;
 
 pub struct PostgresProvider {
@@ -36,6 +37,52 @@ impl PostgresProvider {
 
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     }
+
+    /// Runs CREATE EXTENSION as the database owner
+    async fn create_extensions(&self, db_name: &str, extensions: &[String]) -> anyhow::Result<()> {
+        if extensions.is_empty() {
+            return Ok(());
+        }
+
+        for extension in extensions {
+            anyhow::ensure!(
+                !extension.is_empty()
+                    && extension
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'),
+                "invalid postgres extension name '{extension}'"
+            );
+        }
+
+        let row = self
+            .psql(
+                "postgres",
+                &format!(
+                    "SELECT pg_get_userbyid(datdba), current_user FROM pg_database WHERE datname = '{db_name}'"
+                ),
+            )
+            .await?;
+        let (owner, current) = row
+            .split_once('|')
+            .ok_or_else(|| anyhow::anyhow!("database {db_name} not found"))?;
+
+        // Databases made by older kennel versions have owners kennel cannot SET ROLE to yet
+        if owner != current {
+            self.psql(
+                "postgres",
+                &format!("GRANT \"{owner}\" TO CURRENT_USER WITH SET TRUE"),
+            )
+            .await?;
+        }
+
+        let mut sql = format!("SET ROLE \"{owner}\";");
+        for extension in extensions {
+            sql.push_str(&format!(" CREATE EXTENSION IF NOT EXISTS \"{extension}\";"));
+        }
+
+        self.psql(db_name, &sql).await?;
+        Ok(())
+    }
 }
 
 impl ResourceProvider for PostgresProvider {
@@ -46,6 +93,7 @@ impl ResourceProvider for PostgresProvider {
     async fn provision(
         &self,
         request: &ResourceRequest,
+        config: &KennelConfig,
     ) -> anyhow::Result<HashMap<String, String>> {
         let db_name = Self::db_name(request);
         let user = &request.system_user;
@@ -128,6 +176,9 @@ impl ResourceProvider for PostgresProvider {
             &format!("GRANT CREATE ON DATABASE \"{db_name}\" TO \"{owner}\""),
         )
         .await?;
+
+        self.create_extensions(&db_name, &config.postgres_extensions)
+            .await?;
 
         let mut env = HashMap::new();
         env.insert(

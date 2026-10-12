@@ -20,6 +20,10 @@ pub struct KennelConfig {
 
     #[serde(default)]
     pub resources: Vec<String>,
+
+    /// Extensions to create in the project's database
+    #[serde(default)]
+    pub postgres_extensions: Vec<String>,
 }
 
 impl Default for KennelConfig {
@@ -30,6 +34,7 @@ impl Default for KennelConfig {
             preview_deployments: default_preview_deployments(),
             version: 0,
             resources: Vec::new(),
+            postgres_extensions: Vec::new(),
         }
     }
 }

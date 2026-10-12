@@ -214,6 +214,17 @@ scottylabs.postgres.enable = true;
 
 This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
 
+List the PostgreSQL extensions your app uses:
+
+```nix
+scottylabs.postgres.extensions = e: [
+  e.pg_uuidv7
+  e.pgvector
+];
+```
+
+Kennel creates the same extensions in your deployed database. The default is `e: [ e.pg_uuidv7 ]`.
+
 `sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth.
 
 Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, or `garage`) is never allocated one. Provisioning also depends on keeping the shared devenv module current. Kennel stamps each `kennel.json` with a schema version and refuses any deployment whose version does not match, so run `devenv update` if a build is rejected for a version mismatch.

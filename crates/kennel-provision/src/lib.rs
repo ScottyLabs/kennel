@@ -2,7 +2,7 @@ pub mod garage;
 pub mod postgres;
 pub mod valkey;
 
-use kennel_config::Environment;
+use kennel_config::{Environment, KennelConfig};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -19,8 +19,11 @@ pub struct ResourceRequest {
 #[allow(async_fn_in_trait)]
 pub trait ResourceProvider {
     fn name(&self) -> &str;
-    async fn provision(&self, request: &ResourceRequest)
-    -> anyhow::Result<HashMap<String, String>>;
+    async fn provision(
+        &self,
+        request: &ResourceRequest,
+        config: &KennelConfig,
+    ) -> anyhow::Result<HashMap<String, String>>;
     async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()>;
     async fn reconcile(&self, active: &[ResourceRequest]) -> anyhow::Result<()>;
 }
@@ -43,11 +46,12 @@ impl ResourceProvider for Provider {
     async fn provision(
         &self,
         request: &ResourceRequest,
+        config: &KennelConfig,
     ) -> anyhow::Result<HashMap<String, String>> {
         match self {
-            Self::Postgres(p) => p.provision(request).await,
-            Self::Valkey(v) => v.provision(request).await,
-            Self::Garage(g) => g.provision(request).await,
+            Self::Postgres(p) => p.provision(request, config).await,
+            Self::Valkey(v) => v.provision(request, config).await,
+            Self::Garage(g) => g.provision(request, config).await,
         }
     }
 

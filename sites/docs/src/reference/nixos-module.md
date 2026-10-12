@@ -45,3 +45,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
 - tmpfiles rules for `/var/lib/kennel` subdirectories
 - Firewall rules for ports 80 and 443
 - Cachix binary cache substituter
+
+## PostgreSQL extensions
+
+Kennel creates a project's extensions as the owner of its database. The host must install each one through `services.postgresql.extensions` with `trusted = true` in its control file.

@@ -23,6 +23,7 @@ let
 
     preview_deployments = cfg.previewDeployments;
     resources = cfg.requestedResources;
+    postgres_extensions = cfg.postgresExtensions;
   };
 in
 {
@@ -128,6 +129,13 @@ in
         enabled. The list becomes the `resources` field of `kennel.json`.
         Kennel provisions only the resources named there.
       '';
+    };
+
+    postgresExtensions = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      internal = true;
+      description = "Extensions from `scottylabs.postgres.extensions`, written to `kennel.json`";
     };
 
     config = lib.mkOption {

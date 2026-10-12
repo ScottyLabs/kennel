@@ -68,6 +68,7 @@ impl ResourceProvider for GarageProvider {
     async fn provision(
         &self,
         request: &ResourceRequest,
+        _config: &kennel_config::KennelConfig,
     ) -> anyhow::Result<HashMap<String, String>> {
         let bucket_name = Self::bucket_name(request);
         let key_name = Self::key_name(request);
