@@ -46,6 +46,15 @@ in
       '';
     };
 
+    dirs = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "." ];
+      description = ''
+        Directories, relative to the project root, with their own `deno.json`
+        or `package.json`. `deno install` runs in each on shell entry.
+      '';
+    };
+
     svelte = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -53,18 +62,8 @@ in
         description = ''
           Add the
           [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check)
-          pre-commit hook.
-        '';
-      };
-
-      dir = lib.mkOption {
-        type = lib.types.str;
-        default = ".";
-        description = ''
-          The SvelteKit app directory, relative to the project root. When
-          `svelte.enable` is set, `deno install` and `svelte-kit sync` run here
-          on shell entry so `svelte-check` has `node_modules` and the generated
-          `.svelte-kit` types available.
+          pre-commit hook, and run `svelte-kit sync` in each of `dirs` on shell
+          entry so it has the generated `.svelte-kit` types.
         '';
       };
     };
@@ -77,9 +76,9 @@ in
     # oxlint prefers node_modules/.bin/tsgolint over PATH
     env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
 
-    enterShell = lib.mkIf cfg.svelte.enable ''
-      (cd ${cfg.svelte.dir} && deno install && deno run -A npm:@sveltejs/kit/svelte-kit sync)
-    '';
+    enterShell = lib.concatMapStrings (dir: ''
+      (cd ${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && deno run -A npm:@sveltejs/kit/svelte-kit sync"})
+    '') cfg.dirs;
 
     treefmt.config.programs.oxfmt = {
       enable = true;

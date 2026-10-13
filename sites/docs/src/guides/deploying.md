@@ -160,11 +160,17 @@ This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `dev
 
 A Deno or JavaScript frontend uses `buildDenoTask` the same way.
 
-A browser frontend (Vite, Svelte) also needs a root `deno.json` that excludes its directory, so the `deno check` hook skips it instead of failing on browser code. Replace `sites/web` with your frontend's path:
+List a browser frontend's directory (Vite, Svelte) in `scottylabs.deno.dirs`, so the shell installs its npm packages:
+
+```nix
+scottylabs.deno.dirs = [ "sites/web" ];
+```
+
+It also needs a root `deno.json` that excludes that directory, so the `deno check` hook skips it instead of failing on browser code, and `.devenv`, where those packages are cached. Replace `sites/web` with your frontend's path:
 
 ```json
 {
-  "exclude": ["sites/web"]
+  "exclude": ["sites/web", ".devenv"]
 }
 ```
 
