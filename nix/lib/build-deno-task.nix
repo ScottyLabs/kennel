@@ -99,10 +99,10 @@ let
     )}
   '';
 
-  # patchelf linux addons, dropping musl which it cannot fix
+  # patchelf linux addons, dropping musl packages it cannot fix
   patchAddons = lib.optionalString stdenv.isLinux ''
     if [ -d node_modules ]; then
-      find node_modules -path '*-musl*' -name '*.node' -delete
+      find node_modules -type d -name '*musl*' -prune -exec rm -rf {} +
       autoPatchelf node_modules
     fi
   '';
