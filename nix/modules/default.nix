@@ -82,6 +82,7 @@ in
       treefmt.enable = true;
       statix.enable = true;
       deadnix.enable = true;
+      gitleaks.enable = true;
       editorconfig-checker.enable = cfg.editorconfig.enable;
       commitizen.enable = cfg.conventionalCommits.enable;
 
@@ -92,15 +93,6 @@ in
         entry = "${pkgs.taplo}/bin/taplo check";
         types = [ "toml" ];
         pass_filenames = true;
-        language = "system";
-      };
-
-      # TODO: https://github.com/cachix/git-hooks.nix/pull/642
-      gitleaks = {
-        enable = true;
-        name = "gitleaks";
-        entry = "${pkgs.gitleaks}/bin/gitleaks git --pre-commit --staged --redact";
-        pass_filenames = false;
         language = "system";
       };
 

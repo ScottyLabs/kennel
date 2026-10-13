@@ -46,14 +46,10 @@ in
 
     git-hooks.hooks = {
       ruff.enable = true; # lint
-      # TODO: https://github.com/cachix/git-hooks.nix/pull/724
       ty = {
         enable = true;
-        name = "ty";
-        entry = "${pkgs.ty}/bin/ty check";
-        files = "\\.pyi?$";
+        # check the whole project, not just staged files
         pass_filenames = false;
-        language = "system";
       };
     };
   };
