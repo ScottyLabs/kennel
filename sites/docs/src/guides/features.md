@@ -104,6 +104,8 @@ Read them at startup and pass them to the PostHog SDK to turn on analytics. With
 secrets = ["POSTHOG_KEY", "POSTHOG_HOST"]
 ```
 
+In `posthog-js`, also set `ui_host` to `https://us.posthog.com`. Without it, the PostHog toolbar won't work on your site.
+
 If your service captures events from a server on behalf of visitors (for example a redirect service sending one event per click), set `server_side`:
 
 ```toml
