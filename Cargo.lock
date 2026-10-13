@@ -1917,6 +1917,7 @@ dependencies = [
  "kennel-config",
  "kennel-provision",
  "migration",
+ "parking_lot",
  "reqwest 0.13.4",
  "sea-orm",
  "sea-orm-migration",

@@ -27,6 +27,7 @@ sea-orm-migration = { version = "1.1.20", features = [
   "runtime-tokio-rustls",
   "sqlx-sqlite",
 ] }
+parking_lot = "0.12.5"
 secrecy = "0.10.3"
 secretspec = { version = "0.18.0", features = [
   "openbao",

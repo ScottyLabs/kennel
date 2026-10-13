@@ -247,7 +247,7 @@ pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
     loop {
         tokio::select! {
             _ = interval.tick() => {}
-            _ = state.signal.notified() => {}
+            _ = state.reconcile_signal.notified() => {}
             _ = cancel.cancelled() => break,
         }
 

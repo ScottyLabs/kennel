@@ -2,22 +2,56 @@ use crate::AppState;
 use crate::forgejo::CommitStatus;
 use kennel_config::constants::{BUILD_SCOPE, KENNEL_FLAKE_INPUT};
 use kennel_config::{Environment, KennelConfig};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
+
+/// Build units in flight, keyed by unit name so each project/branch builds one commit at a time
+#[derive(Default)]
+struct Running {
+    units: Mutex<HashSet<String>>,
+    freed: Notify,
+}
+
+/// A claimed build's unit, released and announced when the build task ends
+struct Slot {
+    running: Arc<Running>,
+    unit: String,
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.running.units.lock().remove(&self.unit);
+        self.running.freed.notify_one();
+    }
+}
 
 pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
-    loop {
-        let build = match state.store.builds().find_by_status("queued").await {
-            Ok(builds) if !builds.is_empty() => builds.into_iter().next().unwrap(),
-            Ok(_) => {
+    let running = Arc::new(Running::default());
+    let tasks = TaskTracker::new();
+
+    while !cancel.is_cancelled() {
+        if running.units.lock().len() >= state.config.max_concurrent_builds {
+            tokio::select! {
+                _ = running.freed.notified() => continue,
+                _ = cancel.cancelled() => break,
+            }
+        }
+
+        let (build, project, slot) = match claim_next(&state, &running).await {
+            Ok(Some(claimed)) => claimed,
+            Ok(None) => {
                 tokio::select! {
-                    _ = state.signal.notified() => continue,
+                    _ = state.build_signal.notified() => continue,
+                    _ = running.freed.notified() => continue,
                     _ = cancel.cancelled() => break,
                 }
             }
@@ -28,115 +62,126 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
             }
         };
 
+        tasks.spawn(run_build(state.clone(), build, project, slot));
+    }
+
+    tasks.close();
+    tasks.wait().await;
+}
+
+/// Marks the oldest queued build whose unit is idle as building and reserves its unit
+async fn claim_next(
+    state: &AppState,
+    running: &Arc<Running>,
+) -> Result<Option<(::entity::builds::Model, ::entity::projects::Model, Slot)>, sea_orm::DbErr> {
+    for build in state.store.builds().find_by_status("queued").await? {
+        let Some(project) = state.store.projects().find_by_id(&build.project_id).await? else {
+            tracing::error!(build_id = %build.id, project_id = %build.project_id, "build failed: project not found");
+            let _ = state.store.builds().set_status(&build.id, "failed").await;
+            continue;
+        };
+
+        // Same-named units would stop each other
+        let unit = crate::deploy::build_unit_name(&project.name, &build.branch);
+        if running.units.lock().contains(&unit) {
+            continue;
+        }
+
         if let Err(e) = state.store.builds().set_status(&build.id, "building").await {
             tracing::error!(build_id = %build.id, error = %e, "failed to mark building");
             continue;
         }
 
-        let project = state
-            .store
-            .projects()
-            .find_by_id(&build.project_id)
+        running.units.lock().insert(unit.clone());
+        let slot = Slot {
+            running: running.clone(),
+            unit,
+        };
+        return Ok(Some((build, project, slot)));
+    }
+
+    Ok(None)
+}
+
+/// Runs a claimed build and posts its commit statuses, holding the slot until done
+async fn run_build(
+    state: Arc<AppState>,
+    build: ::entity::builds::Model,
+    project: ::entity::projects::Model,
+    _slot: Slot,
+) {
+    let owner_repo = project
+        .owner
+        .as_deref()
+        .map(|owner| (owner, project.name.as_str()));
+    let build_log_url: Option<String> = state
+        .config
+        .grafana_url
+        .as_deref()
+        .map(|base| crate::deploy::build_logs_url(base, &project.name, &build.id));
+
+    if let Some((owner, repo)) = owner_repo
+        && let Err(e) = state
+            .forgejo
+            .create_commit_status(
+                owner,
+                repo,
+                &build.commit_sha,
+                CommitStatus {
+                    state: "pending",
+                    description: "build started",
+                    context: "kennel/build",
+                    target_url: build_log_url.as_deref(),
+                },
+            )
             .await
-            .ok()
-            .flatten();
-        let owner_repo = project.as_ref().and_then(|p| {
-            p.owner
-                .as_ref()
-                .map(|owner| (owner.clone(), p.name.clone()))
-        });
+    {
+        tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
+        let _ = state.store.builds().set_status(&build.id, "failed").await;
+        return;
+    }
 
-        let build_log_url: Option<String> =
-            match (state.config.grafana_url.as_deref(), project.as_ref()) {
-                (Some(base), Some(p)) => {
-                    Some(crate::deploy::build_logs_url(base, &p.name, &build.id))
-                }
-                _ => None,
-            };
+    tracing::info!(build_id = %build.id, project_id = %build.project_id, "processing build");
 
-        if let Some((ref owner, ref repo)) = owner_repo
-            && let Err(e) = state
-                .forgejo
-                .create_commit_status(
-                    owner,
-                    repo,
-                    &build.commit_sha,
-                    CommitStatus {
-                        state: "pending",
-                        description: "build started",
-                        context: "kennel/build",
-                        target_url: build_log_url.as_deref(),
-                    },
-                )
-                .await
-        {
-            tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
-            let _ = state.store.builds().set_status(&build.id, "failed").await;
-            continue;
-        }
+    let task_state = state.clone();
+    let task_build = build.clone();
+    let task_project = project.clone();
+    let outcome =
+        tokio::spawn(async move { process_build(&task_state, &task_build, &task_project).await })
+            .await;
 
-        tracing::info!(build_id = %build.id, project_id = %build.project_id, "processing build");
-
-        let task_state = state.clone();
-        let task_build = build.clone();
-        let outcome =
-            tokio::spawn(async move { process_build(&task_state, &task_build).await }).await;
-
-        match outcome {
-            Ok(result) => match result {
-                Ok(build_outcome) => {
-                    let description = match build_outcome {
-                        BuildOutcome::Built => "build succeeded",
-                        BuildOutcome::Skipped => "skipped: no services or static sites defined",
-                    };
-                    if let Some((ref owner, ref repo)) = owner_repo
-                        && let Err(e) = state
-                            .forgejo
-                            .create_commit_status(
-                                owner,
-                                repo,
-                                &build.commit_sha,
-                                CommitStatus {
-                                    state: "success",
-                                    description,
-                                    context: "kennel/build",
-                                    target_url: build_log_url.as_deref(),
-                                },
-                            )
-                            .await
-                    {
-                        tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
-                        let _ = state.store.builds().set_status(&build.id, "failed").await;
-                        continue;
-                    }
-                    state.signal.notify_one();
-                }
-                Err(e) => {
-                    tracing::error!(build_id = %build.id, error = %e, "build failed");
-                    if let Some((ref owner, ref repo)) = owner_repo
-                        && let Err(post_err) = state
-                            .forgejo
-                            .create_commit_status(
-                                owner,
-                                repo,
-                                &build.commit_sha,
-                                CommitStatus {
-                                    state: "failure",
-                                    description: &format!("{e:#}"),
-                                    context: "kennel/build",
-                                    target_url: build_log_url.as_deref(),
-                                },
-                            )
-                            .await
-                    {
-                        tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
-                    }
+    match outcome {
+        Ok(result) => match result {
+            Ok(build_outcome) => {
+                let description = match build_outcome {
+                    BuildOutcome::Built => "build succeeded",
+                    BuildOutcome::Skipped => "skipped: no services or static sites defined",
+                };
+                if let Some((owner, repo)) = owner_repo
+                    && let Err(e) = state
+                        .forgejo
+                        .create_commit_status(
+                            owner,
+                            repo,
+                            &build.commit_sha,
+                            CommitStatus {
+                                state: "success",
+                                description,
+                                context: "kennel/build",
+                                target_url: build_log_url.as_deref(),
+                            },
+                        )
+                        .await
+                {
+                    tracing::error!(build_id = %build.id, error = %e, "failed to post commit status");
                     let _ = state.store.builds().set_status(&build.id, "failed").await;
+                    return;
                 }
-            },
-            Err(join_err) => {
-                tracing::error!(build_id = %build.id, error = %join_err, "build task panicked");
-                if let Some((ref owner, ref repo)) = owner_repo
+                state.reconcile_signal.notify_one();
+            }
+            Err(e) => {
+                tracing::error!(build_id = %build.id, error = %e, "build failed");
+                if let Some((owner, repo)) = owner_repo
                     && let Err(post_err) = state
                         .forgejo
                         .create_commit_status(
@@ -144,8 +189,8 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                             repo,
                             &build.commit_sha,
                             CommitStatus {
-                                state: "error",
-                                description: "build panicked",
+                                state: "failure",
+                                description: &format!("{e:#}"),
                                 context: "kennel/build",
                                 target_url: build_log_url.as_deref(),
                             },
@@ -156,6 +201,28 @@ pub async fn run_worker(state: Arc<AppState>, cancel: CancellationToken) {
                 }
                 let _ = state.store.builds().set_status(&build.id, "failed").await;
             }
+        },
+        Err(join_err) => {
+            tracing::error!(build_id = %build.id, error = %join_err, "build task panicked");
+            if let Some((owner, repo)) = owner_repo
+                && let Err(post_err) = state
+                    .forgejo
+                    .create_commit_status(
+                        owner,
+                        repo,
+                        &build.commit_sha,
+                        CommitStatus {
+                            state: "error",
+                            description: "build panicked",
+                            context: "kennel/build",
+                            target_url: build_log_url.as_deref(),
+                        },
+                    )
+                    .await
+            {
+                tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
+            }
+            let _ = state.store.builds().set_status(&build.id, "failed").await;
         }
     }
 }
@@ -210,20 +277,14 @@ fn set_group_writable(path: &Path) -> anyhow::Result<()> {
 async fn process_build(
     state: &AppState,
     build: &::entity::builds::Model,
+    project: &::entity::projects::Model,
 ) -> anyhow::Result<BuildOutcome> {
     let work_dir = PathBuf::from(&state.config.work_dir).join(&build.id);
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await?;
 
-    let project = state
-        .store
-        .projects()
-        .find_by_id(&build.project_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
-
     let environment = Environment::from_branch(&build.branch).unwrap_or(Environment::Dev);
-    let build_env = resolve_build_env(state, &project, build, environment, &work_dir)
+    let build_env = resolve_build_env(state, project, build, environment, &work_dir)
         .await
         .map_err(|e| anyhow::anyhow!("build scope resolution failed: {e:#}"))?;
 

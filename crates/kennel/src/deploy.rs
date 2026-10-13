@@ -793,7 +793,7 @@ async fn enqueue_rebuild(
     }
 
     if enqueued {
-        state.signal.notify_one();
+        state.build_signal.notify_one();
     }
     Ok(enqueued)
 }

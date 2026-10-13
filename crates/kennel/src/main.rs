@@ -28,7 +28,10 @@ use vault::VaultClient;
 
 pub struct AppState {
     pub store: Store,
-    pub signal: Arc<Notify>,
+    /// Wakes the build worker when a build is queued
+    pub build_signal: Notify,
+    /// Wakes the reconciler when a deploy request may be actionable
+    pub reconcile_signal: Notify,
     pub config: AppConfig,
     pub providers: Vec<kennel_provision::Provider>,
     pub forgejo: ForgejoClient,
@@ -75,6 +78,7 @@ impl AppConfig {
             max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
                 .ok()
                 .and_then(|n| n.parse().ok())
+                .filter(|&n| n > 0)
                 .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
             webhook_secret,
             custom_domains_file: std::env::var("CUSTOM_DOMAINS_FILE").ok(),
@@ -108,11 +112,11 @@ async fn main() -> Result<()> {
     let forgejo = build_forgejo_client()?;
     let cloudflare = build_cloudflare_client()?;
     let vault = vault::build_from_env()?;
-    let signal = Arc::new(Notify::new());
 
     let state = Arc::new(AppState {
         store,
-        signal: signal.clone(),
+        build_signal: Notify::new(),
+        reconcile_signal: Notify::new(),
         config,
         providers,
         forgejo,
@@ -130,8 +134,6 @@ async fn main() -> Result<()> {
 
     let build_handle = tokio::spawn(build::run_worker(state.clone(), cancel.clone()));
     let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));
-
-    signal.notify_one();
 
     let app = http::router(state.clone());
     let addr = format!("{}:{}", state.config.api_host, state.config.api_port);

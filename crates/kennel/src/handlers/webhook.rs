@@ -236,7 +236,8 @@ async fn enqueue_deploy(
 
     reap_unreferenced_builds(state, &project.id).await;
 
-    state.signal.notify_one();
+    state.build_signal.notify_one();
+    state.reconcile_signal.notify_one();
     Ok(())
 }
 

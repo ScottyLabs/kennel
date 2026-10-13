@@ -143,7 +143,7 @@ in
 
     builder = {
       maxConcurrentBuilds = mkOption {
-        type = types.int;
+        type = types.ints.positive;
         default = 2;
         description = "Maximum number of concurrent nix builds";
       };
