@@ -23,12 +23,8 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable the Deno/JavaScript development toolchain. Adds
-        [Deno](https://deno.com),
-        [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (denying the
-        `correctness`, `suspicious`, `pedantic`, and `perf` categories, with
-        type-aware rules from nixpkgs'
-        [tsgolint](https://github.com/oxc-project/tsgolint)), and
+        Enable the Deno toolchain. Adds [Deno](https://deno.com),
+        [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and
         [oxfmt](https://oxc.rs/docs/guide/usage/formatter). Runs oxlint,
         `deno check`, and `deno test` on every commit.
       '';
@@ -62,8 +58,8 @@ in
         description = ''
           Add the
           [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check)
-          pre-commit hook, and run `svelte-kit sync` in each of `dirs` on shell
-          entry so it has the generated `.svelte-kit` types.
+          pre-commit hook and run `svelte-kit sync` in each of `dirs` on shell
+          entry.
         '';
       };
     };
@@ -99,7 +95,7 @@ in
           typeAware = true;
           allow = [
             "prefer-readonly-parameter-types"
-            # Todo comments are allowed
+            # TODO comments are allowed
             "no-warning-comments"
           ]
           ++ lib.optionals cfg.react.enable [

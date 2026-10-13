@@ -21,7 +21,7 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable a local PostgreSQL 18 instance with Unix socket access. Creates
+        Enable a PostgreSQL 18 instance with Unix socket access. Creates
         an initial database named after `scottylabs.project.name` and exports
         `DATABASE_URL` into the shell environment.
       '';

@@ -33,8 +33,8 @@ in
       type = lib.types.bool;
       default = true;
       description = ''
-        Run [semgrep](https://semgrep.dev)'s default (`auto`) ruleset for
-        common security footguns, excluding `.forgejo`.
+        Run [semgrep](https://semgrep.dev)'s default (`auto`) ruleset,
+        excluding `.forgejo`.
       '';
     };
 
@@ -42,12 +42,9 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Scan the devenv shell's Nix closure (`$DEVENV_PROFILE`) against NVD
-        CVEs via [vulnix](https://github.com/nix-community/vulnix), covering
-        nixpkgs-pinned dependencies like C libraries and interpreters that
-        `osv-scanner`'s lockfile scan can't see. Off by default: vulnix's
-        CVE matching is a coarse heuristic on package names and reports
-        false positives without a whitelist (`vulnix.whitelist`).
+        Scan the devenv shell's Nix closure against NVD CVEs via
+        [vulnix](https://github.com/nix-community/vulnix). Reports false
+        positives without `vulnix.whitelist`.
       '';
     };
 
@@ -56,8 +53,7 @@ in
       default = null;
       description = ''
         Path or URL to a TOML whitelist of accepted CVE matches, passed as
-        `vulnix -w`. Generate a starting point with `vulnix -W
-        whitelist.toml` after an initial scan.
+        `vulnix -w`.
       '';
     };
   };

@@ -10,8 +10,8 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable a local [Garage](https://garagehq.deuxfleurs.fr/) S3 instance
-        for development. Creates a bucket named after `scottylabs.project.name`
+        Enable a [Garage](https://garagehq.deuxfleurs.fr/) S3 instance.
+        Creates a bucket named after `scottylabs.project.name`
         and exports `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`,
         `S3_SECRET_KEY`, and `S3_BUCKET` into the shell environment.
       '';

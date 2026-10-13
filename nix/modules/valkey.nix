@@ -14,11 +14,8 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable a local [Valkey](https://valkey.io/) instance for development.
-        Layers `services.redis.package = pkgs.valkey` under the hood, so the
-        upstream `services.redis` devenv module drives the process while the
-        binary is the wire-compatible Valkey fork. Adds `pkgs.valkey` to the
-        shell so `valkey-cli` is on the path.
+        Enable a [Valkey](https://valkey.io/) instance with Unix socket access.
+        Exports `VALKEY_URL` into the shell environment.
       '';
     };
   };

@@ -59,7 +59,7 @@ in
           lib.elemAt (builtins.match "pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = ([0-9]+);" line) 0
         );
       readOnly = true;
-      description = "Version of the kennel.json contract emitted by this module.";
+      description = "Version of the kennel.json contract emitted by this module";
     };
 
     services = lib.mkOption {
@@ -77,8 +77,7 @@ in
       default = { };
       description = ''
         Backend services deployed by kennel. Each key must match a devenv
-        process name. Kennel builds the corresponding flake package and deploys
-        it as a systemd transient unit.
+        process name.
       '';
     };
 
@@ -102,8 +101,7 @@ in
       );
       default = { };
       description = ''
-        Static sites deployed by kennel. Each key names a site. Kennel builds
-        the corresponding flake package and serves it via Caddy's file server.
+        Static sites deployed by kennel. Each key names a site.
       '';
     };
 
@@ -112,10 +110,7 @@ in
       default = true;
       description = ''
         Deploy a preview environment for each open pull request. Disable for
-        singleton services such as bots, where a preview would run a second
-        instance alongside production. When disabled, pull request commits
-        still build and report `kennel/build`, but kennel does not deploy the
-        preview.
+        singleton services such as bots.
       '';
     };
 
@@ -124,10 +119,8 @@ in
       default = [ ];
       internal = true;
       description = ''
-        Resource providers this project needs (for example `valkey`,
-        `postgres`, `garage`). Each resource module appends its own name when
-        enabled. The list becomes the `resources` field of `kennel.json`.
-        Kennel provisions only the resources named there.
+        Resources kennel provisions for this project, written to `kennel.json`.
+        Each resource module adds its own name.
       '';
     };
 

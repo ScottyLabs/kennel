@@ -15,9 +15,8 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable SQLite for local development. Adds the `sqlite` package and
-        exports `DATABASE_PATH` pointing to a database file in the devenv state
-        directory.
+        Enable SQLite. Adds the `sqlite` package and exports `DATABASE_PATH`
+        pointing to a database file in the devenv state directory.
       '';
     };
   };

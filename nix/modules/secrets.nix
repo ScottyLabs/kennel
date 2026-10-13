@@ -14,12 +14,8 @@ in
       type = lib.types.bool;
       default = true;
       description = ''
-        When `scottylabs.enable = true`, the `openbao` (`bao`) and `secretspec`
-        CLIs are added to the shell, `BAO_ADDR` is set for OpenBao
-        authentication, and every secret secretspec resolves is exported into
-        the shell environment. Resolution is enabled per project through the
-        `secretspec` block in `devenv.yaml` (see
-        [Secrets](../guides/secrets.md)).
+        Add the `bao` and `secretspec` CLIs and export the project's secrets
+        into the shell environment (see [Secrets](../guides/secrets.md)).
       '';
     };
   };

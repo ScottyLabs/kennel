@@ -15,15 +15,12 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable the Rust development toolchain. Configures nightly Rust with
-        [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift) (fast
-        debug-mode codegen), clippy, rustfmt,
-        [wild](https://github.com/davidlattimore/wild)/lld linker, and
-        [sccache](https://github.com/mozilla/sccache) backed by the org's S3
-        cache. Sets `CARGO_TARGET_DIR` to `.devenv/state/target`. Clippy,
-        `cargo test`, and
-        [cargo-machete](https://github.com/bnjbvr/cargo-machete) (unused
-        dependencies) run on every commit.
+        Enable the Rust toolchain. Adds nightly Rust with
+        [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift),
+        clippy, rustfmt, the [wild](https://github.com/davidlattimore/wild)
+        linker, and [sccache](https://github.com/mozilla/sccache). Runs clippy,
+        `cargo test`, and [cargo-machete](https://github.com/bnjbvr/cargo-machete)
+        on every commit.
       '';
     };
 
@@ -47,9 +44,7 @@ in
         "rustls"
       ];
       description = ''
-        Crate names forced to the LLVM backend instead of cranelift. Some
-        crates use features that cranelift does not support (FFI symbol
-        emission, linker sections).
+        Crates built with LLVM instead of cranelift.
       '';
     };
   };

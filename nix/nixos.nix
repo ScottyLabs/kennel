@@ -67,33 +67,10 @@ in
           type = types.attrsOf types.str;
           default = { };
           description = ''
-            Map of domain names to Cloudflare zone IDs. When this is
-            non-empty, `tunnelId` is set, and the `CLOUDFLARE_API_TOKEN`
-            environment variable is provided (typically via the
-            `environmentFile` secret), kennel automatically manages proxied
-            CNAME records pointing custom domains at the host's Cloudflare
-            Tunnel, for any domain whose suffix matches one of the configured
-            zones. The most specific zone wins for nested domains.
-
-            The token must have `Zone:DNS:Edit` permission on the zones
-            listed.
-
-            Records are upserted on deploy and on each reconciliation pass
-            (so they self-heal if pruned externally). Records are deleted
-            only when kennel tears the deployment down, which happens in
-            three cases:
-
-            1. The branch backing the deployment is deleted from the source
-               repo (push event with deleted=true on that ref).
-            2. The deployment is associated with a pull request and that
-               pull request is closed.
-            3. The deployment is on a `dev` or `preview` branch and exceeds
-               `DEPLOYMENT_EXPIRY_DAYS` since its last update during a
-               reconciliation pass.
-
-            Production deployments are not subject to expiry, so a record for
-            a production custom domain stays in place until the project's
-            main branch is deleted or the deployment row is removed manually.
+            Map of domain names to Cloudflare zone IDs. With `tunnelId` and a
+            `CLOUDFLARE_API_TOKEN` that has `Zone:DNS:Edit`, kennel manages
+            proxied CNAME records pointing custom domains at the tunnel. The
+            most specific matching zone wins.
           '';
         };
 
@@ -101,9 +78,8 @@ in
           type = types.nullOr types.str;
           default = null;
           description = ''
-            Cloudflare Tunnel ID used as the CNAME target of the records that
-            kennel creates for custom domains. Required to enable DNS
-            automation.
+            Cloudflare Tunnel ID the custom domain records point at. Required
+            for DNS automation.
           '';
         };
       };
@@ -242,9 +218,8 @@ in
         type = types.path;
         description = ''
           Path to a file containing a Forgejo API token with the
-          `write:issue` scope. Kennel uses it to post and update a sticky
-          comment on each pull request listing its deployment URLs, and to
-          mark the comment torn down when the pull request is closed.
+          `write:issue` scope, used to comment deployment URLs on pull
+          requests.
         '';
       };
     };

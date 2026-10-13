@@ -30,9 +30,8 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable the shared ScottyLabs development configuration. Required for all
-        other `scottylabs.*` options to take effect, and installs the formatters
-        and commit-time checks shared across ScottyLabs projects.
+        Enable the shared ScottyLabs configuration. Required for all other
+        `scottylabs.*` options.
       '';
     };
 
@@ -45,9 +44,8 @@ in
       type = lib.types.bool;
       default = true;
       description = ''
-        Enforce [Conventional Commits](https://www.conventionalcommits.org/) on
-        `git commit` via the commitizen git hook. Commit messages that do not
-        match the conventional format are rejected at commit time.
+        Enforce [Conventional Commits](https://www.conventionalcommits.org/)
+        via the commitizen git hook.
       '';
     };
 
@@ -56,8 +54,7 @@ in
       default = false;
       description = ''
         Enforce [EditorConfig](https://editorconfig.org/) rules via the
-        editorconfig-checker git hook. Files violating `.editorconfig` are
-        rejected at commit time.
+        editorconfig-checker git hook.
       '';
     };
   };

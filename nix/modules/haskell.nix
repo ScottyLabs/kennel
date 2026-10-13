@@ -35,11 +35,11 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Enable the Haskell development toolchain. Adds GHC, cabal-install,
-        [HLS](https://github.com/haskell/haskell-language-server), and
-        [hlint](https://github.com/ndmitchell/hlint), with
-        [fourmolu](https://github.com/fourmolu/fourmolu) formatting via
-        treefmt. Runs hlint on every commit.
+        Enable the Haskell toolchain. Adds GHC, cabal-install,
+        [HLS](https://github.com/haskell/haskell-language-server),
+        [hlint](https://github.com/ndmitchell/hlint), and
+        [fourmolu](https://github.com/fourmolu/fourmolu). Runs hlint on every
+        commit.
       '';
     };
 
@@ -47,11 +47,8 @@ in
       type = lib.types.attrsOf lib.types.path;
       default = { };
       description = ''
-        The project's cabal packages, package name to source directory. The
-        dependency set is read from each package's `.cabal` file via
-        `callCabal2nix` and provided through `ghcWithPackages`. List the same
-        directories a `buildHaskellService` flake package names, so the shell
-        and deployment builds resolve identical dependencies.
+        The project's cabal packages, package name to source directory. Use the
+        same directories as the `buildHaskellService` flake package.
       '';
     };
   };
