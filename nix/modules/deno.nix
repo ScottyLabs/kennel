@@ -26,13 +26,11 @@ in
         Enable the Deno/JavaScript development toolchain. Adds
         [Deno](https://deno.com),
         [oxlint](https://oxc.rs/docs/guide/usage/linter.html) (denying the
-        `correctness`, `suspicious`, `pedantic`, and `perf` categories),
-        [oxfmt](https://oxc.rs/docs/guide/usage/formatter), and
-        [tsgolint](https://github.com/oxc-project/tsgolint) on `PATH` for
-        `oxlint --type-aware`. Runs oxlint, `deno check`, and `deno test` on
-        every commit. Tool versions (`deno`, `oxlint`, `tsgolint`, ...) come
-        from the consuming project's own `nixpkgs` pin, not kennel's; bump
-        the consumer's flake input to pick up newer tool releases.
+        `correctness`, `suspicious`, `pedantic`, and `perf` categories, with
+        type-aware rules from nixpkgs'
+        [tsgolint](https://github.com/oxc-project/tsgolint)), and
+        [oxfmt](https://oxc.rs/docs/guide/usage/formatter). Runs oxlint,
+        `deno check`, and `deno test` on every commit.
       '';
     };
 
@@ -76,7 +74,7 @@ in
     packages = [ pkgs.deno ] ++ lib.optional cfg.svelte.enable pkgs.svelte-check;
 
     env.DENO_DIR = "${config.devenv.root}/.devenv/state/deno";
-    # oxlint's tsgolint discovery expects a node_modules install; pin the binary instead
+    # oxlint prefers node_modules/.bin/tsgolint over PATH
     env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
 
     enterShell = lib.mkIf cfg.svelte.enable ''
