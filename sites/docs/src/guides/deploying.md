@@ -231,9 +231,9 @@ scottylabs.postgres.extensions = e: [
 
 Kennel creates the same extensions in your deployed database, defaulting to `e: [ e.pg_uuidv7 ]`. It can only create extensions that the host's NixOS configuration installs as trusted, so a new one has to be added there first (see [PostgreSQL extensions](../reference/nixos-module.md#postgresql-extensions)).
 
-`sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth.
+`sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth. With `sqlite`, each deployed service reads `DATABASE_PATH`, a file in a private directory that persists across restarts and redeploys. Services do not share it, so two services on one branch get separate files.
 
-Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, or `garage`) is never allocated one. Provisioning also depends on keeping the shared devenv module current. Kennel stamps each `kennel.json` with a schema version and refuses any deployment whose version does not match, so run `devenv update` if a build is rejected for a version mismatch.
+Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, `sqlite`, or `garage`) is never allocated one. Provisioning also depends on keeping the shared devenv module current. Kennel stamps each `kennel.json` with a schema version and refuses any deployment whose version does not match, so run `devenv update` if a build is rejected for a version mismatch.
 
 When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
 

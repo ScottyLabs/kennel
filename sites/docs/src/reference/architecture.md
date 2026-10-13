@@ -46,7 +46,7 @@ Routes are mounted in `http.rs`; per-resource handlers live under `handlers/`.
 | ----- | ------------ |
 | `build` | building the commit |
 | `config` | checking the `kennel.json` schema version |
-| `provision` | creating postgres, valkey, or garage resources |
+| `provision` | creating postgres, sqlite, valkey, or garage resources |
 | `secrets` | resolving secrets from OpenBao |
 | `systemd` | starting the service's unit |
 | `healthcheck` | waiting for the service to pass its health check |
@@ -99,6 +99,6 @@ Artifact retention is likewise external: gc roots under `/nix/var/nix/gcroots/ke
 
 - `kennel` -- main binary. HTTP router lives in `src/http.rs`, request handlers under `src/handlers/{webhook,metrics,deployments,caddy}.rs`. Build orchestration in `src/build.rs`, deploy in `src/deploy.rs`, reconciliation in `src/reconcile.rs`. Systemd, Caddy, and OpenBao clients each have their own module.
 - `kennel-config` -- shared types, constants, environment enum
-- `kennel-provision` -- resource provisioning trait and implementations (PostgreSQL, Valkey, Garage)
+- `kennel-provision` -- resource provisioning trait and implementations (PostgreSQL, SQLite, Valkey, Garage)
 - `entity` -- SeaORM generated entities
 - `migration` -- SQLite schema migrations

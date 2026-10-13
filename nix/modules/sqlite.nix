@@ -25,5 +25,7 @@ in
     packages = [ pkgs.sqlite ];
 
     env.DATABASE_PATH = "${config.devenv.root}/.devenv/state/${projectName}.db";
+
+    scottylabs.kennel.requestedResources = [ "sqlite" ];
   };
 }

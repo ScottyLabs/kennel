@@ -124,6 +124,10 @@ impl SystemdClient {
             properties.push(("SupplementaryGroups", vec![group].into()));
         }
 
+        if let Some(dir) = sqlite_state_directory(env, user) {
+            properties.push(("StateDirectory", vec![dir].into()));
+        }
+
         if let Some(dir) = working_dir {
             properties.push(("WorkingDirectory", dir.into()));
         }
@@ -351,6 +355,12 @@ fn unix_socket_group_from_valkey_url(url: &str) -> Option<String> {
         .parent()
         .and_then(|p| p.file_name())
         .map(|s| s.to_string_lossy().into_owned())
+}
+
+fn sqlite_state_directory(env: &HashMap<String, String>, user: &str) -> Option<String> {
+    let assigned = kennel_provision::sqlite::database_path(user);
+    (env.get("DATABASE_PATH") == Some(&assigned))
+        .then(|| kennel_provision::sqlite::state_directory(user))
 }
 
 #[cfg(test)]

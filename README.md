@@ -18,7 +18,7 @@ Kennel can also publish the hosts of its live deployments to a file. [ricochet](
 
 - `crates/kennel`: the daemon
 - `crates/kennel-config`: shared types and the devenv config contract
-- `crates/kennel-provision`: resource provisioning (PostgreSQL, Valkey, Garage)
+- `crates/kennel-provision`: resource provisioning (PostgreSQL, SQLite, Valkey, Garage)
 - `crates/entity`, `crates/migration`: SQLite schema and SeaORM entities
 - `nix/modules`: the shared devenv modules projects build on
 - `nix/lib`: Nix build helpers (`mkLib`)

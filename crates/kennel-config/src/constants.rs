@@ -15,6 +15,8 @@ pub const GC_ROOTS_DIR: &str = "/nix/var/nix/gcroots/kennel";
 pub const LOGS_DIR: &str = "/var/lib/kennel/logs";
 pub const VALKEY_BACKUP_DIR: &str = "/var/lib/kennel/valkey-backups";
 pub const VALKEY_BACKUP_KEEP: usize = 20;
+pub const SQLITE_STATE_DIR: &str = "kennel-sqlite";
+pub const SQLITE_DB_FILE: &str = "data.db";
 
 pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = 1;
 pub const KENNEL_FLAKE_INPUT: &str = "scottylabs";

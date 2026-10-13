@@ -19,6 +19,7 @@ This requires the operator to configure `services.kennel.forgejo.apiTokenFile` w
 Each PR deployment gets, for every resource the project enables:
 
 - Its own PostgreSQL database (`kennel_{project}_{branch}`)
+- Its own SQLite file per service
 - Its own Valkey DB number
 - Its own Garage S3 bucket and API key
 

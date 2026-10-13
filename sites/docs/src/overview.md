@@ -6,7 +6,7 @@ Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). When
 
 - Builds your project with Nix when you push to any branch
 - Deploys services as systemd units and static sites via [Caddy](https://caddyserver.com)
-- Provisions per-deployment databases (PostgreSQL), caches (Valkey), and object storage (Garage)
+- Provisions per-deployment databases (PostgreSQL, SQLite), caches (Valkey), and object storage (Garage)
 - Resolves secrets from [OpenBao](https://openbao.org) via [secretspec](https://secretspec.dev)
 - Generates HTTPS URLs for every deployment, including PR previews
 - Tears down deployments and their resources when branches are deleted or PRs are closed

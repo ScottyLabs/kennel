@@ -1,5 +1,6 @@
 pub mod garage;
 pub mod postgres;
+pub mod sqlite;
 pub mod valkey;
 
 use kennel_config::{Environment, KennelConfig};
@@ -30,6 +31,7 @@ pub trait ResourceProvider {
 
 pub enum Provider {
     Postgres(postgres::PostgresProvider),
+    Sqlite(sqlite::SqliteProvider),
     Valkey(valkey::ValkeyProvider),
     Garage(garage::GarageProvider),
 }
@@ -38,6 +40,7 @@ impl ResourceProvider for Provider {
     fn name(&self) -> &str {
         match self {
             Self::Postgres(p) => p.name(),
+            Self::Sqlite(s) => s.name(),
             Self::Valkey(v) => v.name(),
             Self::Garage(g) => g.name(),
         }
@@ -50,6 +53,7 @@ impl ResourceProvider for Provider {
     ) -> anyhow::Result<HashMap<String, String>> {
         match self {
             Self::Postgres(p) => p.provision(request, config).await,
+            Self::Sqlite(s) => s.provision(request, config).await,
             Self::Valkey(v) => v.provision(request, config).await,
             Self::Garage(g) => g.provision(request, config).await,
         }
@@ -58,6 +62,7 @@ impl ResourceProvider for Provider {
     async fn teardown(&self, request: &ResourceRequest) -> anyhow::Result<()> {
         match self {
             Self::Postgres(p) => p.teardown(request).await,
+            Self::Sqlite(s) => s.teardown(request).await,
             Self::Valkey(v) => v.teardown(request).await,
             Self::Garage(g) => g.teardown(request).await,
         }
@@ -66,6 +71,7 @@ impl ResourceProvider for Provider {
     async fn reconcile(&self, active: &[ResourceRequest]) -> anyhow::Result<()> {
         match self {
             Self::Postgres(p) => p.reconcile(active).await,
+            Self::Sqlite(s) => s.reconcile(active).await,
             Self::Valkey(v) => v.reconcile(active).await,
             Self::Garage(g) => g.reconcile(active).await,
         }

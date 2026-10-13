@@ -214,5 +214,9 @@ fn build_providers() -> Vec<kennel_provision::Provider> {
         ));
     }
 
+    providers.push(kennel_provision::Provider::Sqlite(
+        kennel_provision::sqlite::SqliteProvider,
+    ));
+
     providers
 }
