@@ -24,7 +24,7 @@ prod_monthly_budget = 20.0
 - `oidc_client` with `groups` also creates extra Keycloak groups under the project group, left empty for you to manage
 - `ai_gateway` mints budgeted [LiteLLM](https://docs.litellm.ai) API keys under your team and writes `LITELLM_API_KEY` and `LITELLM_BASE_URL` to Vault on every profile
 - `docs` publishes the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org)
-- `google_play` grants your team access to an existing Play Console app by `app_id`
+- `mobile_app` grants your team access to its Play Console app and, if `app_store` is set, to App Store Connect
 
 ### OIDC
 
@@ -152,20 +152,30 @@ LITELLM_BASE_URL = { description = "LiteLLM gateway base URL" }
 
 Point any OpenAI-compatible client at `LITELLM_BASE_URL` with `LITELLM_API_KEY` as the API key; the gateway routes to the models it has configured and meters spend against your key. Keys are grouped under your team in LiteLLM for spend attribution.
 
-### Google Play
+### Mobile Apps
 
-Play Console apps cannot be created through any API, so create the app in the [Play Console](https://play.google.com/console) first, then add `google_play` with its package name:
+Store apps cannot be created through any API, so create the app in the [Play Console](https://play.google.com/console) first, then add `mobile_app` with its package name. If the iOS app is published under the ScottyLabs Apple developer account, create it in [App Store Connect](https://appstoreconnect.apple.com) and add its bundle ID as well:
 
 ```toml
-[team.repos.features.google_play]
-app_id = "quest.cmu.twa"
+[team.repos.features.mobile_app]
+google_play = "org.scottylabs.example"
+app_store = "org.scottylabs.example"
 ```
 
-Governance then grants your team access to the app:
+Leave out `app_store` when the iOS app lives under another Apple developer account, as Quest's does under CMU's.
+
+On Google Play, governance grants your team access to the app:
 
 - members release to testing tracks, edit tester lists, and read crash and vitals data
 - leads additionally release to production, manage the store listing and policy pages, and reply to reviews
 - since the provider rejects users with no account-level permissions, everyone holds account-wide read on non-financial data
+
+On the App Store, governance invites everyone on the team at the email of the Apple Account they linked in Keycloak, so each member must link Apple with Share My Email before the change can merge:
+
+- members build, upload, and run internal TestFlight testing
+- leads additionally submit releases, manage the store listing and pricing, run external TestFlight, and reply to reviews
+- everyone can view analytics and sign builds, and since Apple shows every app to anyone who can sign, access isn't limited to your team's app
+- service keys such as MapKit and push notification keys are created by the tech director
 
 ## Documentation
 
