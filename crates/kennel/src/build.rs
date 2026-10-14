@@ -420,7 +420,12 @@ async fn resolve_build_env(
     tokio::fs::create_dir_all(&spec_dir).await?;
     tokio::fs::write(spec_dir.join("secretspec.toml"), contents).await?;
 
-    crate::secrets::resolve_build_env(&spec_dir, &environment.to_string(), &vault_endpoint)
+    crate::secrets::resolve_build_env(
+        &spec_dir,
+        &environment.to_string(),
+        &vault_endpoint,
+        project.secret_namespace.as_deref(),
+    )
 }
 
 /// Entry point for the `kennel build-exec <id>` subcommand.

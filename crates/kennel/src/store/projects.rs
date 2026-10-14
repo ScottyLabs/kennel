@@ -36,6 +36,18 @@ impl<'a> ProjectRepository<'a> {
         Ok(())
     }
 
+    pub async fn set_secret_namespace(&self, id: &str, namespace: &str) -> Result<(), DbErr> {
+        let mut model: projects::ActiveModel = Projects::find_by_id(id)
+            .one(self.db)
+            .await?
+            .ok_or_else(|| DbErr::RecordNotFound(id.to_string()))?
+            .into();
+
+        model.secret_namespace = Set(Some(namespace.to_string()));
+        model.update(self.db).await?;
+        Ok(())
+    }
+
     pub async fn list(&self) -> Result<Vec<projects::Model>, DbErr> {
         Projects::find().all(self.db).await
     }

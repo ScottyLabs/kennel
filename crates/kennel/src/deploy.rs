@@ -603,7 +603,7 @@ async fn deploy_service(
         custom_domain: Set(custom_domain.map(str::to_string)),
         spa: Set(false),
         unit_name: Set(Some(unit_name)),
-        port: Set(Some(port as i32)),
+        port: Set(Some(i64::from(port))),
         config_store_path: Set(build.config_store_path.clone()),
         ..Default::default()
     };

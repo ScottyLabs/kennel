@@ -42,6 +42,8 @@ providers = ["openbao-ci"]
 [profiles.ci]
 ```
 
+Secrets are stored under your project's slug in governance, or your team's slug if the team has no projects, so the project `name` must be that slug. Kennel fails the build when they differ.
+
 `[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for `dev` and for every environment you deploy to; a section left empty inherits `default` unchanged.
 
 The `[providers]` table names the backends once: `openbao` logs in with your local `bao` token, `openbao-ci` is the same backend reached with a CI job's OIDC token, and `local` is a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` routes dev resolution through `openbao` and `[profiles.ci.defaults]` routes CI through `openbao-ci`; without a profile's `providers`, its secrets have no route and resolution fails.

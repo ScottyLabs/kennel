@@ -1,10 +1,11 @@
 use axum::{
     body::Bytes,
-    extract::State,
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
 };
 use hmac::{Hmac, Mac, digest::KeyInit};
 use sea_orm::ActiveValue::Set;
+use serde::Deserialize;
 use sha2::Sha256;
 use std::sync::Arc;
 
@@ -14,8 +15,14 @@ use crate::systemd::SystemdClient;
 use crate::teardown::teardown_deployment;
 use kennel_config::Environment;
 
+#[derive(Deserialize)]
+pub struct WebhookParams {
+    namespace: Option<String>,
+}
+
 pub async fn handle(
     State(state): State<Arc<AppState>>,
+    Query(params): Query<WebhookParams>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<StatusCode, StatusCode> {
@@ -29,12 +36,18 @@ pub async fn handle(
         StatusCode::BAD_REQUEST
     })?;
 
-    let project = find_or_create_project(&state, &event.repo_name, &event.repo_url, &event.owner)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "failed to find or create project");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let project = find_or_create_project(
+        &state,
+        &event.repo_name,
+        &event.repo_url,
+        &event.owner,
+        params.namespace.as_deref(),
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, "failed to find or create project");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     match event.kind {
         EventKind::Push {
@@ -163,12 +176,25 @@ async fn find_or_create_project(
     repo_name: &str,
     repo_url: &str,
     owner: &str,
+    namespace: Option<&str>,
 ) -> anyhow::Result<::entity::projects::Model> {
     if let Some(mut project) = state.store.projects().find_by_name(repo_name).await? {
         if project.owner.as_deref() != Some(owner) {
             state.store.projects().set_owner(&project.id, owner).await?;
             project.owner = Some(owner.to_string());
         }
+
+        if let Some(namespace) = namespace
+            && project.secret_namespace.as_deref() != Some(namespace)
+        {
+            state
+                .store
+                .projects()
+                .set_secret_namespace(&project.id, namespace)
+                .await?;
+            project.secret_namespace = Some(namespace.to_string());
+        }
+
         return Ok(project);
     }
 
@@ -178,6 +204,7 @@ async fn find_or_create_project(
         name: Set(repo_name.to_string()),
         repo_url: Set(repo_url.to_string()),
         owner: Set(Some(owner.to_string())),
+        secret_namespace: Set(namespace.map(str::to_string)),
         repo_type: Set("forgejo".to_string()),
         default_branch: Set("main".to_string()),
         ..Default::default()

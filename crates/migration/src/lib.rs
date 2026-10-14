@@ -7,6 +7,7 @@ mod m20260626_000000_add_owner_to_projects;
 mod m20260707_000000_create_deploy_requests;
 mod m20261005_111128_builds_per_branch;
 mod m20261012_000000_add_failure_stage_to_deploy_requests;
+mod m20261014_081820_add_secret_namespace_to_projects;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260707_000000_create_deploy_requests::Migration),
             Box::new(m20261005_111128_builds_per_branch::Migration),
             Box::new(m20261012_000000_add_failure_stage_to_deploy_requests::Migration),
+            Box::new(m20261014_081820_add_secret_namespace_to_projects::Migration),
         ]
     }
 }
