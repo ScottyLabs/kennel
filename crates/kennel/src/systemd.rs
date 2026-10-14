@@ -120,7 +120,9 @@ impl SystemdClient {
             properties.push(("Environment", env_strings.into()));
         }
 
-        if let Some(group) = valkey_supplementary_group(env) {
+        if let Ok(socket_path) = std::env::var("VALKEY_SOCKET_PATH")
+            && let Some(group) = valkey_supplementary_group(env, &socket_path)
+        {
             properties.push(("SupplementaryGroups", vec![group].into()));
         }
 
@@ -343,17 +345,16 @@ fn log_extra_fields(fields: &[String]) -> zbus::zvariant::Value<'static> {
         .into()
 }
 
-fn valkey_supplementary_group(env: &HashMap<String, String>) -> Option<String> {
-    env.get("VALKEY_URL")
-        .and_then(|url| unix_socket_group_from_valkey_url(url))
-}
+fn valkey_supplementary_group(env: &HashMap<String, String>, socket_path: &str) -> Option<String> {
+    let url = env.get("VALKEY_URL")?;
+    let path = url.strip_prefix("redis+unix://")?.split('?').next()?;
+    if path != socket_path {
+        return None;
+    }
 
-fn unix_socket_group_from_valkey_url(url: &str) -> Option<String> {
-    let path = url.strip_prefix("redis+unix://")?;
-    let path = path.split('?').next()?;
     std::path::Path::new(path)
-        .parent()
-        .and_then(|p| p.file_name())
+        .parent()?
+        .file_name()
         .map(|s| s.to_string_lossy().into_owned())
 }
 
@@ -367,6 +368,8 @@ fn sqlite_state_directory(env: &HashMap<String, String>, user: &str) -> Option<S
 mod tests {
     use super::*;
 
+    const SOCKET: &str = "/run/redis-kennel/redis.sock";
+
     #[test]
     fn derives_group_from_valkey_url() {
         let env = HashMap::from([(
@@ -374,7 +377,7 @@ mod tests {
             "redis+unix:///run/redis-kennel/redis.sock?db=8".into(),
         )]);
         assert_eq!(
-            valkey_supplementary_group(&env).as_deref(),
+            valkey_supplementary_group(&env, SOCKET).as_deref(),
             Some("redis-kennel")
         );
     }
@@ -382,6 +385,15 @@ mod tests {
     #[test]
     fn ignores_deployments_without_valkey() {
         let env = HashMap::from([("PORT".into(), "3000".into())]);
-        assert_eq!(valkey_supplementary_group(&env), None);
+        assert_eq!(valkey_supplementary_group(&env, SOCKET), None);
+    }
+
+    #[test]
+    fn ignores_valkey_url_naming_another_socket() {
+        let env = HashMap::from([(
+            "VALKEY_URL".into(),
+            "redis+unix:///run/systemd-journal/x.sock?db=1".into(),
+        )]);
+        assert_eq!(valkey_supplementary_group(&env, SOCKET), None);
     }
 }
