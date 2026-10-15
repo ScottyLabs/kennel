@@ -119,6 +119,22 @@
             ''
               mdbook build ${src} --dest-dir "$out"
             '';
+        buildZensical =
+          {
+            src,
+            name ? "docs",
+          }:
+          pkgs.runCommand name
+            {
+              nativeBuildInputs = [ pkgs.zensical ];
+              env = buildEnv;
+            }
+            ''
+              cp -r --no-preserve=mode ${src} project
+              cd project
+              zensical build
+              cp -r site "$out"
+            '';
         buildOptionsDoc = import ./nix/lib/options-doc.nix { inherit pkgs; };
       };
     in

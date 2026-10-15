@@ -240,6 +240,35 @@ Type: `str`, default: `"docs"`
 }
 ```
 
+## `buildZensical`
+
+Builds a [Zensical](https://zensical.org) site to the result. The site is built to Zensical's default `site_dir`, so the config must not override it.
+
+### `src`
+
+Directory holding `zensical.toml` and the docs it points to.
+
+Type: `path`, required
+
+### `name`
+
+Derivation name.
+
+Type: `str`, default: `"docs"`
+
+```nix
+(scottylabs.mkLib pkgs).buildZensical {
+  src = lib.fileset.toSource {
+    root = ./.;
+    fileset = lib.fileset.unions [
+      ./zensical.toml
+      ./docs
+    ];
+  };
+  name = "my-project-docs";
+}
+```
+
 ## `buildOptionsDoc`
 
 Renders a module set's option declarations to a CommonMark reference with nixpkgs' `nixosOptionsDoc`, producing a single markdown file listing every option with its description, type, default, and a link to the declaring module. Both options reference pages in these docs are generated with it. Only declarations are evaluated, never the merged config, so an option whose `default` reads other config must set `defaultText`. Every documented option must have a `description`, or the build fails.
