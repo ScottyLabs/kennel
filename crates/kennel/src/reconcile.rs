@@ -206,6 +206,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                 .map(|p| p.name)
                 .unwrap_or_else(|| deployment.project_id.clone());
             deploy::ensure_dns_record(state, &project_name, custom_domain).await;
+
+            if let Some(redirect_domain) = deploy::www_redirect_domain(custom_domain) {
+                let redirect_route_id = format!("kennel-{}-redirect", deployment.id);
+                if !existing_routes.contains(&redirect_route_id) {
+                    let _ = caddy
+                        .add_redirect_route(&redirect_route_id, &redirect_domain, custom_domain)
+                        .await;
+                }
+                deploy::ensure_dns_record(state, &project_name, &redirect_domain).await;
+            }
         }
     }
 

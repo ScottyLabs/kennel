@@ -119,6 +119,8 @@ Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched
 
 Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://git.cmu.dev/ScottyLabs/infrastructure). Kennel creates the DNS record itself for registered zones, routing the domain through Cloudflare, so a domain whose zone is missing does not resolve until the zone is registered.
 
+If `customDomain` is an apex domain like `example.org`, kennel also redirects `www.example.org` to it.
+
 ### Health checks
 
 Every backend service must expose a `GET /api/health` endpoint that returns HTTP `200` once it is ready to accept traffic. After starting a service, kennel polls this endpoint every 2 seconds for up to 60 seconds, holding back traffic until it returns `200`. If it has not passed by then, the deployment is marked failed and the public domain is never routed to it. Static sites have no health endpoint and are exempt.

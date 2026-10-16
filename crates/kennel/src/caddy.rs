@@ -85,6 +85,25 @@ impl CaddyClient {
         self.add_route(&config).await
     }
 
+    pub async fn add_redirect_route(
+        &self,
+        route_id: &str,
+        domain: &str,
+        target: &str,
+    ) -> anyhow::Result<()> {
+        let config = serde_json::json!({
+            "@id": route_id,
+            "match": [{"host": [domain]}],
+            "handle": [{
+                "handler": "static_response",
+                "status_code": 308,
+                "headers": {"Location": [format!("https://{target}{{http.request.uri}}")]}
+            }]
+        });
+
+        self.add_route(&config).await
+    }
+
     pub async fn remove_route(&self, route_id: &str) -> anyhow::Result<()> {
         let url = format!("{}/id/{}", self.admin_url, route_id);
         let resp = self.client.delete(&url).send().await?;

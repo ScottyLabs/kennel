@@ -383,16 +383,15 @@ async fn deploy_static_site(
         environment,
     );
 
-    let deployment_id = match state
+    let existing = state
         .store
         .deployments()
         .find_by_project_service_branch(&build.project_id, name, branch)
         .await
-        .at(FailureStage::Internal)?
-    {
-        Some(existing) => existing.id,
-        None => uuid::Uuid::now_v7().to_string(),
-    };
+        .at(FailureStage::Internal)?;
+    let deployment_id = existing
+        .as_ref()
+        .map_or_else(|| uuid::Uuid::now_v7().to_string(), |d| d.id.clone());
 
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(&build.project_id)
@@ -434,6 +433,17 @@ async fn deploy_static_site(
             .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
+
+    route_www_redirect(
+        state,
+        caddy,
+        project_name,
+        &deployment_id,
+        custom_domain,
+        existing.as_ref().and_then(|d| d.custom_domain.as_deref()),
+    )
+    .await
+    .at(FailureStage::Routing)?;
 
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
@@ -533,16 +543,15 @@ async fn deploy_service(
         .entry("APP_URL".to_string())
         .or_insert_with(|| app_url(&domain, custom_domain));
 
-    let deployment_id = match state
+    let existing = state
         .store
         .deployments()
         .find_by_project_service_branch(&build.project_id, name, branch)
         .await
-        .at(FailureStage::Internal)?
-    {
-        Some(existing) => existing.id,
-        None => uuid::Uuid::now_v7().to_string(),
-    };
+        .at(FailureStage::Internal)?;
+    let deployment_id = existing
+        .as_ref()
+        .map_or_else(|| uuid::Uuid::now_v7().to_string(), |d| d.id.clone());
 
     let systemd = crate::systemd::SystemdClient::connect()
         .await
@@ -587,6 +596,17 @@ async fn deploy_service(
             .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;
     }
+
+    route_www_redirect(
+        state,
+        caddy,
+        project_name,
+        &deployment_id,
+        custom_domain,
+        existing.as_ref().and_then(|d| d.custom_domain.as_deref()),
+    )
+    .await
+    .at(FailureStage::Routing)?;
 
     // Commit before moving the gc root so the recorded path is never unrooted
     let model = ::entity::deployments::ActiveModel {
@@ -644,6 +664,48 @@ pub async fn ensure_dns_record(state: &AppState, project_name: &str, fqdn: &str)
             tracing::warn!(fqdn = %fqdn, error = %e, "failed to upsert cloudflare record");
         }
     }
+}
+
+pub async fn delete_dns_record(state: &AppState, fqdn: &str) {
+    let Some(cf) = &state.cloudflare else {
+        return;
+    };
+
+    if let Err(e) = cf.delete_record(fqdn).await {
+        tracing::warn!(fqdn = %fqdn, error = %e, "failed to delete cloudflare record");
+    }
+}
+
+/// Redirects `www.{custom_domain}` to an apex custom domain
+async fn route_www_redirect(
+    state: &AppState,
+    caddy: &CaddyClient,
+    project_name: &str,
+    deployment_id: &str,
+    custom_domain: Option<&str>,
+    previous_custom_domain: Option<&str>,
+) -> anyhow::Result<()> {
+    let route_id = format!("kennel-{deployment_id}-redirect");
+    let redirect = custom_domain.and_then(www_redirect_domain);
+    let previous = previous_custom_domain.and_then(www_redirect_domain);
+
+    match redirect.as_deref().zip(custom_domain) {
+        Some((from, target)) => {
+            caddy.add_redirect_route(&route_id, from, target).await?;
+            ensure_dns_record(state, project_name, from).await;
+        }
+        None if previous.is_some() => caddy.remove_route(&route_id).await?,
+        None => {}
+    }
+
+    if let Some(previous) = previous
+        && redirect.as_ref() != Some(&previous)
+        && custom_domain != Some(previous.as_str())
+    {
+        delete_dns_record(state, &previous).await;
+    }
+
+    Ok(())
 }
 
 pub(crate) async fn add_gc_root(name: &str, store_path: &str) -> anyhow::Result<()> {
@@ -839,6 +901,11 @@ pub fn deployment_domains<'a>(
 /// Public URL of a deployment, set as `APP_URL` in builds and services
 pub fn app_url(domain: &str, custom_domain: Option<&str>) -> String {
     format!("https://{}", custom_domain.unwrap_or(domain))
+}
+
+/// The www name redirected to a `name.tld` custom domain
+pub fn www_redirect_domain(custom_domain: &str) -> Option<String> {
+    (custom_domain.matches('.').count() == 1).then(|| format!("www.{custom_domain}"))
 }
 
 pub fn sanitize(s: &str) -> String {
