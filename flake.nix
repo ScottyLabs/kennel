@@ -10,7 +10,6 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    devenv.url = "github:cachix/devenv";
 
     crane.url = "github:ipetkov/crane";
 
@@ -56,7 +55,6 @@
   outputs =
     {
       nixpkgs,
-      devenv,
       crane,
       treefmt-nix,
       ricochet,
@@ -171,7 +169,7 @@
         in
         {
           inherit kennel docs options-doc;
-          devenv = devenv.packages.${system}.devenv;
+          inherit (pkgs) devenv;
           docs-options = docsGen.generated;
         }
       );

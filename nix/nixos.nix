@@ -29,6 +29,17 @@ in
       '';
     };
 
+    nixPackage = mkOption {
+      type = types.package;
+      default = pkgs.nix;
+      defaultText = literalExpression "pkgs.nix";
+      description = ''
+        The package providing `nix` and `nix-store` to kennel. The build
+        worker runs `nix build` for each declared service and site, and the
+        reconciler roots build outputs with `nix-store --realise`.
+      '';
+    };
+
     webhookSecretFile = mkOption {
       type = types.path;
       description = ''
@@ -311,10 +322,10 @@ in
 
         path = [
           cfg.devenvPackage
+          cfg.nixPackage
         ]
         ++ (with pkgs; [
           git
-          nix
           cachix
         ])
         ++ optional cfg.resources.postgres.enable pkgs.postgresql
