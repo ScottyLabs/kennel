@@ -472,14 +472,17 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
         log_line(log, "no services or static sites defined, skipping deploy");
     }
 
-    if let Some(values) = &input.build_env {
-        ensure_build_env_input(&repo_path).await?;
-        let mut names: Vec<&str> = values.keys().map(String::as_str).collect();
-        names.sort_unstable();
-        log_line(log, &format!("injecting build scope: {}", names.join(", ")));
+    let build_env_node = match &input.build_env {
+        Some(values) => {
+            let node = build_env_node(&repo_path).await?;
 
-        tokio::fs::create_dir_all(work_dir.join("build-env")).await?;
-    }
+            let mut names: Vec<&str> = values.keys().map(String::as_str).collect();
+            names.sort_unstable();
+            log_line(log, &format!("injecting build scope: {}", names.join(", ")));
+            Some(node)
+        }
+        None => None,
+    };
 
     let services = kennel_config
         .services
@@ -492,17 +495,13 @@ async fn build_pipeline(work_dir: &Path, log: &mut String) -> anyhow::Result<Bui
 
     let mut store_paths: HashMap<String, String> = HashMap::new();
     for (name, attr, custom_domain) in services.chain(sites) {
-        let build_env_file = match &input.build_env {
-            Some(values) => {
-                let file = work_dir.join("build-env").join(format!("{name}.json"));
-                let env = package_build_env(&input, values, name, custom_domain);
-                tokio::fs::write(&file, serde_json::to_vec(&env)?).await?;
-                Some(file)
-            }
-            None => None,
-        };
+        if let (Some(values), Some(node)) = (&input.build_env, &build_env_node) {
+            let env = package_build_env(&input, values, name, custom_domain);
+            let dir = work_dir.join("build-env").join(name);
+            lock_build_env(&repo_path, node, &dir, &env).await?;
+        }
 
-        let store_path = nix_build(log, &repo_path, attr, build_env_file).await?;
+        let store_path = nix_build(log, &repo_path, attr).await?;
         store_paths.insert(name.clone(), store_path);
     }
 
@@ -614,33 +613,21 @@ async fn eval_kennel_config(
     Ok((config, store_path.to_string()))
 }
 
-async fn nix_build(
-    log: &mut String,
-    repo_path: &Path,
-    name: &str,
-    build_env_file: Option<PathBuf>,
-) -> anyhow::Result<String> {
+async fn nix_build(log: &mut String, repo_path: &Path, name: &str) -> anyhow::Result<String> {
     let system = format!("{}-linux", std::env::consts::ARCH);
     let flake_ref = format!(".#packages.{system}.{name}");
 
     let mut cmd = Command::new("nix");
     cmd.args(["build", &flake_ref, "--no-link", "--print-out-paths"])
         .current_dir(repo_path);
-    if let Some(file) = build_env_file {
-        cmd.arg("--override-input")
-            .arg(format!("{KENNEL_FLAKE_INPUT}/build-env"))
-            .arg(format!("path:{}", file.display()));
-    }
-
     let phase = run_streamed(log, &format!("nix-build:{name}"), &mut cmd).await?;
 
     anyhow::ensure!(phase.status.success(), "nix build failed for {name}");
     Ok(phase.stdout.trim().to_string())
 }
 
-/// Checks that flake.lock has the kennel flake's build-env input. Nix only warns
-/// when `--override-input` names an input that does not exist.
-async fn ensure_build_env_input(repo_path: &Path) -> anyhow::Result<()> {
+/// Key of the kennel flake's build-env node in the checkout's flake.lock
+async fn build_env_node(repo_path: &Path) -> anyhow::Result<String> {
     let lock: serde_json::Value = match tokio::fs::read(repo_path.join("flake.lock")).await {
         Ok(bytes) => serde_json::from_slice(&bytes)?,
         Err(_) => serde_json::Value::Null,
@@ -648,15 +635,59 @@ async fn ensure_build_env_input(repo_path: &Path) -> anyhow::Result<()> {
 
     let nodes = &lock["nodes"];
     let root = lock["root"].as_str().unwrap_or("root");
-    let has_input = nodes[root]["inputs"][KENNEL_FLAKE_INPUT]
+    let key = nodes[root]["inputs"][KENNEL_FLAKE_INPUT]
         .as_str()
-        .is_some_and(|key| nodes[key]["inputs"].get("build-env").is_some());
+        .and_then(|kennel| nodes[kennel]["inputs"]["build-env"].as_str())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "secretspec.toml declares [scopes.{BUILD_SCOPE}] but flake.lock has no `{KENNEL_FLAKE_INPUT}/build-env` input. Import the kennel flake as `{KENNEL_FLAKE_INPUT}` and update it."
+            )
+        })?;
 
     anyhow::ensure!(
-        has_input,
-        "secretspec.toml declares [scopes.{BUILD_SCOPE}] but flake.lock has no `{KENNEL_FLAKE_INPUT}/build-env` input. Import the kennel flake as `{KENNEL_FLAKE_INPUT}` and update it."
+        nodes[key]["original"]["type"] != "file",
+        "flake.lock pins a kennel revision older than its kennel-build-env default. Run `nix flake update {KENNEL_FLAKE_INPUT}`."
     );
+    Ok(key.to_string())
+}
+
+/// Locks the build-env node to this package's environment, keeping `original` so nix reuses it
+async fn lock_build_env(
+    repo_path: &Path,
+    node: &str,
+    dir: &Path,
+    env: &HashMap<String, String>,
+) -> anyhow::Result<()> {
+    tokio::fs::create_dir_all(dir).await?;
+    tokio::fs::write(dir.join("build-env.json"), serde_json::to_vec(env)?).await?;
+
+    let nar_hash = nix_hash_path(dir).await?;
+
+    let lock_path = repo_path.join("flake.lock");
+    let mut lock: serde_json::Value = serde_json::from_slice(&tokio::fs::read(&lock_path).await?)?;
+    lock["nodes"][node]["locked"] = serde_json::json!({
+        "type": "path",
+        "path": dir,
+        "narHash": nar_hash,
+    });
+
+    tokio::fs::write(&lock_path, serde_json::to_vec_pretty(&lock)?).await?;
     Ok(())
+}
+
+async fn nix_hash_path(path: &Path) -> anyhow::Result<String> {
+    let output = Command::new("nix")
+        .args(["hash", "path"])
+        .arg(path)
+        .output()
+        .await?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "nix hash path failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
 /// Adds `APP_URL` and `COMMIT_HASH` to the build scope for one package

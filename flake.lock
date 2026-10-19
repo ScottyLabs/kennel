@@ -3,13 +3,17 @@
     "build-env": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-d6xi4mKdjkX2JFicDIv5niSzpyI0m/Hnm8GGAIU04kY=",
-        "type": "file",
-        "url": "file:///dev/null"
+        "lastModified": 1792396616,
+        "narHash": "sha256-lkA2XZM//95FO8Sg03IPm45ib+pY97gQtefYumaAVtk=",
+        "ref": "refs/heads/main",
+        "rev": "b5dd180ba5f5380c7f01a77e07bc9c0e95c998bf",
+        "revCount": 1,
+        "type": "git",
+        "url": "https://git.cmu.dev/ScottyLabs/kennel-build-env"
       },
       "original": {
-        "type": "file",
-        "url": "file:///dev/null"
+        "type": "git",
+        "url": "https://git.cmu.dev/ScottyLabs/kennel-build-env"
       }
     },
     "cachix": {

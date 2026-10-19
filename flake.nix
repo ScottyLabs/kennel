@@ -45,9 +45,9 @@
       };
     };
 
-    # Overridden by kennel with the build environment as JSON
+    # Empty default kennel relocks per package
     build-env = {
-      url = "file+file:///dev/null";
+      url = "git+https://git.cmu.dev/ScottyLabs/kennel-build-env";
       flake = false;
     };
   };
@@ -83,11 +83,7 @@
         };
 
       # Environment variables kennel sets for helper builds
-      buildEnv =
-        let
-          raw = builtins.readFile build-env;
-        in
-        if raw == "" then { } else builtins.fromJSON raw;
+      buildEnv = builtins.fromJSON (builtins.readFile "${build-env}/build-env.json");
 
       # Build helpers bound to a consumer pkgs, mirroring crane.mkLib
       mkLib = pkgs: {

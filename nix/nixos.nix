@@ -33,11 +33,7 @@ in
       type = types.package;
       default = pkgs.nix;
       defaultText = literalExpression "pkgs.nix";
-      description = ''
-        The package providing `nix` and `nix-store` to kennel. The build
-        worker runs `nix build` for each declared service and site, and the
-        reconciler roots build outputs with `nix-store --realise`.
-      '';
+      description = "The package providing `nix` and `nix-store` to kennel.";
     };
 
     webhookSecretFile = mkOption {
