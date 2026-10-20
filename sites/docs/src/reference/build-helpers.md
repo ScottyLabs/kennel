@@ -185,7 +185,7 @@ By default the result is the script's output directory, for a static site. Set `
 
 ### `src`
 
-Directory holding `pnpm-lock.yaml`. In a pnpm workspace this is the workspace root, and `cwd` selects the member to build.
+Directory holding `pnpm-lock.yaml`, the same directory listed in `scottylabs.node.dirs`. In a pnpm workspace this is the workspace root, and `cwd` selects the member to build.
 
 Type: `path`, required
 
@@ -215,9 +215,9 @@ Type: `str`, required
 
 ### `script`
 
-The `package.json` script to run with `pnpm run`.
+The `package.json` script to run with `pnpm run`. `null` skips the build, for a service that Node.js runs from source.
 
-Type: `str`, default: `"build"`
+Type: `nullOr str`, default: `"build"`
 
 ### `output`
 
@@ -227,7 +227,7 @@ Type: `str`, default: `"dist"`
 
 ### `main`
 
-Script, relative to `cwd`, that the service runs with Node.js. When set, the result holds the built workspace with its `node_modules` under `lib/` and a `bin/<pname>` wrapper that runs it, which is what kennel starts for a service. The wrapper keeps the caller's working directory, so the service still finds `secretspec.toml`. The whole workspace ships, development dependencies included.
+Script, relative to `cwd`, that the service runs with Node.js. When set, the result holds the built workspace with its `node_modules` under `lib/` and a `bin/<pname>` wrapper that runs it, which is what kennel starts for a service. The wrapper keeps the caller's working directory, so the service still finds `secretspec.toml`, and sets `NODE_ENV=production` unless it is already set. The whole workspace ships, development dependencies included.
 
 A TypeScript `main` runs directly only if it uses erasable syntax alone ([type stripping](https://nodejs.org/api/typescript.html#type-stripping)); otherwise compile it in `script` and point `main` at the output.
 

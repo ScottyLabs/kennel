@@ -194,7 +194,13 @@ Enable the Node.js toolchain in `devenv.nix`:
 scottylabs.node.enable = true;
 ```
 
-The shell runs `pnpm install` from the project root on entry, so a [pnpm workspace](https://pnpm.io/workspaces) installs every member at once. On every commit, oxlint runs along with the root `package.json` scripts named `typecheck` and `test`, if present. In a workspace, have those root scripts fan out to the members (`pnpm -r typecheck`, or the turbo equivalent). Rename them with `scottylabs.node.checkScript` and `scottylabs.node.testScript`.
+The shell runs `pnpm install` on entry in each directory of `scottylabs.node.dirs`, the project root by default. A [pnpm workspace](https://pnpm.io/workspaces) installs every member from its root, so list only the workspace root. When the JavaScript lives beside another language, such as a frontend in `sites/web` of a Rust project, point `dirs` at it:
+
+```nix
+scottylabs.node.dirs = [ "sites/web" ];
+```
+
+On every commit, oxlint runs along with the `typecheck` and `test` scripts from the `package.json` in each of `dirs`, if present. In a workspace, have those root scripts fan out to the members (`pnpm -r typecheck`, or the turbo equivalent). Rename them with `scottylabs.node.checkScript` and `scottylabs.node.testScript`.
 
 Build each package with `buildPnpmTask`. A static site copies the script's output directory, and a backend service sets `main` to the file Node.js runs:
 
@@ -219,7 +225,8 @@ Every package built from the same `src` fetches the same dependencies, so they s
 The build differs from your shell in a few ways:
 
 - Install scripts don't run, so code generation that usually runs on `postinstall` (such as `prisma generate`) has to be part of the build script.
-- `main` runs without a separate compile step only if it is JavaScript, or TypeScript that uses erasable syntax alone ([type stripping](https://nodejs.org/api/typescript.html#type-stripping): no `enum`, `namespace`, or parameter properties). Otherwise, compile it in the build script and point `main` at the output.
+- A service runs with `NODE_ENV=production` unless kennel's environment sets it.
+- `main` runs without a separate compile step only if it is JavaScript, or TypeScript that uses erasable syntax alone ([type stripping](https://nodejs.org/api/typescript.html#type-stripping): no `enum`, `namespace`, or parameter properties). Otherwise, compile it in the build script and point `main` at the output. A service with nothing to build sets `script = null`.
 - The shell and the build share the pnpm from `scottylabs.node.pnpm`. A `packageManager` field naming another pnpm major makes the shell switch versions while the build does not, so drop the field or set `scottylabs.node.pnpm` and the helper's `pnpm` to the matching package (for example `pkgs.pnpm_10`).
 
 Add `node_modules/` to `.gitignore`.

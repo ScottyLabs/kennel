@@ -8,6 +8,14 @@
 let
   cfg = config.scottylabs.node;
   store = "${config.devenv.root}/.devenv/state/pnpm";
+  # Hooks start at the repo root; dirs without the script are skipped
+  runScript =
+    name: script:
+    pkgs.writeShellScript "pnpm-${name}" (
+      lib.concatMapStrings (dir: ''
+        (cd ${lib.escapeShellArg dir} && pnpm run --if-present ${lib.escapeShellArg script}) || exit 1
+      '') cfg.dirs
+    );
 in
 {
   options.scottylabs.node = {
@@ -19,8 +27,8 @@ in
         [pnpm](https://pnpm.io),
         [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and
         [oxfmt](https://oxc.rs/docs/guide/usage/formatter). Runs oxlint and the
-        root `package.json` scripts named by `checkScript` and `testScript` on
-        every commit.
+        `package.json` scripts named by `checkScript` and `testScript` in each
+        of `dirs` on every commit.
       '';
     };
 
@@ -59,13 +67,23 @@ in
       '';
     };
 
+    dirs = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "." ];
+      description = ''
+        Directories, relative to the project root, holding a pnpm project's
+        `package.json` and `pnpm-lock.yaml` (for a workspace, its root).
+        `pnpm install` and the commit hook scripts run in each.
+      '';
+    };
+
     checkScript = lib.mkOption {
       type = lib.types.str;
       default = "typecheck";
       description = ''
-        Root `package.json` script that type-checks the project, run on every
-        commit when present. In a workspace, have it fan out to the members
-        (for example `pnpm -r typecheck` or `turbo typecheck`).
+        `package.json` script in each of `dirs` that type-checks the project,
+        run on every commit when present. In a workspace, have it fan out to
+        the members (for example `pnpm -r typecheck` or `turbo typecheck`).
       '';
     };
 
@@ -73,8 +91,8 @@ in
       type = lib.types.str;
       default = "test";
       description = ''
-        Root `package.json` script that runs the tests, run on every commit
-        when present.
+        `package.json` script in each of `dirs` that runs the tests, run on
+        every commit when present.
       '';
     };
   };
@@ -89,16 +107,16 @@ in
     env.npm_config_store_dir = store;
     env.pnpm_config_store_dir = store;
 
-    # pnpm installs every workspace member from the root
-    enterShell = ''
-      pnpm install
-    '';
+    # pnpm installs every workspace member from its root
+    enterShell = lib.concatMapStrings (dir: ''
+      (cd ${lib.escapeShellArg dir} && pnpm install)
+    '') cfg.dirs;
 
     git-hooks.hooks = {
       pnpm-check = {
         enable = true;
         name = "pnpm-check";
-        entry = "pnpm run --if-present ${cfg.checkScript}";
+        entry = "${runScript "check" cfg.checkScript}";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx|vue|svelte)$";
         pass_filenames = false;
         language = "system";
@@ -106,7 +124,7 @@ in
       pnpm-test = {
         enable = true;
         name = "pnpm-test";
-        entry = "pnpm run --if-present ${cfg.testScript}";
+        entry = "${runScript "test" cfg.testScript}";
         files = "\\.(ts|tsx|mts|cts|js|mjs|cjs|jsx|vue|svelte)$";
         pass_filenames = false;
         language = "system";

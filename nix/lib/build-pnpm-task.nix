@@ -19,6 +19,7 @@
   version ? "0.1.0",
   # Hash of the fetched pnpm store, "" to have nix report it
   hash,
+  # null skips the build, for a service node runs from source
   script ? "build",
   output ? "dist",
   # Script under cwd to run with node, making the result a service instead of output
@@ -33,7 +34,7 @@ let
   patchAddons = lib.optionalString stdenv.hostPlatform.isLinux ''
     if [ -d node_modules ]; then
       find node_modules -type d -name '*musl*' -prune -exec rm -rf {} +
-      find . -xtype l -delete
+      find . -path '*/node_modules/*' -xtype l -delete
       autoPatchelf node_modules
     fi
   '';
@@ -66,7 +67,9 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     ${patchAddons}
-    ( cd ${lib.escapeShellArg cwd} && pnpm run ${lib.escapeShellArg script} )
+    ${lib.optionalString (script != null) ''
+      ( cd ${lib.escapeShellArg cwd} && pnpm run ${lib.escapeShellArg script} )
+    ''}
     runHook postBuild
   '';
 
@@ -84,6 +87,7 @@ stdenv.mkDerivation {
         mkdir -p "$out/bin"
         cp -r . "$out/lib"
         makeWrapper ${lib.getExe nodejs} "$out/bin/${pname}" \
+          --set-default NODE_ENV production \
           --add-flags "$out/lib/"${lib.escapeShellArg "${cwd}/${main}"}
       ''
   )
