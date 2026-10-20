@@ -14,6 +14,8 @@ in
     ./kennel.nix
     ./rust.nix
     ./deno.nix
+    ./node.nix
+    ./oxc.nix
     ./haskell.nix
     ./python.nix
     ./garage.nix

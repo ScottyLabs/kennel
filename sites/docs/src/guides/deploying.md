@@ -160,7 +160,7 @@ outputs = { nixpkgs, scottylabs, ... }:
 
 This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages. The kennel input must be named `scottylabs`.
 
-A Deno or JavaScript frontend uses `buildDenoTask` the same way.
+A Deno or JavaScript frontend uses `buildDenoTask` the same way. A pnpm project on Node.js uses `buildPnpmTask`, with `scottylabs.node.enable` in place of `scottylabs.deno.enable`.
 
 List a browser frontend's directory (Vite, Svelte) in `scottylabs.deno.dirs`, so the shell installs its npm packages:
 

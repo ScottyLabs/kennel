@@ -177,6 +177,87 @@ A workspace member builds from the workspace root that holds the shared `deno.lo
 }
 ```
 
+## `buildPnpmTask`
+
+Builds a [pnpm](https://pnpm.io) project, or a single member of a pnpm workspace, running a `package.json` script with Node.js. Dependencies come from `pnpm-lock.yaml` through nixpkgs' `fetchPnpmDeps`, so the build needs the hash of the fetched store. Install scripts do not run. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
+
+By default the result is the script's output directory, for a static site. Set `main` to build a backend service instead.
+
+### `src`
+
+Directory holding `pnpm-lock.yaml`. In a pnpm workspace this is the workspace root, and `cwd` selects the member to build.
+
+Type: `path`, required
+
+### `cwd`
+
+Subdirectory of `src` to build in, for a workspace member. `"."` builds `src` itself. The script runs from `src/<cwd>`, so `output` and `main` resolve relative to the member.
+
+Type: `str`, default: `"."`
+
+### `pname`
+
+Package name. With `main` set, it is also the name of the executable under `bin/`.
+
+Type: `str`, required
+
+### `version`
+
+Package version.
+
+Type: `str`, default: `"0.1.0"`
+
+### `hash`
+
+Hash of the dependencies fetched from `pnpm-lock.yaml`. Set it to `""`, build once, and copy the `got:` hash from the mismatch error. Update it the same way whenever the lockfile changes.
+
+Type: `str`, required
+
+### `script`
+
+The `package.json` script to run with `pnpm run`.
+
+Type: `str`, default: `"build"`
+
+### `output`
+
+Directory the script emits, copied verbatim to the result. Ignored when `main` is set.
+
+Type: `str`, default: `"dist"`
+
+### `main`
+
+Script, relative to `cwd`, that the service runs with Node.js. When set, the result holds the built workspace with its `node_modules` under `lib/` and a `bin/<pname>` wrapper that runs it, which is what kennel starts for a service. The wrapper keeps the caller's working directory, so the service still finds `secretspec.toml`.
+
+Type: `nullOr str`, default: `null`
+
+### `nodejs`
+
+Node.js package the script and the service run with. Match `scottylabs.node.package`.
+
+Type: `package`, default: `pkgs.nodejs_24`
+
+```nix
+(scottylabs.mkLib pkgs).buildPnpmTask {
+  src = ./.;
+  cwd = "apps/web";
+  pname = "web";
+  hash = "sha256-...";
+}
+```
+
+A backend service in the same workspace sets `main` to its built entrypoint:
+
+```nix
+(scottylabs.mkLib pkgs).buildPnpmTask {
+  src = ./.;
+  cwd = "apps/server";
+  pname = "server";
+  hash = "sha256-...";
+  main = "dist/index.js";
+}
+```
+
 ## `buildPythonService`
 
 Builds a [uv](https://docs.astral.sh/uv/) project into a virtual environment with [uv2nix](https://github.com/pyproject-nix/uv2nix), resolving every dependency from `uv.lock` as a Nix derivation. The result is a relocatable venv exposing each `[project.scripts]` entry under `bin/`, consumed as `${pkg}/bin/<script>`.

@@ -7,15 +7,6 @@
 
 let
   cfg = config.scottylabs.deno;
-  oxlintPlugins = [
-    "oxc"
-    "unicorn"
-    "typescript"
-  ]
-  ++ lib.optionals cfg.react.enable [
-    "react"
-    "jsx-a11y"
-  ];
 in
 {
   options.scottylabs.deno = {
@@ -69,42 +60,12 @@ in
     packages = [ pkgs.deno ] ++ lib.optional cfg.svelte.enable pkgs.svelte-check;
 
     env.DENO_DIR = "${config.devenv.root}/.devenv/state/deno";
-    # oxlint prefers node_modules/.bin/tsgolint over PATH
-    env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
 
     enterShell = lib.concatMapStrings (dir: ''
       (cd ${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && deno run -A npm:@sveltejs/kit/svelte-kit sync"})
     '') cfg.dirs;
 
-    treefmt.config.programs.oxfmt = {
-      enable = true;
-      excludes = [ "*.md" ]; # owned by mdformat
-    };
-
     git-hooks.hooks = {
-      oxlint = {
-        enable = true;
-        settings = {
-          plugins = oxlintPlugins;
-          deny = [
-            "correctness"
-            "suspicious"
-            "pedantic"
-            "perf"
-          ];
-          typeAware = true;
-          allow = [
-            "prefer-readonly-parameter-types"
-            # TODO comments are allowed
-            "no-warning-comments"
-          ]
-          ++ lib.optionals cfg.react.enable [
-            # The automatic jsx runtime needs no react import
-            "react-in-jsx-scope"
-            "jsx-uses-react"
-          ];
-        };
-      };
       svelte-check = lib.mkIf cfg.svelte.enable {
         enable = true;
         entry = "${pkgs.svelte-check}/bin/svelte-check";

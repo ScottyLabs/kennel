@@ -1,6 +1,6 @@
 # Shared devenv config
 
-Projects import these shared ScottyLabs [devenv](https://devenv.sh) modules and Nix build helpers via the `scottylabs` flake input. They provide language toolchains (Rust, Deno, Haskell, Python), formatting and linting via treefmt and git hooks, local database services (Postgres, SQLite, Valkey, Garage), OpenBao secrets, Cachix binary caching, and kennel deployment config.
+Projects import these shared ScottyLabs [devenv](https://devenv.sh) modules and Nix build helpers via the `scottylabs` flake input. They provide language toolchains (Rust, Deno, Node.js, Haskell, Python), formatting and linting via treefmt and git hooks, local database services (Postgres, SQLite, Valkey, Garage), OpenBao secrets, Cachix binary caching, and kennel deployment config.
 
 - [Deploying a Project](https://docs.kennel.scottylabs.org/guides/deploying.html)
 - [Secrets](https://docs.kennel.scottylabs.org/guides/secrets.html)

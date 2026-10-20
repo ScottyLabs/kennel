@@ -42,7 +42,7 @@ jobs:
 
 - Cachix (`scottylabs`) as a substituter for pulls and a push target for Nix store paths.
 - sccache for Rust compilation, backed by the shared S3 bucket.
-- The Rust `target` cache ([Swatinem/rust-cache](https://github.com/Swatinem/rust-cache)) and the Deno and uv caches under `.devenv/state`.
+- The Rust `target` cache ([Swatinem/rust-cache](https://github.com/Swatinem/rust-cache)) and the Deno, pnpm, and uv caches under `.devenv/state`.
 - devenv's Nix eval cache.
 
 ## Secrets

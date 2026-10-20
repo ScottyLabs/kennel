@@ -9,8 +9,9 @@ runs:
       with:
         path: |
           .devenv/state/deno
+          .devenv/state/pnpm
           .devenv/state/uv
-        key: devenv-state-${{ hashFiles('**/deno.lock', '**/uv.lock') }}
+        key: devenv-state-${{ hashFiles('**/deno.lock', '**/pnpm-lock.yaml', '**/uv.lock') }}
         restore-keys: devenv-state-
 
     - name: Cache devenv eval
