@@ -220,7 +220,7 @@ api = helpers.buildPnpmTask {
 };
 ```
 
-Every package built from the same `src` fetches the same dependencies, so they share one `hash`. To get it, set `hash = "";`, run `nix build .#web`, and copy the `got:` value from the hash mismatch error. Any change to `pnpm-lock.yaml` changes the hash, and kennel's build fails with that same mismatch until you update it, so update the hash in the same commit as the lockfile.
+Every package built from the same `src` fetches the same dependencies, so they share one `hash`. To get it, set `hash = "";`, run `nix build .#web`, and copy the `got:` value from the hash mismatch error. Any change to `pnpm-lock.yaml` changes the hash, and kennel's build fails with that same mismatch until you update it, so update the hash in the same commit as the lockfile. A different pnpm version also changes it, so recheck the hash after updating the `nixpkgs` pin.
 
 The build differs from your shell in a few ways:
 

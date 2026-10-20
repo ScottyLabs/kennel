@@ -209,7 +209,7 @@ Type: `str`, default: `"0.1.0"`
 
 ### `hash`
 
-Hash of the dependencies fetched from `pnpm-lock.yaml`. Set it to `""`, build once, and copy the `got:` hash from the mismatch error. Update it the same way whenever the lockfile changes; until then the build fails with that mismatch. Packages built from the same `src` share one hash.
+Hash of the dependencies fetched from `pnpm-lock.yaml`. Set it to `""`, build once, and copy the `got:` hash from the mismatch error. Update it the same way whenever the lockfile or the pnpm version changes, including a nixpkgs update that bumps `pkgs.pnpm`; until then the build fails with that mismatch. Packages built from the same `src` share one hash.
 
 Type: `str`, required
 
