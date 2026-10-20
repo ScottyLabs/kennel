@@ -179,9 +179,9 @@ A workspace member builds from the workspace root that holds the shared `deno.lo
 
 ## `buildPnpmTask`
 
-Builds a [pnpm](https://pnpm.io) project, or a single member of a pnpm workspace, running a `package.json` script with Node.js. Dependencies come from `pnpm-lock.yaml` through nixpkgs' `fetchPnpmDeps`, so the build needs the hash of the fetched store. Install scripts do not run. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
+Builds a [pnpm](https://pnpm.io) project, or a single member of a pnpm workspace, running a `package.json` script with Node.js. Dependencies come from `pnpm-lock.yaml` through nixpkgs' `fetchPnpmDeps`, so the build needs the hash of the fetched store. Install scripts do not run, so code generation such as `prisma generate` belongs in `script`. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
 
-By default the result is the script's output directory, for a static site. Set `main` to build a backend service instead.
+By default the result is the script's output directory, for a static site. Set `main` to build a backend service instead. See [Node.js with pnpm](../guides/deploying.md#nodejs-with-pnpm) for the shell side and how the build differs from it.
 
 ### `src`
 
@@ -209,7 +209,7 @@ Type: `str`, default: `"0.1.0"`
 
 ### `hash`
 
-Hash of the dependencies fetched from `pnpm-lock.yaml`. Set it to `""`, build once, and copy the `got:` hash from the mismatch error. Update it the same way whenever the lockfile changes.
+Hash of the dependencies fetched from `pnpm-lock.yaml`. Set it to `""`, build once, and copy the `got:` hash from the mismatch error. Update it the same way whenever the lockfile changes; until then the build fails with that mismatch. Packages built from the same `src` share one hash.
 
 Type: `str`, required
 
@@ -227,7 +227,9 @@ Type: `str`, default: `"dist"`
 
 ### `main`
 
-Script, relative to `cwd`, that the service runs with Node.js. When set, the result holds the built workspace with its `node_modules` under `lib/` and a `bin/<pname>` wrapper that runs it, which is what kennel starts for a service. The wrapper keeps the caller's working directory, so the service still finds `secretspec.toml`.
+Script, relative to `cwd`, that the service runs with Node.js. When set, the result holds the built workspace with its `node_modules` under `lib/` and a `bin/<pname>` wrapper that runs it, which is what kennel starts for a service. The wrapper keeps the caller's working directory, so the service still finds `secretspec.toml`. The whole workspace ships, development dependencies included.
+
+A TypeScript `main` runs directly only if it uses erasable syntax alone ([type stripping](https://nodejs.org/api/typescript.html#type-stripping)); otherwise compile it in `script` and point `main` at the output.
 
 Type: `nullOr str`, default: `null`
 
@@ -236,6 +238,12 @@ Type: `nullOr str`, default: `null`
 Node.js package the script and the service run with. Match `scottylabs.node.package`.
 
 Type: `package`, default: `pkgs.nodejs_24`
+
+### `pnpm`
+
+pnpm package that fetches and installs the dependencies. Match `scottylabs.node.pnpm`, which must agree with any `packageManager` field in `package.json`.
+
+Type: `package`, default: `pkgs.pnpm`
 
 ```nix
 (scottylabs.mkLib pkgs).buildPnpmTask {

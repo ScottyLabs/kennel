@@ -23,8 +23,9 @@ in
       type = lib.types.bool;
       default = true;
       description = ''
-        Scan lockfiles (`Cargo.lock`, `deno.lock`, `uv.lock`, ...) against the
-        [OSV.dev](https://osv.dev) vulnerability database via
+        Scan lockfiles (`Cargo.lock`, `deno.lock`, `pnpm-lock.yaml`,
+        `uv.lock`, ...) against the [OSV.dev](https://osv.dev) vulnerability
+        database via
         [osv-scanner](https://github.com/google/osv-scanner).
       '';
     };

@@ -15,7 +15,7 @@ prod_monthly_budget = 20.0
 ```
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
-- `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile; set `platform` (for example `rust`, `deno`, or `python`) to label the project's SDK
+- `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile; set `platform` (for example `rust`, `deno`, `node`, or `python`) to label the project's SDK
 - `posthog` creates a PostHog project and writes its key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile
 - `posthog` with `server_side = true` also parses browser, OS, and device from each event's user agent and keeps client IPs for location, for services that capture events from a server on behalf of visitors
 - `cdn` provisions a per-project public-read [Garage](https://garagehq.deuxfleurs.fr/) bucket and writes `CDN_S3_ENDPOINT`, `CDN_S3_BUCKET`, `CDN_ACCESS_KEY_ID`, `CDN_SECRET_ACCESS_KEY`, and `CDN_PUBLIC_URL` to Vault on the `prod` profile
@@ -83,7 +83,7 @@ SENTRY_DSN = { description = "Sentry project DSN" }
 
 Read `SENTRY_DSN` at startup and pass it to the Sentry SDK to turn on error reporting, following [Sentry's setup guide](https://docs.sentry.io/platforms/). Without a DSN, in local development and previews, the SDK stays inert.
 
-Set `platform` in the feature to label the project's SDK in Sentry (for example `rust`, `deno`, `python`, or `other` when Sentry has no matching SDK).
+Set `platform` in the feature to label the project's SDK in Sentry (for example `rust`, `deno`, `node`, `python`, or `other` when Sentry has no matching SDK).
 
 ### PostHog
 

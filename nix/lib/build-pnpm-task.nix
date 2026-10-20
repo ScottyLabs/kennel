@@ -2,8 +2,7 @@
 {
   lib,
   stdenv,
-  nodejs_24,
-  pnpm,
+  pkgs,
   fetchPnpmDeps,
   pnpmConfigHook,
   autoPatchelfHook,
@@ -24,7 +23,9 @@
   output ? "dist",
   # Script under cwd to run with node, making the result a service instead of output
   main ? null,
-  nodejs ? nodejs_24,
+  nodejs ? pkgs.nodejs_24,
+  # Match the pnpm the shell runs, since pnpm-lock.yaml settings are checked against it
+  pnpm ? pkgs.pnpm,
 }:
 
 let

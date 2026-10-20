@@ -91,7 +91,7 @@ rustc-ice-*.txt
 .DS_Store
 ```
 
-Add any project-specific entries as needed (e.g., `sites/docs/book/` for mdbook output, `node_modules/` for JS projects).
+Add any project-specific entries as needed (e.g., `sites/docs/book/` for mdbook output, `node_modules/` for Node.js projects).
 
 ## 3. Declare what to deploy
 
@@ -160,7 +160,15 @@ outputs = { nixpkgs, scottylabs, ... }:
 
 This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages. The kennel input must be named `scottylabs`.
 
-A Deno or JavaScript frontend uses `buildDenoTask` the same way. A pnpm project on Node.js uses `buildPnpmTask`, with `scottylabs.node.enable` in place of `scottylabs.deno.enable`.
+Kennel builds each package with `nix build .#packages.{system}.{name}`.
+
+### JavaScript and TypeScript
+
+Deno is the default runtime for JavaScript and TypeScript projects. Use Node.js with pnpm only for a project that can't move to Deno yet. Pick one per project; enabling both runs both sets of commit hooks over the same files.
+
+#### Deno
+
+A Deno project, frontend or backend, builds with `buildDenoTask` the same way.
 
 List a browser frontend's directory (Vite, Svelte) in `scottylabs.deno.dirs`, so the shell installs its npm packages:
 
@@ -178,7 +186,52 @@ It also needs a root `deno.json` that excludes that directory, so the `deno chec
 
 For a SvelteKit app, `svelte-check` type-checks it (enable `scottylabs.deno.svelte.enable`).
 
-Kennel builds each package with `nix build .#packages.{system}.{name}`.
+#### Node.js with pnpm
+
+Enable the Node.js toolchain in `devenv.nix`:
+
+```nix
+scottylabs.node.enable = true;
+```
+
+The shell runs `pnpm install` from the project root on entry, so a [pnpm workspace](https://pnpm.io/workspaces) installs every member at once. On every commit, oxlint runs along with the root `package.json` scripts named `typecheck` and `test`, if present. In a workspace, have those root scripts fan out to the members (`pnpm -r typecheck`, or the turbo equivalent). Rename them with `scottylabs.node.checkScript` and `scottylabs.node.testScript`.
+
+Build each package with `buildPnpmTask`. A static site copies the script's output directory, and a backend service sets `main` to the file Node.js runs:
+
+```nix
+web = helpers.buildPnpmTask {
+  src = ./.;
+  cwd = "apps/web";
+  pname = "web";
+  hash = "sha256-...";
+};
+api = helpers.buildPnpmTask {
+  src = ./.;
+  cwd = "apps/api";
+  pname = "api";
+  hash = "sha256-...";
+  main = "dist/index.js";
+};
+```
+
+Every package built from the same `src` fetches the same dependencies, so they share one `hash`. To get it, set `hash = "";`, run `nix build .#web`, and copy the `got:` value from the hash mismatch error. Any change to `pnpm-lock.yaml` changes the hash, and kennel's build fails with that same mismatch until you update it, so update the hash in the same commit as the lockfile.
+
+The build differs from your shell in a few ways:
+
+- Install scripts don't run, so code generation that usually runs on `postinstall` (such as `prisma generate`) has to be part of the build script.
+- `main` runs without a separate compile step only if it is JavaScript, or TypeScript that uses erasable syntax alone ([type stripping](https://nodejs.org/api/typescript.html#type-stripping): no `enum`, `namespace`, or parameter properties). Otherwise, compile it in the build script and point `main` at the output.
+- The shell and the build share the pnpm from `scottylabs.node.pnpm`. A `packageManager` field naming another pnpm major makes the shell switch versions while the build does not, so drop the field or set `scottylabs.node.pnpm` and the helper's `pnpm` to the matching package (for example `pkgs.pnpm_10`).
+
+Add `node_modules/` to `.gitignore`.
+
+#### Migrating from Bun
+
+`pnpm import` does not read `bun.lock`, so dependencies are resolved fresh within the ranges in `package.json`:
+
+1. Move the `workspaces` globs from `package.json` into `pnpm-workspace.yaml` as `packages`.
+1. Delete `bun.lock` and the `packageManager` field, then run `pnpm install` in the devenv shell and commit `pnpm-lock.yaml`.
+1. Replace `bun` and `bunx` in scripts with `pnpm` and `pnpm exec`, and swap `@types/bun` for `@types/node`.
+1. Rewrite code that uses Bun-only APIs (`Bun.serve`, `Bun.file`, `bun:sqlite`, `bun:test`) against Node.js equivalents.
 
 ### Runtime environment
 

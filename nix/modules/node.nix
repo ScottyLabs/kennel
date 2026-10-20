@@ -34,6 +34,19 @@ in
       '';
     };
 
+    pnpm = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.pnpm;
+      defaultText = lib.literalExpression "pkgs.pnpm";
+      description = ''
+        pnpm package. Pass the same package as `pnpm` to `buildPnpmTask`. A
+        `packageManager` field in `package.json` naming another pnpm major
+        makes the shell switch to that version while the Nix build keeps
+        this one, so either drop the field or pick the matching package (for
+        example `pkgs.pnpm_10`).
+      '';
+    };
+
     react.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -69,7 +82,7 @@ in
   config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
     packages = [
       cfg.package
-      pkgs.pnpm
+      cfg.pnpm
     ];
 
     # pnpm 10 reads npm_config_*, pnpm 11 and later read pnpm_config_*
