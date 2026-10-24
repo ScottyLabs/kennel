@@ -8,18 +8,6 @@
 let
   cfg = config.scottylabs.security;
 
-  # nixpkgs' patchelf 0.19.2 aborts in `shiftFile` when it has to grow a large
-  # prebuilt ELF, which is exactly what semgrep-core's `postFixup` does to the
-  # ~250MB unstripped binary it unpacks from the PyPI wheel:
-  #   patchelf.cc:547: Assertion `splitIndex == -1' failed   (builder exit 134)
-  # That takes the whole devenv shell down, since semgrep-core is a build input
-  # of the semgrep Python package.
-  # Tracking: https://github.com/NixOS/nixpkgs/issues/577387
-  #
-  # Same shape as nixpkgs' own workarounds for rgp and patch-nupkgs: hand the
-  # affected derivation the last known-good patchelf. Version-gated so it
-  # self-disables once nixpkgs carries a fixed patchelf, and so repos pinned to
-  # an older nixpkgs keep their cached semgrep-core instead of rebuilding it.
   patchelfIsBroken = pkgs.stdenv.hostPlatform.isLinux && pkgs.patchelf.version == "0.19.2";
 
   patchelfStable = pkgs.patchelf.overrideAttrs (
