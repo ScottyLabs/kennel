@@ -190,6 +190,16 @@
         }
       );
 
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = pkgsFor system;
+        in
+        {
+          semgrep-patchelf = import ./nix/tests/semgrep-patchelf.nix { inherit pkgs; };
+        }
+      );
+
       formatter = forAllSystems (
         system:
         (treefmt-nix.lib.evalModule (pkgsFor system) {
