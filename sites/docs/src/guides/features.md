@@ -22,6 +22,7 @@ prod_monthly_budget = 20.0
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
 - `oidc_client` with `admin = true` also provisions a service-account client with the `view-users`, `manage-users`, and `view-identity-providers` roles, written to Vault as `KEYCLOAK_ADMIN_CLIENT_ID` and `KEYCLOAK_ADMIN_CLIENT_SECRET`
 - `oidc_client` with `groups` also creates extra Keycloak groups under the project group, left empty for you to manage
+- `oidc_client` with `public = true` provisions public clients that have no secret, so `OIDC_CLIENT_SECRET` is not written
 - `ai_gateway` mints budgeted [LiteLLM](https://docs.litellm.ai) API keys under your team and writes `LITELLM_API_KEY` and `LITELLM_BASE_URL` to Vault on every profile
 - `docs` publishes the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org)
 - `mobile_app` grants your team access to its Play Console app and, if `app_store` is set, to App Store Connect
@@ -58,6 +59,21 @@ PROJECT_ADMIN_GROUP = { description = "Keycloak project admin group path" }
 Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/flake-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).
 
 The OIDC client also adds the user's group memberships to the token as a `groups` claim, in full-path form like `/projects/<slug>`. Match it against `PROJECT_GROUP` and `PROJECT_ADMIN_GROUP` to grant enhanced permissions.
+
+### PKCE
+
+Every OIDC client requires [PKCE](https://datatracker.ietf.org/doc/html/rfc7636) with the `S256` method, so Keycloak rejects any authorization request without a `code_challenge`. Most OIDC libraries handle this for you, including `openid-client` and `axum-oidc`, but a hand-built authorization URL has to add `code_challenge` and `code_challenge_method=S256` itself.
+
+### Public Clients
+
+Apps that can't keep a secret, like CLIs, SPAs, and mobile apps, should use a public client:
+
+```toml
+[team.repos.features.oidc_client]
+public = true
+```
+
+Public clients authenticate with PKCE alone, so governance doesn't write `OIDC_CLIENT_SECRET` and you should drop it from your `secretspec.toml`.
 
 ### Keycloak Groups
 
