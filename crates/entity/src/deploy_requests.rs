@@ -12,7 +12,6 @@ pub struct Model {
     pub project_id: String,
     #[sea_orm(unique_key = "idx_deploy_requests_project_branch")]
     pub branch: String,
-    pub git_ref: String,
     pub commit_sha: String,
     pub status: String,
     pub created_at: DateTimeUtc,

@@ -1,4 +1,4 @@
-pub mod builds;
+pub mod artifacts;
 pub mod deploy_requests;
 pub mod deployments;
 pub mod projects;
@@ -22,8 +22,8 @@ impl Store {
         projects::ProjectRepository::new(&self.db)
     }
 
-    pub fn builds(&self) -> builds::BuildRepository<'_> {
-        builds::BuildRepository::new(&self.db)
+    pub fn artifacts(&self) -> artifacts::ArtifactRepository<'_> {
+        artifacts::ArtifactRepository::new(&self.db)
     }
 
     pub fn deployments(&self) -> deployments::DeploymentRepository<'_> {

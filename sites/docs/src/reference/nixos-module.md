@@ -10,8 +10,8 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
   services.kennel = {
     enable = true;
     package = kennel.packages.x86_64-linux.kennel;
-    devenvPackage = kennel.packages.x86_64-linux.devenv;
     webhookSecretFile = config.age.secrets.kennel-webhook.path;
+    nixbotTokenFile = config.age.secrets.kennel-nixbot-token.path;
     environmentFile = config.age.secrets.kennel.path;
 
     domains = {
@@ -44,7 +44,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
 - A Caddy virtualhost for the kennel domain with automatic TLS, plus the admin API for dynamic route management
 - tmpfiles rules for `/var/lib/kennel` subdirectories
 - Firewall rules for ports 80 and 443
-- Cachix binary cache substituter
+- The ScottyLabs Cachix cache as a trusted substituter, which kennel fetches artifacts from
 
 ## PostgreSQL extensions
 

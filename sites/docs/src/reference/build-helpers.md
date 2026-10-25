@@ -1,22 +1,16 @@
 # Build Helpers
 
-These builders come from the [shared ScottyLabs flake](https://git.cmu.dev/ScottyLabs/kennel) as `mkLib`, a function applied to a `pkgs` set (the same shape as `crane.mkLib`). Add the flake as an input, then call a helper per system:
+The [shared flake module](./flake-options.md) passes these builders to every `perSystem` module as `helpers`:
 
 ```nix
-# flake.nix inputs
-scottylabs = {
-  url = "git+https://git.cmu.dev/ScottyLabs/kennel";
-  inputs.nixpkgs.follows = "nixpkgs";
-};
-
-# in outputs
-pkgs = nixpkgs.legacyPackages.${system};
-kennel = (scottylabs.mkLib pkgs).buildRustService { ... };
+perSystem =
+  { helpers, ... }:
+  {
+    services.api.package = helpers.buildRustService { ... };
+  };
 ```
 
-Each helper takes the consumer's `pkgs`, so packages build against your nixpkgs pin rather than the shared flake's.
-
-Under kennel, every helper exports the project's [build environment](../guides/deploying.md#build-environment) into the build of the project's own package, leaving dependency builds and their cache untouched. The values are also available as `(scottylabs.mkLib pkgs).buildEnv` for a derivation built without the helpers, and are empty outside kennel. `buildRustService` merges `buildArgs.env` over them.
+Helpers build with your flake's `pkgs`, which comes from kennel's nixpkgs.
 
 ## `buildRustService`
 
@@ -60,16 +54,18 @@ Type: `listOf package`, default: `[ ]`
 
 ### `buildArgs`
 
-Build-only options forwarded to crane's `buildPackage`, kept separate from the arguments above so changing them never rebuilds the cached dependencies. `doCheck` defaults to `false`. Common keys are `cargoExtraArgs` to select a workspace member such as `"-p kennel"`, and `postInstall` to wrap the binary.
+Options forwarded to crane's `buildPackage`. `doCheck` defaults to `false` and `meta.mainProgram` to `pname`. `cargoExtraArgs` defaults to `"--locked"` and applies to the dependency build, clippy, and tests as well as the package. In a workspace, set it to `"--locked -p kennel"` to build one member.
+
+The package carries `passthru.checks.clippy` and `passthru.checks.test`, which the flake module adds to `checks` for every service and site, so nixbot runs clippy (denying warnings) and `cargo test` on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
 
 Type: `attrs`, default: `{ }`
 
 ```nix
-(scottylabs.mkLib pkgs).buildRustService {
+helpers.buildRustService {
   src = ./.;
   pname = "kennel";
   version = "0.1.0";
-  buildArgs.cargoExtraArgs = "-p kennel";
+  buildArgs.cargoExtraArgs = "--locked -p kennel";
 }
 ```
 
@@ -85,7 +81,7 @@ Type: `str`, required
 
 ### `localPackages`
 
-The project's cabal packages, package name to source directory. Every package builds inside the same extended set, so intra-project dependencies resolve to each other. List the same directories as `scottylabs.haskell.localPackages` in `devenv.nix`, so the shell and the build resolve identical dependencies.
+The project's cabal packages, package name to source directory. Every package builds inside the same extended set, so intra-project dependencies resolve to each other. List the same directories as `scottylabs.haskell.localPackages` so that the shell and the build resolve identical dependencies.
 
 Type: `attrsOf path`, required
 
@@ -96,7 +92,7 @@ A final overlay over the package set, to jailbreak or pin a dependency the set's
 Type: `function`, default: `_final: _prev: { }`
 
 ```nix
-(scottylabs.mkLib pkgs).buildHaskellService {
+helpers.buildHaskellService {
   pname = "reviewd";
   localPackages = {
     kernel-effects = ./kernel-effects;
@@ -158,7 +154,7 @@ Provision [denort](https://docs.deno.com/runtime/reference/cli/compile/) so `den
 Type: `bool`, default: `false`
 
 ```nix
-(scottylabs.mkLib pkgs).buildDenoTask {
+helpers.buildDenoTask {
   src = ./sites/web;
   pname = "link-shortener-web";
   version = "0.1.0";
@@ -168,7 +164,7 @@ Type: `bool`, default: `false`
 A workspace member builds from the workspace root that holds the shared `deno.lock`, with `cwd` selecting the member:
 
 ```nix
-(scottylabs.mkLib pkgs).buildDenoTask {
+helpers.buildDenoTask {
   src = ./.;
   cwd = "apps/backend";
   pname = "housing-backend";
@@ -189,7 +185,7 @@ Type: `path`, required
 
 ### `python`
 
-The Python interpreter the environment is built against.
+The Python interpreter the environment is built against. Set `scottylabs.python.package` to the same interpreter so that the shell and the `hooks` check match the service.
 
 Type: `package`, default: `pkgs.python3`
 
@@ -207,12 +203,12 @@ Type: `function`, default: `ws: ws.deps.default`
 
 ### `overrides`
 
-An overlay applied last over the Python package set, to supply system libraries or build tools uv2nix cannot infer for a package built from source (for example adding `pkgs.openssl` to `buildInputs`).
+An overlay applied last over the Python package set, to supply system libraries or build tools uv2nix cannot infer for a package built from source (for example adding `pkgs.openssl` to `buildInputs`). Set `scottylabs.python.overrides` to the same overlay so that the `hooks` check can build the project's dev dependencies.
 
 Type: `function`, default: `_final: _prev: { }`
 
 ```nix
-(scottylabs.mkLib pkgs).buildPythonService {
+helpers.buildPythonService {
   src = ./.;
 }
 ```
@@ -234,7 +230,7 @@ Derivation name.
 Type: `str`, default: `"docs"`
 
 ```nix
-(scottylabs.mkLib pkgs).buildMdbook {
+helpers.buildMdbook {
   src = ./sites/docs;
   name = "kennel-docs";
 }
@@ -257,7 +253,7 @@ Derivation name.
 Type: `str`, default: `"docs"`
 
 ```nix
-(scottylabs.mkLib pkgs).buildZensical {
+helpers.buildZensical {
   src = lib.fileset.toSource {
     root = ./.;
     fileset = lib.fileset.unions [
@@ -298,7 +294,7 @@ Source browser base URL the declaration links point to.
 Type: `str`, required
 
 ```nix
-(scottylabs.mkLib pkgs).buildOptionsDoc {
+helpers.buildOptionsDoc {
   module = ./nixos;
   subtree = options: options.services.kennel;
   root = ./.;

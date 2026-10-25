@@ -21,13 +21,19 @@ pub async fn teardown_deployment(
         tracing::warn!(unit = %unit_name, error = %e, "failed to stop unit");
     }
 
-    // Remove static site symlink
+    // Remove static site symlink and runtime env
     if deployment.service_type == "static" {
         let link = std::path::PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
             .join(&deployment.project_id)
             .join(&deployment.branch_slug)
             .join(&deployment.service_name);
         let _ = tokio::fs::remove_file(&link).await;
+        let _ = tokio::fs::remove_dir_all(crate::deploy::site_env_dir(
+            &deployment.project_id,
+            &deployment.branch_slug,
+            &deployment.service_name,
+        ))
+        .await;
     }
 
     // Remove caddy routes

@@ -4,7 +4,6 @@
   uv2nix,
   pyproject-nix,
   pyproject-build-systems,
-  buildEnv,
 }:
 
 {
@@ -18,39 +17,29 @@
 }:
 
 let
-  inherit (pkgs) lib;
-
   pname = (fromTOML (builtins.readFile (src + "/pyproject.toml"))).project.name;
 
-  workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = src; };
-  overlay = workspace.mkPyprojectOverlay { inherit sourcePreference; };
-
-  # The wheel overlay avoids building the bootstrap build systems from source
-  buildSystems =
-    if sourcePreference == "wheel" then
-      pyproject-build-systems.overlays.wheel
-    else
-      pyproject-build-systems.overlays.default;
-
-  # Applied only to the project package so dependencies are not rebuilt
-  projectEnv =
-    _final: prev:
-    let
-      key = pyproject-nix.lib.pypa.normalizePackageName pname;
-    in
-    lib.optionalAttrs (buildEnv != { }) {
-      ${key} = prev.${key}.overrideAttrs (old: {
-        env = (old.env or { }) // buildEnv;
-      });
-    };
-
-  pythonSet = (pkgs.callPackage pyproject-nix.build.packages { inherit python; }).overrideScope (
-    lib.composeManyExtensions [
-      buildSystems
-      overlay
-      projectEnv
-      overrides
-    ]
-  );
+  inherit
+    (import ./python-set.nix
+      {
+        inherit
+          pkgs
+          uv2nix
+          pyproject-nix
+          pyproject-build-systems
+          ;
+      }
+      {
+        inherit
+          src
+          python
+          sourcePreference
+          overrides
+          ;
+      }
+    )
+    workspace
+    pythonSet
+    ;
 in
 pythonSet.mkVirtualEnv "${pname}-env" (selectDeps workspace)

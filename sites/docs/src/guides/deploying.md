@@ -4,84 +4,54 @@ This guide walks through setting up a ScottyLabs project for deployment with ken
 
 ## Prerequisites
 
-- A project registed in governance with an associated Codeberg repository
-- [devenv](https://devenv.sh) and its shell hooks installed locally
+- A project registered in governance with an associated Forgejo repository
+- [Nix](https://nixos.org) with flakes enabled
 
-## 1. Import the shared module
+## 1. Write the flake
 
-Add the ScottyLabs devenv input to your `devenv.yaml`:
-
-```yaml
-secretspec:
-  enable: true
-  profile: dev
-
-inputs:
-  nixpkgs:
-    url: github:nixos/nixpkgs/nixos-unstable
-  scottylabs:
-    url: git+https://git.cmu.dev/ScottyLabs/kennel
-    inputs:
-      nixpkgs:
-        follows: nixpkgs
-  rust-overlay:
-    url: github:oxalica/rust-overlay
-    inputs:
-      nixpkgs:
-        follows: nixpkgs
-  treefmt-nix:
-    url: github:numtide/treefmt-nix
-  git-hooks:
-    url: github:cachix/git-hooks.nix
-    inputs:
-      nixpkgs:
-        follows: nixpkgs
-```
-
-This `nixpkgs` pin must match the one in `flake.nix` below, so the shell and the build resolve identical packages.
-
-Import it in your `devenv.nix`:
+Kennel's flake exports a [flake-parts](https://flake.parts) module that sets up the dev shell, local services, git hooks, and the outputs kennel deploys. Your `flake.nix` imports it and configures it under `scottylabs`:
 
 ```nix
-{ pkgs, config, inputs, ... }:
 {
-  imports = [ inputs.scottylabs.devenvModules.default ];
-
-  scottylabs = {
-    enable = true;
-    project.name = "my-project";
+  nixConfig = {
+    extra-substituters = [ "https://scottylabs.cachix.org" ];
+    extra-trusted-public-keys = [
+      "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
+    ];
   };
+
+  inputs = {
+    scottylabs.url = "git+https://git.cmu.dev/ScottyLabs/kennel";
+    nixpkgs.follows = "scottylabs/nixpkgs";
+    flake-parts.follows = "scottylabs/flake-parts";
+  };
+
+  outputs =
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.scottylabs.flakeModules.default ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+
+      perSystem =
+        { pkgs, helpers, ... }:
+        {
+          scottylabs.project.name = "my-project";
+        };
+    };
 }
 ```
 
-The `secretspec` block resolves your project's secrets from OpenBao into the shell. See the [Secrets](./secrets.md) guide to declare and manage them.
+Set `project.name` to your governance slug, the same value as `[project] name` in `secretspec.toml`.
 
-## 2. Set up devenv
+Follow kennel's nixpkgs so that your builds can reuse the outputs other projects have already pushed to the binary cache. Renovate updates every flake input by opening a `nix flake update` pull request each week and after every push to kennel. To update sooner, run `nix flake update scottylabs` and commit the new `flake.lock`.
 
-When you first enter the project directory, allow devenv to automatically activate the shell:
+Load the shell with `nix develop`, which resolves your secrets from OpenBao on entry. If that fails, run the one-time [OpenBao setup](./secrets.md).
 
-```bash
-devenv allow
-```
-
-You can exit the shell with `exit` and re-enter it with `devenv shell`.
-
-If this command fails with a secret-related error, make sure you have run the one-time [OpenBao setup](./secrets.md).
-
-Add a `.gitignore` for generated and local-only files:
+The shell keeps its state (build caches, local databases) in `.scottylabs/` and links generated files such as `.pre-commit-config.yaml` into the checkout, adding each one to `.git/info/exclude`. Add a `.gitignore` for anything else local:
 
 ```gitignore
-# Nix / devenv
-.devenv/
-.pre-commit-config.yaml
-
-# AI
-.mcp.json
-.claude
-
 # Rust
 target/
-.cargo/
 rustc-ice-*.txt
 
 # Secrets
@@ -91,33 +61,52 @@ rustc-ice-*.txt
 .DS_Store
 ```
 
-Add any project-specific entries as needed (e.g., `sites/docs/book/` for mdbook output, `node_modules/` for JS projects).
+## 2. Declare what to deploy
 
-## 3. Declare what to deploy
+Kennel deploys two flake outputs:
 
-Add kennel options to your `devenv.nix` to tell kennel what your project produces.
+- `services`: backend services, run as systemd units
+- `sites`: static sites, served by Caddy
 
-For a backend service:
-
-```nix
-scottylabs.kennel.services.api = {
-  customDomain = "api.my-project.scottylabs.org";
-};
-```
-
-In production kennel runs the flake package, so the `scottylabs.kennel.services` key and the flake package must share the same name (here, `api`).
-
-For a static site:
+Build each target's package with the shared [build helpers](../reference/build-helpers.md), which every `perSystem` module receives as `helpers`:
 
 ```nix
-scottylabs.kennel.sites.app = {
-  spa = true;
-};
+perSystem =
+  { pkgs, helpers, ... }:
+  {
+    scottylabs.project.name = "my-project";
+
+    services.api = {
+      package = helpers.buildRustService {
+        src = ./.;
+        pname = "api";
+        buildArgs.cargoExtraArgs = "--locked -p api";
+      };
+      customDomain = "api.my-project.scottylabs.org";
+    };
+
+    sites.app = {
+      package = helpers.buildDenoTask {
+        src = ./sites/app;
+        pname = "my-project-app";
+        output = "build";
+      };
+      spa = true;
+    };
+  };
 ```
 
-Set `spa = true` for single-page apps so Caddy serves `index.html` for unmatched routes. It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
+The attribute name is the target's name, so this deploys an `api` service and an `app` site. You can use `nix build .#services.x86_64-linux.api.package` to build one locally.
 
-Note that custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://git.cmu.dev/ScottyLabs/infrastructure). Kennel creates the DNS record itself for registered zones, routing the domain through Cloudflare, so a domain whose zone is missing does not resolve until the zone is registered.
+A service unit runs the package's `meta.mainProgram`, which `buildRustService` and `buildHaskellService` set to `pname`. Without one, kennel runs the first executable in `bin/`.
+
+Besides `package`, a target takes:
+
+- `customDomain`: a domain the target is also served on in production
+- `spa`: for sites, serve `index.html` for unmatched routes (single-page apps). It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
+- `env`: for services, extra variables in the service's environment (see [Runtime environment](#runtime-environment))
+
+Custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://git.cmu.dev/ScottyLabs/infrastructure). Kennel creates the DNS record itself for registered zones, so a domain whose zone is missing does not resolve until the zone is registered.
 
 If `customDomain` is an apex domain like `example.org`, kennel also redirects `www.example.org` to it.
 
@@ -125,94 +114,85 @@ If `customDomain` is an apex domain like `example.org`, kennel also redirects `w
 
 Every backend service must expose a `GET /api/health` endpoint that returns HTTP `200` once it is ready to accept traffic. After starting a service, kennel polls this endpoint every 2 seconds for up to 60 seconds, holding back traffic until it returns `200`. If it has not passed by then, the deployment is marked failed and the public domain is never routed to it. Static sites have no health endpoint and are exempt.
 
-### Flake packages
+### Frontends
 
-Your `flake.nix` must expose these packages, and their names must match the keys in `scottylabs.kennel.services` and `scottylabs.kennel.sites`. Build them with the shared [build helpers](../reference/build-helpers.md):
+Enable Deno and list each browser frontend's directory (Vite, Svelte) so that the shell installs its npm packages:
 
 ```nix
-inputs = {
-  nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-  scottylabs = {
-    url = "git+https://git.cmu.dev/ScottyLabs/kennel";
-    inputs.nixpkgs.follows = "nixpkgs";
-  };
+scottylabs.deno = {
+  enable = true;
+  dirs = [ "sites/app" ];
 };
-
-outputs = { nixpkgs, scottylabs, ... }:
-  let
-    forAllSystems = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
-  in {
-    packages = forAllSystems (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-        helpers = scottylabs.mkLib pkgs;
-      in {
-        api = helpers.buildRustService {
-          src = ./.;
-          pname = "api";
-          buildArgs.cargoExtraArgs = "-p api";
-        };
-        docs = helpers.buildMdbook { src = ./sites/docs; };
-      }
-    );
-  };
 ```
 
-This must be the same `nixpkgs` pinned in `devenv.yaml`, so `nix build` and `devenv shell` resolve identical packages. The kennel input must be named `scottylabs`.
-
-A Deno or JavaScript frontend uses `buildDenoTask` the same way.
-
-List a browser frontend's directory (Vite, Svelte) in `scottylabs.deno.dirs`, so the shell installs its npm packages:
-
-```nix
-scottylabs.deno.dirs = [ "sites/web" ];
-```
-
-It also needs a root `deno.json` that excludes that directory, so the `deno check` hook skips it instead of failing on browser code, and `.devenv`, where those packages are cached. Replace `sites/web` with your frontend's path:
+It also needs a root `deno.json` that excludes that directory, so the `deno check` hook skips it instead of failing on browser code, and `.scottylabs`, where those packages are cached:
 
 ```json
 {
-  "exclude": ["sites/web", ".devenv"]
+  "exclude": ["sites/app", ".scottylabs"]
 }
 ```
 
 For a SvelteKit app, `svelte-check` type-checks it (enable `scottylabs.deno.svelte.enable`).
 
-Kennel builds each package with `nix build .#packages.{system}.{name}`.
+If a service serves a frontend, give the service the frontend's store path through `env`. That way, changing the frontend doesn't rebuild the service:
+
+```nix
+services.api =
+  let
+    web = helpers.buildDenoTask {
+      src = ./web;
+      pname = "api-web";
+    };
+  in
+  {
+    package = helpers.buildRustService { src = ./.; pname = "api"; };
+    env.STATIC_DIR = "${web}";
+  };
+```
 
 ### Runtime environment
 
 Kennel injects these variables into every backend service it deploys:
 
 - `PORT`: the port your service must bind to. Kennel allocates it and routes the public domain to it through Caddy, so read it at startup instead of hardcoding a port.
-- `COMMIT_HASH`: the full Git commit SHA of the running build.
+- `COMMIT_HASH`: the full Git commit SHA of the running deployment.
 - `APP_URL`: the public URL of this deployment, its custom domain when configured or the generated domain otherwise.
 
 Resolved secrets from your `secretspec.toml` are injected alongside these.
 
+A service's `env` adds variables of your own, and secrets and resource variables take precedence over it when both set the same name.
+
 Kennel runs each service from a working directory that contains your `secretspec.toml`, so the [secretspec SDK's runtime `load()`](./secrets.md#runtime-loading) finds it automatically. The filesystem is read-only apart from a private `/tmp`, so keep persistent state in a provisioned database or object store.
 
-### Build environment
+### Public values
 
-Some frontends read configuration at build time, such as Vite replacing `import.meta.env.VITE_*` with its value. List those variables in a `build` scope in your `secretspec.toml`:
+A browser frontend often needs values that change per environment, such as an API URL or an analytics key. Declare them in `secretspec.toml` like any other secret, with names starting with `PUBLIC_`, and list them in a `public` scope:
 
 ```toml
 [profiles.default]
-VITE_API_URL = { description = "API base URL", default = "http://localhost:3000" }
-POSTHOG_KEY = { description = "PostHog project key" }
+PUBLIC_API_URL = { description = "API base URL", default = "http://localhost:3000" }
 
 [profiles.prod]
-VITE_API_URL = { description = "API base URL", default = "https://api.my-project.scottylabs.org" }
+PUBLIC_API_URL = { description = "API base URL", default = "https://api.my-project.scottylabs.org" }
+PUBLIC_POSTHOG_KEY = { description = "PostHog project key" }
 
-[scopes.build]
-secrets = ["VITE_API_URL", "POSTHOG_KEY"]
+[scopes.public]
+secrets = ["PUBLIC_API_URL", "PUBLIC_POSTHOG_KEY"]
 ```
 
-Kennel resolves the scope with the profile matching the branch and exports the values, plus `APP_URL` and `COMMIT_HASH`, into every package built with the [build helpers](../reference/build-helpers.md). A package built without the helpers can opt in with `env = (scottylabs.mkLib pkgs).buildEnv;`.
+When kennel deploys a site, it resolves these values for the branch's profile and serves them next to the site's files:
 
-Only list values that are safe to make public. They can end up in the build output, which is downloadable from the shared binary cache and, for a website, readable by anyone who visits it. Changing a value in OpenBao only takes effect from your next push.
+- `/_app/env.js`, which SvelteKit loads for `$env/dynamic/public`
+- `/_kennel/env.json`, a JSON object other frameworks can fetch on load
 
-## 4. Enable infrastructure
+Locally, SvelteKit's dev server reads them from the dev shell's environment. For another framework, commit a development copy at `public/_kennel/env.json`, which kennel's file replaces once deployed.
+
+Anyone can read these files, so only list values that are safe to publish. If a frontend needs something secret, such as a signing key, keep the key in a backend as a runtime secret and have the frontend ask the backend to sign.
+
+A site builds once for every environment, so promoting a commit from `dev` to `staging` or `main` reuses its build from the binary cache. Builds depend on the source tree and not the commit, which means a merge or squash commit with an already built tree reuses them as well. Keep commit metadata such as `self.rev` out of builds, since it would give every commit its own build. Services read the commit from `COMMIT_HASH` at runtime instead.
+
+## 3. Enable infrastructure
 
 If your project needs a database:
 
@@ -233,49 +213,31 @@ scottylabs.postgres.extensions = e: [
 
 Kennel creates the same extensions in your deployed database, defaulting to `e: [ e.pg_uuidv7 ]`. It can only create extensions that the host's NixOS configuration installs as trusted, so a new one has to be added there first (see [PostgreSQL extensions](../reference/nixos-module.md#postgresql-extensions)).
 
-`sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [devenv options](../reference/devenv-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth. With `sqlite`, each deployed service reads `DATABASE_PATH`, a file in a private directory that persists across restarts and redeploys. Services do not share it, so two services on one branch get separate files.
+`sqlite`, `garage` (S3-compatible object storage), and `valkey` (Redis-compatible key-value store) are also available and documented in the [flake options](../reference/flake-options.md). Aside from `garage`, these databases are configured with unix socket auth rather than TCP/password auth. With `sqlite`, each deployed service reads `DATABASE_PATH`, a file in a private directory that persists across restarts and redeploys. Services do not share it, so two services on one branch get separate files.
 
-Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, `sqlite`, or `garage`) is never allocated one. Provisioning also depends on keeping the shared devenv module current. Kennel stamps each `kennel.json` with a schema version and refuses any deployment whose version does not match, so run `devenv update` if a build is rejected for a version mismatch.
+Kennel provisions a resource only when the project enables it, so a project that does not declare `valkey` (or `postgres`, `sqlite`, or `garage`) is never allocated one.
 
-When developing the OAuth flow locally, enable the relay so the IdP redirects back through it the way it does in production:
+To run these services locally, see [Local Development](./local-development.md).
 
-```nix
-scottylabs.ricochet.enable = true;
-scottylabs.ricochet.appUrl = "http://localhost:3000";
-```
+## 4. Push
 
-Governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so `enable` only runs Ricochet locally. `appUrl` is your service's local URL, the port your dev server listens on, exported as `APP_URL` so the relay can return to it. Set it only for development: deployed environments receive `APP_URL` from kennel automatically (see [Runtime environment](#runtime-environment)), and it is never declared in `secretspec.toml`.
+Kennel deploys three long-lived branches (`main`, `staging`, and `dev`). To get a preview, open a pull request. Pushing any other branch is ignored.
 
-## 5. Development scripts
+On every push, [nixbot](https://nixbot.scottylabs.org) evaluates the flake once, builds its `checks` (which include every service and site) on the build farm, and pushes the results to the binary cache. Kennel then fetches the manifest from the cache and deploys it with the branch's profile.
 
-`scripts.<name>.exec` defines a command available in your shell whenever the devenv environment is active. Use it for project-specific development tasks such as database migrations or code generation:
-
-```nix
-scripts = {
-  migrate.exec = "sea-orm-cli migrate up -d crates/migration";
-  generate-api.exec = "cd app && deno task generate-api";
-};
-```
-
-Running `migrate` in the shell then executes that command. Scripts are a development convenience only. Kennel never runs them, in builds or deployments.
-
-## 6. Push
-
-Kennel deploys three long-lived branches (`main`, `staging`, or `dev`). To get a preview, open a pull request and kennel builds and deploys it. Pushing any other branch is ignored.
-
-Your deployment will be available at `{project}-{service}-{branch}.scottylabs.net`, where `service` is the key from `scottylabs.kennel.services`:
+Your deployment will be available at `{project}-{target}-{branch}.scottylabs.net`:
 
 - `my-project-api-main.scottylabs.net` for the `api` service on the main branch
 - `my-project-api-pr-42.scottylabs.net` for PR #42
 
-As it works, kennel reports progress back to Forgejo as commit statuses on the pushed commit. The `kennel/build` status moves from pending to success or failure as the build runs, and `kennel/deploy` reports success once the deployment passes its health check. A failed status means the commit never reached a healthy deployment; check the build log to see why.
+Progress shows up as commit statuses on the pushed commit. nixbot reports one status per built attribute, with a link to the build log, and `kennel/deploy` reports success once the deployment passes its health check.
 
 ### Disabling preview deployments
 
-Some services should never run more than one instance at a time. A Discord bot, for example, would respond twice if a preview ran alongside production. Disable preview deployments for the whole project:
+If a second running copy would cause trouble, as with a Discord bot that would answer every message twice while a preview runs next to production, turn off preview deployments, which are on by default:
 
 ```nix
-scottylabs.kennel.previewDeployments = false;
+scottylabs.previewDeployments = false;
 ```
 
-It defaults to `true`. When disabled, opening or updating a pull request still builds and reports `kennel/build`, but kennel does not deploy the preview.
+With previews off, nixbot still builds pull requests, but kennel doesn't deploy them.

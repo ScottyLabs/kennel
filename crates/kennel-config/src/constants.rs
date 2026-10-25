@@ -5,9 +5,6 @@ pub const DEFAULT_API_PORT: u16 = 3000;
 pub const DEFAULT_EPHEMERAL_DOMAIN: &str = "scottylabs.net";
 pub const CADDY_SERVER_NAME: &str = "srv0";
 
-pub const DEFAULT_MAX_CONCURRENT_BUILDS: usize = 2;
-pub const DEFAULT_WORK_DIR: &str = "/var/lib/kennel/builds";
-pub const KENNEL_BUILD_GROUP: &str = "kennel-builds";
 pub const DEFAULT_DB_PATH: &str = "/var/lib/kennel/kennel.db";
 
 pub const SITES_BASE_DIR: &str = "/var/lib/kennel/sites";
@@ -19,10 +16,8 @@ pub const SQLITE_STATE_DIR: &str = "kennel-sqlite";
 pub const SQLITE_DB_FILE: &str = "data.db";
 
 pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = 1;
-pub const KENNEL_FLAKE_INPUT: &str = "scottylabs";
-pub const BUILD_SCOPE: &str = "build";
 
-pub const BUILD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+pub const ARTIFACT_FETCH_GRACE: Duration = Duration::from_secs(15 * 60);
 pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(300);

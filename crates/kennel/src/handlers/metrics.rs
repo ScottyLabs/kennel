@@ -10,9 +10,9 @@ use crate::AppState;
 use crate::deploy::FailureStage;
 
 pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, StatusCode> {
-    let build_counts = state
+    let request_counts = state
         .store
-        .builds()
+        .deploy_requests()
         .count_by_status()
         .await
         .map_err(internal)?;
@@ -27,10 +27,14 @@ pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoRespo
 
     let mut out = String::new();
 
-    writeln!(out, "# HELP kennel_builds Builds grouped by current status").ok();
-    writeln!(out, "# TYPE kennel_builds gauge").ok();
-    for (status, count) in &build_counts {
-        writeln!(out, "kennel_builds{{status=\"{status}\"}} {count}").ok();
+    writeln!(
+        out,
+        "# HELP kennel_deploy_requests Branch deploy intents grouped by status"
+    )
+    .ok();
+    writeln!(out, "# TYPE kennel_deploy_requests gauge").ok();
+    for (status, count) in &request_counts {
+        writeln!(out, "kennel_deploy_requests{{status=\"{status}\"}} {count}").ok();
     }
 
     writeln!(

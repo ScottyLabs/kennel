@@ -21,19 +21,11 @@ in
       description = "The Kennel package to use";
     };
 
-    devenvPackage = mkOption {
-      type = types.package;
-      description = ''
-        The devenv package. The build worker uses `devenv build` to evaluate
-        project kennel configs from their `devenv.nix`.
-      '';
-    };
-
     nixPackage = mkOption {
       type = types.package;
       default = pkgs.nix;
       defaultText = literalExpression "pkgs.nix";
-      description = "The package providing `nix` and `nix-store` to kennel.";
+      description = "The package providing `nix-store`, which kennel substitutes artifacts with";
     };
 
     webhookSecretFile = mkOption {
@@ -42,6 +34,14 @@ in
         Path to a file containing the HMAC secret used to verify all incoming
         webhooks. This is a single secret shared across all projects,
         provisioned by governance.
+      '';
+    };
+
+    nixbotTokenFile = mkOption {
+      type = types.path;
+      description = ''
+        Path to a file containing the bearer token nixbot's post-build step
+        sends to `/nixbot` when it reports a project's deploy manifests.
       '';
     };
 
@@ -122,30 +122,6 @@ in
         Writes the custom domains of all live deployments to this path, one
         per line, refreshed on each reconciliation pass. Unset disables it.
       '';
-    };
-
-    builder = {
-      maxConcurrentBuilds = mkOption {
-        type = types.ints.positive;
-        default = 2;
-        description = "Maximum number of concurrent nix builds";
-      };
-
-      workDir = mkOption {
-        type = types.path;
-        default = "/var/lib/kennel/builds";
-        description = "Build working directory";
-      };
-
-      cachix = {
-        enable = mkEnableOption "pushing build artifacts to a Cachix binary cache";
-
-        cacheName = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Cachix cache name";
-        };
-      };
     };
 
     resources = {
@@ -247,19 +223,14 @@ in
       type = types.nullOr types.path;
       default = null;
       description = ''
-        Path to an environment file containing secrets like `VAULT_TOKEN`,
-        `CACHIX_AUTH_TOKEN`, and `GARAGE_ADMIN_TOKEN`. Loaded by systemd
-        before the service starts.
+        Path to an environment file containing secrets like `VAULT_TOKEN` and
+        `GARAGE_ADMIN_TOKEN`. Loaded by systemd before the service starts.
       '';
     };
   };
 
   config = mkIf cfg.enable {
     assertions = [
-      {
-        assertion = cfg.builder.cachix.enable -> cfg.builder.cachix.cacheName != null;
-        message = "services.kennel.builder.cachix.cacheName must be set when Cachix is enabled";
-      }
       {
         assertion = cfg.resources.garage.enable -> cfg.environmentFile != null;
         message = "An environmentFile containing GARAGE_ADMIN_TOKEN is required when Garage is enabled";
@@ -270,15 +241,10 @@ in
       users.${cfg.user} = mkIf (cfg.user == "kennel") {
         isSystemUser = true;
         inherit (cfg) group;
-        extraGroups = [ "kennel-builds" ];
         description = "Kennel service user";
       };
 
-      groups = {
-        ${cfg.group} = mkIf (cfg.group == "kennel") { };
-        # Shared group so the daemon can read back the build units' work dirs
-        kennel-builds = { };
-      };
+      groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
     };
 
     security.polkit.enable = true;
@@ -317,13 +283,8 @@ in
         wantedBy = [ "multi-user.target" ];
 
         path = [
-          cfg.devenvPackage
           cfg.nixPackage
         ]
-        ++ (with pkgs; [
-          git
-          cachix
-        ])
         ++ optional cfg.resources.postgres.enable pkgs.postgresql
         ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
@@ -335,14 +296,10 @@ in
           API_PORT = toString cfg.api.port;
           EPHEMERAL_DOMAIN = cfg.domains.ephemeral;
           CADDY_ADMIN_URL = cfg.caddy.adminUrl;
-          MAX_CONCURRENT_BUILDS = toString cfg.builder.maxConcurrentBuilds;
-          WORK_DIR = cfg.builder.workDir;
           WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
+          NIXBOT_TOKEN_FILE = cfg.nixbotTokenFile;
           FORGEJO_API_URL = cfg.forgejo.apiUrl;
           FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
-        }
-        // optionalAttrs cfg.builder.cachix.enable {
-          CACHIX_CACHE_NAME = cfg.builder.cachix.cacheName;
         }
         // optionalAttrs cfg.resources.postgres.enable {
           POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
@@ -395,7 +352,6 @@ in
 
       tmpfiles.rules = [
         "d /var/lib/kennel 0755 ${cfg.user} ${cfg.group} -"
-        "d /var/lib/kennel/builds 2770 ${cfg.user} kennel-builds -"
         "d /var/lib/kennel/sites 0755 ${cfg.user} ${cfg.group} -"
         "d /nix/var/nix/gcroots/kennel 0755 ${cfg.user} ${cfg.group} -"
         "d /var/lib/kennel/logs 0755 ${cfg.user} ${cfg.group} -"
@@ -418,11 +374,13 @@ in
 
     nix.settings = {
       extra-substituters = [ "https://scottylabs.cachix.org" ];
-      # Lets the untrusted build units pull from the cache without --accept-flake-config
+      # Lets kennel substitute artifacts as an untrusted user without --accept-flake-config
       trusted-substituters = [ "https://scottylabs.cachix.org" ];
       extra-trusted-public-keys = [
         "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
       ];
+      # re-query cachix when retrying a fetch
+      narinfo-cache-negative-ttl = mkDefault 0;
     };
   };
 }

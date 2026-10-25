@@ -1,10 +1,10 @@
 # Kennel
 
-Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). When you push code to a repository, kennel builds it with Nix, deploys it, and routes traffic to it.
+Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). When you push code to a repository, kennel deploys what nixbot built for that commit and routes traffic to it.
 
 ## What it does
 
-- Builds your project with Nix when you push to any branch
+- Deploys each push to `main`, `staging`, `dev`, and every pull request
 - Deploys services as systemd units and static sites via [Caddy](https://caddyserver.com)
 - Provisions per-deployment databases (PostgreSQL, SQLite), caches (Valkey), and object storage (Garage)
 - Resolves secrets from [OpenBao](https://openbao.org) via [secretspec](https://secretspec.dev)
@@ -13,7 +13,7 @@ Kennel is the deployment platform for [ScottyLabs](https://scottylabs.org). When
 
 ## How it works
 
-Your project's `devenv.nix` declares what it needs to run: processes, databases, secrets, static sites. Kennel evaluates this configuration, builds the Nix packages, and deploys everything with isolated resources per branch.
+A project lists its services and static sites in `flake.nix`, along with the databases and secrets they use. For each commit, nixbot builds the project and pushes the result to the binary cache. Kennel then deploys it with isolated resources per branch.
 
 Every deployment gets a URL at `{project}-{branch}.scottylabs.net`. Production deployments can also have custom domains.
 

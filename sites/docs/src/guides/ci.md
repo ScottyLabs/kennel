@@ -1,10 +1,19 @@
 # Continuous Integration
 
-ScottyLabs projects share one reusable Forgejo Actions workflow from the [kennel repo](https://git.cmu.dev/ScottyLabs/kennel). It runs the git hooks your `devenv.nix` enables and builds the project, matching what runs on commit.
+On each push and pull request, [nixbot](https://nixbot.scottylabs.org) builds every flake `check` on the build farm, pushes the results to the binary cache, and posts one commit status per check. nixbot picks up every repository in the organization with the `nixbot` topic, which is set automatically on repos registered in governance.
 
-## Adding CI to a project
+The shared module's checks are:
 
-Create `.forgejo/workflows/ci.yml`:
+- `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests) except clippy and `cargo-test`, run in the build sandbox without network access
+- `clippy` (denying warnings) and `test` for each `buildRustService` target, built against its cached dependencies
+- `kennel`: the deploy manifest, which builds every service and site
+- `devShell`: the dev shell for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`, so it can come from the binary cache
+
+Commit message hooks run only locally.
+
+## Network checks
+
+Checks that need the network run on Forgejo Actions instead. Create `.forgejo/workflows/ci.yml`:
 
 ```yaml
 name: CI
@@ -15,36 +24,48 @@ on:
   pull_request:
 
 jobs:
-  check:
+  checks:
     uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
-    enable-openid-connect: true
 ```
 
-It installs Lix and devenv, then:
+The workflow runs `nix run .#ci`, which runs every check in `scottylabs.ci.checks`. By default these are security scans of the lockfiles with [osv-scanner](https://github.com/google/osv-scanner) and of the code with [semgrep](https://semgrep.dev). [vulnix](https://github.com/nix-community/vulnix) can also scan each service and site's runtime closure once `scottylabs.security.vulnix.enable` is set. Add a check of your own as a shell script:
 
-- runs every git hook your modules enable (formatting, linting, type-checking, tests, commit message checks) with `devenv shell -- prek run --all-files`
-- builds every service and site declared in `scottylabs.kennel.services` and `scottylabs.kennel.sites` with `nix build`, the same set kennel deploys
+```nix
+scottylabs.ci.checks.links = "${lib.getExe pkgs.lychee} docs/";
+```
 
-## Options
+## Custom workflows
 
-The workflow takes one input, `build` (boolean, default `true`), which gates the build job. A project with nothing for kennel to build, or whose build is too expensive to run per commit, can keep the checks and skip it:
+nixbot's checks run in the build sandbox without secrets. A job that needs secrets while it runs, such as a scheduled scraper, runs on Forgejo Actions and resolves a `ci` profile, which signs in to OpenBao with the job's OIDC token. Add the profile to `secretspec.toml`:
+
+```toml
+[providers]
+openbao-ci = "openbao://secrets.scottylabs.org/secret?auth=jwt&role=ci&audience=openbao"
+
+[profiles.ci.defaults]
+required = false
+providers = ["openbao-ci"]
+
+[profiles.ci]
+CMU_LDAP_PASSWORD = { description = "CMU directory bind password", required = true }
+```
+
+The token reads the project's `ci` profile and none of its other profiles, so `required = false` keeps the secrets inherited from `[profiles.default]` from failing resolution, and each secret the job actually needs is marked `required = true`. Then add the job:
 
 ```yaml
+name: Scrape
+
+on:
+  schedule:
+    - cron: "0 6 1 * *" # monthly
+
 jobs:
-  check:
-    uses: ScottyLabs/kennel/.forgejo/workflows/ci.yml@main
+  scrape:
+    runs-on: native
     enable-openid-connect: true
-    with:
-      build: false
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v7
+
+      - name: Scrape
+        run: SECRETSPEC_PROFILE=ci nix develop --command cargo run -p scraper
 ```
-
-## Caching
-
-- Cachix (`scottylabs`) as a substituter for pulls and a push target for Nix store paths.
-- sccache for Rust compilation, backed by the shared S3 bucket.
-- The Rust `target` cache ([Swatinem/rust-cache](https://github.com/Swatinem/rust-cache)) and the Deno and uv caches under `.devenv/state`.
-- devenv's Nix eval cache.
-
-## Secrets
-
-The reusable signs in to OpenBao with the job's Forgejo Actions OIDC token and reads the shared Cachix token and sccache S3 keys from there to reach the binary caches. A project's own secrets are optional under the `ci` profile.

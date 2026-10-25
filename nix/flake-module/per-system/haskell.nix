@@ -1,7 +1,7 @@
 {
-  pkgs,
   lib,
   config,
+  pkgs,
   ...
 }:
 
@@ -48,21 +48,21 @@ in
       default = { };
       description = ''
         The project's cabal packages, package name to source directory. Use the
-        same directories as the `buildHaskellService` flake package.
+        same directories as `buildHaskellService`.
       '';
     };
   };
 
-  config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
-    packages = [
+  config = lib.mkIf cfg.enable {
+    scottylabs.shell.packages = [
       ghcEnv
       pkgs.cabal-install
       hset.haskell-language-server
       pkgs.hlint
     ];
 
-    treefmt.config.programs.fourmolu.enable = true;
+    treefmt.programs.fourmolu.enable = true;
 
-    git-hooks.hooks.hlint.enable = true;
+    pre-commit.settings.hooks.hlint.enable = true;
   };
 }

@@ -27,7 +27,6 @@ sea-orm-migration = { version = "2.0.4", features = [
   "runtime-tokio-rustls",
   "sqlx-sqlite",
 ] }
-parking_lot = "0.12.5"
 secrecy = "0.10.3"
 secretspec = { version = "0.18.0", features = [
   "openbao",
@@ -41,4 +40,4 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 urlencoding = "2.1.3"
 uuid = { version = "1.23.0", features = ["v7"] }
-zbus = "5.14.0"
+zbus = "6.1.0"

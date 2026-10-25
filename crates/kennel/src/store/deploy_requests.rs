@@ -16,7 +16,6 @@ impl<'a> DeployRequestRepository<'a> {
         &self,
         project_id: &str,
         branch: &str,
-        git_ref: &str,
         commit_sha: &str,
     ) -> Result<deploy_requests::Model, DbErr> {
         if let Some(existing) = self.find_by_project_branch(project_id, branch).await? {
@@ -24,7 +23,6 @@ impl<'a> DeployRequestRepository<'a> {
             let already_deployed =
                 existing.commit_sha == commit_sha && existing.status == "deployed";
             let mut model: deploy_requests::ActiveModel = existing.into();
-            model.git_ref = Set(git_ref.to_string());
             model.commit_sha = Set(commit_sha.to_string());
             if !already_deployed {
                 model.status = Set("pending".to_string());
@@ -37,7 +35,6 @@ impl<'a> DeployRequestRepository<'a> {
                 id: Set(uuid::Uuid::now_v7().to_string()),
                 project_id: Set(project_id.to_string()),
                 branch: Set(branch.to_string()),
-                git_ref: Set(git_ref.to_string()),
                 commit_sha: Set(commit_sha.to_string()),
                 status: Set("pending".to_string()),
                 created_at: Set(chrono::Utc::now()),
@@ -122,14 +119,15 @@ impl<'a> DeployRequestRepository<'a> {
         Ok(res.rows_affected)
     }
 
-    /// (branch, commit) pairs currently targeted by a deploy request in this project
-    pub async fn active_targets(&self, project_id: &str) -> Result<Vec<(String, String)>, DbErr> {
-        Ok(DeployRequests::find()
-            .filter(deploy_requests::Column::ProjectId.eq(project_id))
+    /// Counts requests per status
+    pub async fn count_by_status(&self) -> Result<Vec<(String, i64)>, DbErr> {
+        DeployRequests::find()
+            .select_only()
+            .column(deploy_requests::Column::Status)
+            .column_as(deploy_requests::Column::Id.count(), "count")
+            .group_by(deploy_requests::Column::Status)
+            .into_tuple()
             .all(self.db)
-            .await?
-            .into_iter()
-            .map(|r| (r.branch, r.commit_sha))
-            .collect())
+            .await
     }
 }

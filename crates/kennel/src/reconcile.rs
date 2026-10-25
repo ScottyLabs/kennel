@@ -12,70 +12,62 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     let systemd = SystemdClient::connect().await?;
     let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
 
-    // Deploy pending intents whose build artifacts are ready
+    // Deploy pending intents whose artifacts nixbot has reported
     let pending = state
         .store
         .deploy_requests()
         .find_by_status("pending")
         .await?;
     for request in &pending {
-        let Some(build) = state
+        let Some(artifact) = state
             .store
-            .builds()
-            .find_by_project_branch_commit(
-                &request.project_id,
-                &request.branch,
-                &request.commit_sha,
-            )
+            .artifacts()
+            .find(&request.project_id, &request.branch, &request.commit_sha)
             .await?
         else {
             continue;
         };
-        match build.status.as_str() {
-            "built" => match deploy::deploy_request(state, request, &build).await {
-                Ok(deploy::DeployOutcome::Deployed) => {
-                    let _ = state
-                        .store
-                        .deploy_requests()
-                        .set_status(&request.id, "deployed")
-                        .await;
-                }
-                Ok(deploy::DeployOutcome::SkippedPreview) => {
-                    let _ = state
-                        .store
-                        .deploy_requests()
-                        .set_status(&request.id, "skipped")
-                        .await;
-                }
-                Err(e) => {
-                    // Failures before any deploy step carry no stage and count as kennel's own
-                    let stage = e
-                        .downcast_ref::<deploy::StageError>()
-                        .map_or(deploy::FailureStage::Internal, |s| s.stage);
-                    tracing::error!(request_id = %request.id, stage = stage.as_str(), error = %e, "deploy failed during reconciliation");
 
-                    let _ = state
-                        .store
-                        .deploy_requests()
-                        .set_failed(&request.id, stage)
-                        .await;
-                }
-            },
-            "failed" | "cancelled" => {
+        match deploy::deploy_request(state, request, &artifact).await {
+            Ok(deploy::DeployOutcome::Deployed) => {
                 let _ = state
                     .store
                     .deploy_requests()
-                    .set_failed(&request.id, deploy::FailureStage::Build)
+                    .set_status(&request.id, "deployed")
                     .await;
             }
-            "skipped" => {
+            Ok(deploy::DeployOutcome::SkippedPreview) => {
                 let _ = state
                     .store
                     .deploy_requests()
                     .set_status(&request.id, "skipped")
                     .await;
             }
-            _ => {}
+            Err(e) => {
+                // errors without a stage count as internal
+                let stage = e
+                    .downcast_ref::<deploy::StageError>()
+                    .map_or(deploy::FailureStage::Internal, |s| s.stage);
+
+                // nixbot may still be uploading the artifact to the cache
+                let waiting = stage == deploy::FailureStage::Fetch
+                    && Utc::now() - artifact.created_at
+                        < chrono::Duration::from_std(
+                            kennel_config::constants::ARTIFACT_FETCH_GRACE,
+                        )
+                        .unwrap_or_default();
+                if waiting {
+                    tracing::info!(request_id = %request.id, error = %e, "artifact not in the binary cache yet");
+                    continue;
+                }
+
+                tracing::error!(request_id = %request.id, stage = stage.as_str(), error = %e, "deploy failed during reconciliation");
+                let _ = state
+                    .store
+                    .deploy_requests()
+                    .set_failed(&request.id, stage)
+                    .await;
+            }
         }
     }
 
@@ -121,12 +113,14 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
         let _ = systemd.stop_unit(orphan).await;
     }
 
-    // Re-pin each live gc root, rebuild collected artifacts, and restart down units
+    // Re-pin each live gc root, re-fetch collected artifacts, and restart down units
     for deployment in &deployments {
-        if !deploy::store_path_exists(&deployment.store_path).await {
-            deploy::recover_collected_artifact(state, deployment, &systemd).await;
+        if !deploy::store_path_exists(&deployment.store_path).await
+            && !deploy::recover_collected_artifact(deployment, &systemd).await
+        {
             continue;
         }
+
         deploy::ensure_gc_root(deployment).await;
 
         let Some(unit_name) = &deployment.unit_name else {
@@ -159,6 +153,12 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
     for deployment in &deployments {
         let route_id = format!("kennel-{}", deployment.id);
+        let env_dir = deploy::site_env_dir(
+            &deployment.project_id,
+            &deployment.branch_slug,
+            &deployment.service_name,
+        );
+        let env_dir = env_dir.to_string_lossy();
 
         if !existing_routes.contains(&route_id) {
             if deployment.service_type == "static" {
@@ -167,6 +167,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                         &route_id,
                         &deployment.domain,
                         &deployment.store_path,
+                        &env_dir,
                         deployment.spa,
                     )
                     .await;
@@ -186,6 +187,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                             &custom_route_id,
                             custom_domain,
                             &deployment.store_path,
+                            &env_dir,
                             deployment.spa,
                         )
                         .await;
@@ -294,13 +296,13 @@ async fn restart_service(
         return;
     };
 
-    let project_name = match state
+    let project = match state
         .store
         .projects()
         .find_by_id(&deployment.project_id)
         .await
     {
-        Ok(Some(project)) => project.name,
+        Ok(Some(project)) => project,
         Ok(None) => {
             tracing::warn!(unit = %unit_name, "project not found, skipping restart");
             return;
@@ -318,13 +320,17 @@ async fn restart_service(
             return;
         }
     };
-    let mut env_vars = match deploy::provision_declared(state, &kennel_config, &request).await {
-        Ok(v) => v,
+
+    let svc_config = kennel_config.services.get(&deployment.service_name);
+
+    let mut env_vars = svc_config.map(|svc| svc.env.clone()).unwrap_or_default();
+    match deploy::provision_declared(state, &kennel_config, &request).await {
+        Ok(vars) => env_vars.extend(vars),
         Err(e) => {
             tracing::warn!(unit = %unit_name, error = %e, "resource provisioning failed, skipping restart");
             return;
         }
-    };
+    }
 
     if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT") {
         let env_str = request.environment.to_string();
@@ -332,7 +338,7 @@ async fn restart_service(
             std::path::Path::new(config_store_path),
             &env_str,
             &vault_endpoint,
-            None,
+            project.secret_namespace.as_deref(),
         ) {
             env_vars.extend(secrets);
         }
@@ -347,7 +353,12 @@ async fn restart_service(
         deploy::app_url(&deployment.domain, deployment.custom_domain.as_deref())
     });
 
-    match deploy::find_executable(&deployment.store_path).await {
+    let exec_start = match svc_config.and_then(|svc| svc.exec.clone()) {
+        Some(exec) => Ok(exec),
+        None => deploy::find_executable(&deployment.store_path).await,
+    };
+
+    match exec_start {
         Ok(exec_start) => {
             if let Err(e) = systemd
                 .start_transient_unit(
@@ -357,7 +368,7 @@ async fn restart_service(
                     &system_user,
                     deployment.config_store_path.as_deref(),
                     &deploy::deploy_log_fields(
-                        &project_name,
+                        &project.name,
                         &deployment.branch,
                         &deployment.commit_sha,
                     ),

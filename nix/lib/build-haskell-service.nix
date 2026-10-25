@@ -1,5 +1,5 @@
 # Builds a Haskell service with callCabal2nix, every dep from the nixpkgs Haskell set
-{ pkgs, buildEnv }:
+{ pkgs }:
 
 {
   # Package name to build, must be a key of localPackages
@@ -16,14 +16,7 @@ let
   localOverlay =
     final: _prev: builtins.mapAttrs (name: src: final.callCabal2nix name src { }) localPackages;
 
-  # Keep in sync with modules/haskell.nix
+  # Keep in sync with nix/flake-module/per-system/haskell.nix
   hset = pkgs.haskell.packages.ghc914.extend (lib.composeExtensions localOverlay overrides);
 in
-pkgs.haskell.lib.justStaticExecutables (
-  if buildEnv == { } then
-    hset.${pname}
-  else
-    pkgs.haskell.lib.overrideCabal hset.${pname} (old: {
-      env = (old.env or { }) // buildEnv;
-    })
-)
+pkgs.haskell.lib.justStaticExecutables hset.${pname}

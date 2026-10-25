@@ -12,10 +12,10 @@ type UnitListEntry = (
     String,
     String,
     String,
-    zbus::zvariant::OwnedObjectPath,
+    zbus::OwnedObjectPath,
     u32,
     String,
-    zbus::zvariant::OwnedObjectPath,
+    zbus::OwnedObjectPath,
 );
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -68,7 +68,7 @@ impl SystemdClient {
         // StartTransientUnit with mode fail errors while one is still loaded
         let service_unit = format!("{unit_name}.service");
         let mut job_removed = proxy.receive_signal("JobRemoved").await?;
-        let stop: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
+        let stop: zbus::Result<zbus::OwnedObjectPath> = proxy
             .call("StopUnit", &(service_unit.as_str(), "replace"))
             .await;
         if let Ok(job) = stop {
@@ -77,7 +77,7 @@ impl SystemdClient {
                     if let Ok((_, removed, _, _)) =
                         signal
                             .body()
-                            .deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
+                            .deserialize::<(u32, zbus::OwnedObjectPath, String, String)>()
                         && removed == job
                     {
                         break;
@@ -90,7 +90,7 @@ impl SystemdClient {
             .call("ResetFailedUnit", &(service_unit.as_str(),))
             .await;
 
-        let mut properties: Vec<(&str, zbus::zvariant::Value)> = vec![
+        let mut properties: Vec<(&str, zbus::Variant)> = vec![
             ("Description", format!("Kennel: {unit_name}").into()),
             ("Slice", "kennel.slice".into()),
             ("Restart", "on-failure".into()),
@@ -139,14 +139,14 @@ impl SystemdClient {
         properties.push(("ExecStart", exec_start_value.into()));
         properties.push(("LogExtraFields", log_extra_fields(log_fields)));
 
-        let _: zbus::zvariant::OwnedObjectPath = proxy
+        let _: zbus::OwnedObjectPath = proxy
             .call(
                 "StartTransientUnit",
                 &(
                     format!("{unit_name}.service"),
                     "fail",
                     properties,
-                    Vec::<(String, Vec<(String, zbus::zvariant::Value)>)>::new(),
+                    Vec::<(String, Vec<(String, zbus::Variant)>)>::new(),
                 ),
             )
             .await?;
@@ -155,91 +155,10 @@ impl SystemdClient {
         Ok(())
     }
 
-    pub async fn run_build_unit(
-        &self,
-        unit_name: &str,
-        argv: &[String],
-        working_dir: &str,
-        env: &HashMap<String, String>,
-        log_fields: &[String],
-    ) -> anyhow::Result<bool> {
-        let proxy = self.manager_proxy().await?;
-        let service_unit = format!("{unit_name}.service");
-
-        let mut job_removed = proxy.receive_signal("JobRemoved").await?;
-        let _: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
-            .call("StopUnit", &(service_unit.as_str(), "replace"))
-            .await;
-
-        let env_strings: Vec<String> = env.iter().map(|(k, v)| format!("{k}={v}")).collect();
-        let exec_start: Vec<(String, Vec<String>, bool)> =
-            vec![(argv[0].clone(), argv.to_vec(), false)];
-
-        let properties: Vec<(&str, zbus::zvariant::Value)> = vec![
-            ("Description", format!("Kennel build: {unit_name}").into()),
-            ("Slice", "kennel.slice".into()),
-            ("Type", "oneshot".into()),
-            ("CollectMode", "inactive-or-failed".into()),
-            ("DynamicUser", true.into()),
-            (
-                "SupplementaryGroups",
-                vec![kennel_config::constants::KENNEL_BUILD_GROUP.to_string()].into(),
-            ),
-            ("WorkingDirectory", working_dir.into()),
-            ("Environment", env_strings.into()),
-            ("NoNewPrivileges", true.into()),
-            ("ProtectSystem", "strict".into()),
-            ("ProtectHome", "yes".into()),
-            ("PrivateTmp", true.into()),
-            ("ReadWritePaths", vec![working_dir.to_string()].into()),
-            ("ExecStart", exec_start.into()),
-            ("LogExtraFields", log_extra_fields(log_fields)),
-        ];
-
-        let start_job: zbus::zvariant::OwnedObjectPath = proxy
-            .call(
-                "StartTransientUnit",
-                &(
-                    service_unit.as_str(),
-                    "replace",
-                    properties,
-                    Vec::<(String, Vec<(String, zbus::zvariant::Value)>)>::new(),
-                ),
-            )
-            .await?;
-
-        tracing::info!(unit = %unit_name, "started build unit");
-
-        let waited = tokio::time::timeout(kennel_config::constants::BUILD_TIMEOUT, async {
-            while let Some(signal) = job_removed.next().await {
-                if let Ok((_, removed, _, result)) =
-                    signal
-                        .body()
-                        .deserialize::<(u32, zbus::zvariant::OwnedObjectPath, String, String)>()
-                    && removed == start_job
-                {
-                    return result;
-                }
-            }
-            "failed".to_string()
-        })
-        .await;
-
-        match waited {
-            Ok(result) => Ok(result == "done"),
-            Err(_) => {
-                let _: zbus::Result<zbus::zvariant::OwnedObjectPath> = proxy
-                    .call("StopUnit", &(service_unit.as_str(), "replace"))
-                    .await;
-                anyhow::bail!("build unit {unit_name} timed out")
-            }
-        }
-    }
-
     pub async fn stop_unit(&self, unit_name: &str) -> anyhow::Result<()> {
         let proxy = self.manager_proxy().await?;
 
-        let _: zbus::zvariant::OwnedObjectPath = proxy
+        let _: zbus::OwnedObjectPath = proxy
             .call("StopUnit", &(format!("{unit_name}.service"), "fail"))
             .await?;
 
@@ -252,7 +171,7 @@ impl SystemdClient {
             return false;
         };
 
-        let result: Result<zbus::zvariant::OwnedObjectPath, _> = proxy
+        let result: Result<zbus::OwnedObjectPath, _> = proxy
             .call("GetUnit", &(format!("{unit_name}.service"),))
             .await;
 
@@ -281,7 +200,7 @@ impl SystemdClient {
 
     pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<UnitHealth> {
         let proxy = self.manager_proxy().await?;
-        let unit_path: zbus::zvariant::OwnedObjectPath = proxy
+        let unit_path: zbus::OwnedObjectPath = proxy
             .call("GetUnit", &(format!("{unit_name}.service"),))
             .await?;
 
@@ -337,7 +256,7 @@ impl SystemdClient {
 }
 
 /// `KEY=VALUE` fields as the `aay` systemd expects
-fn log_extra_fields(fields: &[String]) -> zbus::zvariant::Value<'static> {
+fn log_extra_fields(fields: &[String]) -> zbus::Variant<'static> {
     fields
         .iter()
         .map(|field| field.as_bytes().to_vec())

@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Deployment configuration produced by the kennel devenv module.
-/// Deserialized from the JSON output of evaluating
-/// `.#devenv.shells.default.config.kennel.config`.
+/// Deployment manifest a project's flake builds, read from `kennel.json` in
+/// the artifact kennel receives from nixbot.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct KennelConfig {
     #[serde(default)]
@@ -12,7 +11,6 @@ pub struct KennelConfig {
     #[serde(default)]
     pub static_sites: HashMap<String, StaticSiteConfig>,
 
-    #[serde(default = "default_preview_deployments")]
     pub preview_deployments: bool,
 
     #[serde(default)]
@@ -24,19 +22,6 @@ pub struct KennelConfig {
     /// Extensions to create in the project's database
     #[serde(default)]
     pub postgres_extensions: Vec<String>,
-}
-
-impl Default for KennelConfig {
-    fn default() -> Self {
-        Self {
-            services: HashMap::new(),
-            static_sites: HashMap::new(),
-            preview_deployments: default_preview_deployments(),
-            version: 0,
-            resources: Vec::new(),
-            postgres_extensions: Vec::new(),
-        }
-    }
 }
 
 impl KennelConfig {
@@ -51,14 +36,21 @@ impl KennelConfig {
     }
 }
 
-fn default_preview_deployments() -> bool {
-    true
-}
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServiceConfig {
     #[serde(default)]
     pub custom_domain: Option<String>,
+
+    #[serde(default)]
+    pub store_path: Option<String>,
+
+    /// Program the unit runs, `meta.mainProgram` of the service's package
+    #[serde(default)]
+    pub exec: Option<String>,
+
+    /// Non-secret variables the unit runs with, below resources and secrets in precedence
+    #[serde(default)]
+    pub env: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -70,5 +62,5 @@ pub struct StaticSiteConfig {
     pub custom_domain: Option<String>,
 
     #[serde(default)]
-    pub package_attr: Option<String>,
+    pub store_path: Option<String>,
 }

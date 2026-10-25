@@ -11,10 +11,25 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+
     crane.url = "github:ipetkov/crane";
+
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -44,161 +59,91 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
-
-    # Empty default kennel relocks per package
-    build-env = {
-      url = "git+https://git.cmu.dev/ScottyLabs/kennel-build-env";
-      flake = false;
-    };
   };
 
   outputs =
-    {
-      nixpkgs,
-      crane,
-      treefmt-nix,
-      ricochet,
-      pyproject-nix,
-      uv2nix,
-      pyproject-build-systems,
-      build-env,
-      ...
-    }:
+    inputs@{ flake-parts, ... }:
     let
-      supportedSystems = [
+      flakeModule = import ./nix/flake-module inputs;
+    in
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ flakeModule ];
+
+      systems = [
         "x86_64-linux"
         "aarch64-linux"
         "aarch64-darwin"
-        "x86_64-darwin"
       ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgsFor = system: nixpkgs.legacyPackages.${system};
 
-      # devenv module set shared with downstream projects
-      devenvModules.default =
-        { pkgs, ... }:
-        {
-          imports = [ ./nix/modules ];
-          _module.args.ricochet = ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
-        };
-
-      # Environment variables kennel sets for helper builds
-      buildEnv = builtins.fromJSON (builtins.readFile "${build-env}/build-env.json");
-
-      # Build helpers bound to a consumer pkgs, mirroring crane.mkLib
-      mkLib = pkgs: {
-        inherit buildEnv;
-        buildDenoTask = pkgs.callPackage ./nix/lib/build-deno-task.nix { inherit buildEnv; };
-        buildRustService = import ./nix/lib/build-rust-service.nix { inherit pkgs crane buildEnv; };
-        buildHaskellService = import ./nix/lib/build-haskell-service.nix { inherit pkgs buildEnv; };
-        buildPythonService = import ./nix/lib/build-python-service.nix {
-          inherit
-            pkgs
-            uv2nix
-            pyproject-nix
-            pyproject-build-systems
-            buildEnv
-            ;
-        };
-        buildMdbook =
-          {
-            src,
-            name ? "docs",
-          }:
-          pkgs.runCommand name
-            {
-              nativeBuildInputs = [ pkgs.mdbook ];
-              env = buildEnv;
-            }
-            ''
-              mdbook build ${src} --dest-dir "$out"
-            '';
-        buildZensical =
-          {
-            src,
-            name ? "docs",
-          }:
-          pkgs.runCommand name
-            {
-              nativeBuildInputs = [ pkgs.zensical ];
-              env = buildEnv;
-            }
-            ''
-              cp -r --no-preserve=mode ${src} project
-              cd project
-              zensical build
-              cp -r site "$out"
-            '';
-        buildOptionsDoc = import ./nix/lib/options-doc.nix { inherit pkgs; };
+      flake = {
+        flakeModules.default = flakeModule;
+        nixosModules.default = import ./nix/nixos.nix;
       };
-    in
-    {
-      packages = forAllSystems (
-        system:
-        let
-          pkgs = pkgsFor system;
-          lib' = mkLib pkgs;
 
-          kennel = lib'.buildRustService {
+      perSystem =
+        { pkgs, helpers, ... }:
+        let
+          kennel = helpers.buildRustService {
             src = ./.;
             pname = "kennel";
             version = "0.1.0";
-            buildArgs.cargoExtraArgs = "-p kennel";
+            buildArgs.cargoExtraArgs = "--locked -p kennel";
           };
 
-          options-doc = lib'.buildOptionsDoc {
-            module = devenvModules.default;
-            subtree = options: options.scottylabs;
-            root = ./.;
-            repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
-          };
-
-          docsGen = import ./sites/docs/generate.nix {
-            inherit pkgs mkLib;
-            devenvOptionsMd = options-doc;
-          };
-
-          docs = lib'.buildMdbook {
-            inherit (docsGen) src;
-            name = "kennel-docs";
-          };
+          docsGen = import ./sites/docs/generate.nix { inherit pkgs helpers inputs; };
         in
         {
-          inherit kennel docs options-doc;
-          inherit (pkgs) devenv;
-          docs-options = docsGen.generated;
-        }
-      );
+          scottylabs = {
+            project.name = "kennel";
+            rust = {
+              enable = true;
+              cranelift.excludePackages = [
+                "aws-lc-sys"
+                "aws-lc-rs"
+                "rustls"
+                "linkme"
+              ];
+            };
+            sqlite.enable = true;
 
-      nixosModules.default = import ./nix/nixos.nix;
+            shell = {
+              packages = [ pkgs.sea-orm-cli ];
+              scripts = {
+                server = "cargo run -p kennel";
+                migration = ''sea-orm-cli migrate generate "$1" -d crates/migration'';
+                migrate = ''DATABASE_URL="sqlite://$DATABASE_PATH?mode=rwc" sea-orm-cli migrate up -d crates/migration'';
+                generate-entities = ''DATABASE_URL="sqlite://$DATABASE_PATH" sea-orm-cli generate entity -o crates/entity/src --with-serde both --lib'';
+                docs = ''
+                  nix build .#docs-options --out-link sites/docs/src/reference/generated
+                  cd sites/docs && mdbook serve
+                '';
+              };
+            };
+          };
 
-      inherit devenvModules mkLib;
+          sites.docs = {
+            package = helpers.buildMdbook {
+              inherit (docsGen) src;
+              name = "kennel-docs";
+            };
+            customDomain = "docs.kennel.scottylabs.org";
+          };
 
-      apps = forAllSystems (
-        system:
-        let
-          pkgs = pkgsFor system;
-        in
-        {
-          login = {
+          packages = {
+            inherit kennel;
+            default = kennel;
+            docs-options = docsGen.generated;
+          };
+
+          checks = kennel.passthru.checks;
+
+          apps.login = {
             type = "app";
             program = "${pkgs.writeShellScript "scottylabs-login" ''
               export BAO_ADDR=https://secrets.scottylabs.org
               ${pkgs.openbao}/bin/bao login -method=oidc
             ''}";
           };
-        }
-      );
-
-      formatter = forAllSystems (
-        system:
-        (treefmt-nix.lib.evalModule (pkgsFor system) {
-          programs = {
-            nixfmt.enable = true;
-            mdformat.enable = true;
-            yamlfmt.enable = true;
-          };
-        }).config.build.wrapper
-      );
+        };
     };
 }

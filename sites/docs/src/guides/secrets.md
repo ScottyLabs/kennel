@@ -14,12 +14,10 @@ revision = "1.0"
 [providers]
 local = "dotenv://.env"
 openbao = "openbao://secrets.scottylabs.org/secret"
-openbao-ci = "openbao://secrets.scottylabs.org/secret?auth=jwt&role=ci&audience=openbao"
 
 [profiles.default]
 AWS_ACCESS_KEY_ID = { description = "sccache S3 access key ID", ref = { item = "shared/sccache", field = "AWS_ACCESS_KEY_ID" } }
 AWS_SECRET_ACCESS_KEY = { description = "sccache S3 secret access key", ref = { item = "shared/sccache", field = "AWS_SECRET_ACCESS_KEY" } }
-CACHIX_AUTH_TOKEN = { description = "Cachix auth token", ref = { item = "shared/cachix", field = "CACHIX_AUTH_TOKEN" } }
 JWT_SECRET = { description = "JWT signing key" }
 STRIPE_KEY = { description = "Stripe API key" }
 
@@ -34,33 +32,19 @@ STRIPE_KEY = { description = "Stripe test key", required = false }
 providers = ["openbao"]
 
 [profiles.dev]
-
-[profiles.ci.defaults]
-required = false
-providers = ["openbao-ci"]
-
-[profiles.ci]
 ```
 
-Secrets are stored under your project's slug in governance, or your team's slug if the team has no projects, so the project `name` must be that slug. Kennel fails the build when they differ.
+`[project] name` must be the slug governance stores your secrets under, which is the project's slug, or the team's slug for a team without projects. A deploy fails at the `secrets` stage when the name doesn't match.
 
-`[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for `dev` and for every environment you deploy to; a section left empty inherits `default` unchanged.
+`[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for every environment.
 
-The `[providers]` table names the backends once: `openbao` logs in with your local `bao` token, `openbao-ci` is the same backend reached with a CI job's OIDC token, and `local` is a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` routes dev resolution through `openbao` and `[profiles.ci.defaults]` routes CI through `openbao-ci`; without a profile's `providers`, its secrets have no route and resolution fails.
+The `[providers]` table defines `openbao`, which logs in with your local `bao` token, and `local`, a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` makes local development read from `openbao`. Deployed profiles need no `providers`, since kennel sets its own.
 
-`[profiles.ci.defaults]` sets `required = false`, so the runtime secrets inherited from `default` are optional in CI while the shared caches still resolve because they are available. CI signs in through `openbao-ci` with the job's Forgejo Actions OIDC token, so nothing is passed into the workflow.
+Forgejo Actions jobs that need secrets use an `openbao-ci` provider, set up in [Custom workflows](./ci.md#custom-workflows).
 
 ## Enabling resolution
 
-Turn secretspec on in your `devenv.yaml`:
-
-```yaml
-secretspec:
-  enable: true
-  profile: dev
-```
-
-`enable` turns on resolution and `profile` selects which profile to load locally (kennel chooses the profile per branch when it deploys). The shared ScottyLabs config (`scottylabs.enable = true`) supplies the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell.
+The flake module resolves secrets whenever the project has a `secretspec.toml` (`scottylabs.secrets.enable`, on by default). It adds the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell with `secretspec export`, using the profile in `SECRETSPEC_PROFILE` (`dev` when unset). Kennel chooses the profile per branch when it deploys.
 
 ## Per-developer secrets
 
@@ -86,11 +70,11 @@ Log in to OpenBao once per machine:
 nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
 ```
 
-A project shell resolves secrets as it loads, so it won't build without a token. On a fresh checkout you don't have one and can't reach `bao` from inside the shell yet, hence the standalone command above. Cachix and the rest resolve from OpenBao when the shell loads.
+A project shell resolves secrets as it loads and only warns when it has no token, leaving the secrets unset. The standalone command above logs in without a project shell.
 
 The token is periodic and renews on each shell entry, so it stays valid as long as you open a project shell at least once every 90 days. You only log in again on a new machine, or after 90 days without using it.
 
-Secrets then load into your devenv shell automatically.
+Secrets then load into your shell on entry.
 
 ## Managing secrets
 
@@ -127,7 +111,7 @@ Kennel authenticates to OpenBao with a service token provided via `VAULT_TOKEN` 
 
 If a required secret cannot be resolved, the deployment fails. Deployed services also receive `PORT`, `COMMIT_HASH`, and `APP_URL` (see [Deploying a Project](./deploying.md#runtime-environment)).
 
-Values a frontend needs at build time go in a `[scopes.build]` table, which kennel resolves with the same profile and exports into the build. Only public values belong there (see [Build environment](./deploying.md#build-environment)).
+Values a browser frontend reads go in a `[scopes.public]` table, which kennel serves to the site for the branch's profile. Only values safe to publish belong there (see [Public values](./deploying.md#public-values)).
 
 ## Runtime loading
 

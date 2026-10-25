@@ -16,7 +16,7 @@ prod_monthly_budget = 20.0
 
 - `kennel` provisions the webhook that connects your repository to kennel for builds and deployments
 - `sentry` creates a Sentry project and writes its DSN to Vault as `SENTRY_DSN` on the `prod` profile; set `platform` (for example `rust`, `deno`, or `python`) to label the project's SDK
-- `posthog` creates a PostHog project and writes its key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile
+- `posthog` creates a PostHog project and writes its key and host to Vault as `PUBLIC_POSTHOG_KEY` and `PUBLIC_POSTHOG_HOST` on the `prod` profile
 - `posthog` with `server_side = true` also parses browser, OS, and device from each event's user agent and keeps client IPs for location, for services that capture events from a server on behalf of visitors
 - `cdn` provisions a per-project public-read [Garage](https://garagehq.deuxfleurs.fr/) bucket and writes `CDN_S3_ENDPOINT`, `CDN_S3_BUCKET`, `CDN_ACCESS_KEY_ID`, `CDN_SECRET_ACCESS_KEY`, and `CDN_PUBLIC_URL` to Vault on the `prod` profile
 - `oidc_client` provisions prod, staging, and dev Keycloak OIDC clients and writes `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `OAUTH_RELAY_URL`, `PROJECT_GROUP`, and `PROJECT_ADMIN_GROUP` to Vault for each profile
@@ -28,10 +28,10 @@ prod_monthly_budget = 20.0
 
 ### OIDC
 
-For OIDC authentication, note the distinction between the OAuth relay (`scottylabs.ricochet.enable` in devenv) and the Keycloak OIDC client (`oidc_client` in governance). The OAuth relay is used to relay between the standardized authorized redirect URI used by the OIDC client.
+For OIDC authentication, note the distinction between the OAuth relay (`scottylabs.ricochet.enable` in your flake) and the Keycloak OIDC client (`oidc_client` in governance). The OAuth relay is used to relay between the standardized authorized redirect URI used by the OIDC client.
 
 - prod uses the standard `<name>` OIDC client, preview and staging share `<name>-staging`, and dev uses `<name>-dev`
-- prod, staging, and preview all share the `https://oauth.scottylabs.org/oauth2/callback` (Ricochet) relay, while dev uses the `http://localhost:8090/oauth2/callback` (local) relay that requires `scottylabs.ricochet.enable` to be enabled in devenv.
+- prod, staging, and preview all share the `https://oauth.scottylabs.org/oauth2/callback` (Ricochet) relay, while dev uses the `http://localhost:8090/oauth2/callback` (local) relay that requires `scottylabs.ricochet.enable` in your flake.
 
 Your service receives the client credentials, Keycloak connection settings, and project group paths as env vars, declared in your `secretspec.toml`:
 
@@ -55,7 +55,7 @@ PROJECT_ADMIN_GROUP = { description = "Keycloak project admin group path" }
 [profiles.dev]
 ```
 
-Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/devenv-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).
+Your service builds its own callback URL from `APP_URL` and the relay forwards the authorization code there after login. Set it with [`scottylabs.ricochet.appUrl`](../reference/flake-options.md#scottylabsricochetappurl) in local development; in deployments kennel injects `APP_URL` from the domain (see [runtime environment](./deploying.md#runtime-environment)).
 
 The OIDC client also adds the user's group memberships to the token as a `groups` claim, in full-path form like `/projects/<slug>`. Match it against `PROJECT_GROUP` and `PROJECT_ADMIN_GROUP` to grant enhanced permissions.
 
@@ -87,21 +87,21 @@ Set `platform` in the feature to label the project's SDK in Sentry (for example 
 
 ### PostHog
 
-If your service sends product analytics to PostHog, add `posthog` to its `features` in governance. It creates a PostHog project and writes the project key and host to Vault as `POSTHOG_KEY` and `POSTHOG_HOST` on the `prod` profile, so declare them there:
+If your service sends product analytics to PostHog, add `posthog` to its `features` in governance. It creates a PostHog project and writes the project key and host to Vault as `PUBLIC_POSTHOG_KEY` and `PUBLIC_POSTHOG_HOST` on the `prod` profile, so declare them there:
 
 ```toml
 [profiles.prod]
-POSTHOG_KEY = { description = "PostHog project API key" }
-POSTHOG_HOST = { description = "PostHog ingestion host" }
+PUBLIC_POSTHOG_KEY = { description = "PostHog project API key" }
+PUBLIC_POSTHOG_HOST = { description = "PostHog ingestion host" }
 ```
 
 Read them at startup and pass them to the PostHog SDK to turn on analytics. Without a key, in local development and previews, the SDK stays inert.
 
-`POSTHOG_HOST` is `https://v.scottylabs.org`, PostHog's managed reverse proxy on a ScottyLabs domain, so ad blockers that filter PostHog's own domains don't drop events. Pass it as the SDK's host (`api_host` in `posthog-js`). A browser frontend reads both values at build time, so also list them in the [build scope](./deploying.md#build-environment):
+`PUBLIC_POSTHOG_HOST` is `https://v.scottylabs.org`, PostHog's managed reverse proxy on a ScottyLabs domain, so ad blockers that filter PostHog's own domains don't drop events. Pass it as the SDK's host (`api_host` in `posthog-js`). A browser frontend reads both at runtime, so also list them in the [public scope](./deploying.md#public-values):
 
 ```toml
-[scopes.build]
-secrets = ["POSTHOG_KEY", "POSTHOG_HOST"]
+[scopes.public]
+secrets = ["PUBLIC_POSTHOG_KEY", "PUBLIC_POSTHOG_HOST"]
 ```
 
 In `posthog-js`, also set `ui_host` to `https://us.posthog.com`. Without it, the PostHog toolbar won't work on your site.

@@ -1,15 +1,17 @@
+kennelInputs:
 {
-  ricochet,
   lib,
   config,
+  pkgs,
   ...
 }:
 
 let
   cfg = config.scottylabs.ricochet;
+  ricochet = kennelInputs.ricochet.packages.${pkgs.stdenv.hostPlatform.system}.ricochet;
 
   # Fixed so governance can register one dev redirect for every app
-  port = 8090;
+  port = "8090";
 in
 {
   options.scottylabs.ricochet = {
@@ -31,8 +33,14 @@ in
     };
   };
 
-  config = lib.mkIf (config.scottylabs.enable && cfg.enable) {
-    processes.ricochet.exec = "RICOCHET_DEV=1 RICOCHET_BIND=127.0.0.1:${toString port} ${ricochet}/bin/ricochet";
-    env.APP_URL = cfg.appUrl;
+  config = lib.mkIf cfg.enable {
+    scottylabs = {
+      shell.env.APP_URL = cfg.appUrl;
+
+      processes.ricochet = {
+        run = "RICOCHET_DEV=1 RICOCHET_BIND=127.0.0.1:${port} exec ${ricochet}/bin/ricochet";
+        ready = "${lib.getExe pkgs.curl} -s -o /dev/null http://127.0.0.1:${port}/";
+      };
+    };
   };
 }

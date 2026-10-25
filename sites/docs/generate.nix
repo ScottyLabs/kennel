@@ -2,25 +2,34 @@
 # declarations, pulled into the reference pages via {{#include}}
 {
   pkgs,
-  mkLib,
-  devenvOptionsMd,
+  helpers,
+  inputs,
 }:
 
 let
-  slib = mkLib pkgs;
+  repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
 
-  nixosOptionsMd = slib.buildOptionsDoc {
+  flakeOptionsMd = helpers.buildOptionsDoc {
+    module.imports = import ../../nix/flake-module/per-system inputs;
+    subtree = options: {
+      inherit (options) scottylabs services sites;
+    };
+    root = ../..;
+    inherit repoUrl;
+  };
+
+  nixosOptionsMd = helpers.buildOptionsDoc {
     module = ../../nix/nixos.nix;
     subtree = options: options.services.kennel;
     root = ../..;
-    repoUrl = "https://git.cmu.dev/ScottyLabs/kennel/src/branch/main";
+    inherit repoUrl;
   };
 in
 rec {
   # Unescape dots in generated headings (nixpkgs#224661)
   generated = pkgs.runCommand "kennel-docs-generated" { } ''
     mkdir $out
-    sed 's/\\\././g' ${devenvOptionsMd} > $out/devenv-options.md
+    sed 's/\\\././g' ${flakeOptionsMd} > $out/flake-options.md
     sed 's/\\\././g' ${nixosOptionsMd} > $out/nixos-module.md
   '';
 

@@ -10,8 +10,9 @@ use std::path::PathBuf;
 struct DeployCtx<'a> {
     state: &'a AppState,
     caddy: &'a CaddyClient,
-    project_name: &'a str,
-    build: &'a ::entity::builds::Model,
+    project: &'a ::entity::projects::Model,
+    commit_sha: &'a str,
+    config_store_path: &'a str,
     branch: &'a str,
     branch_slug: &'a str,
     environment: &'a Environment,
@@ -27,8 +28,8 @@ pub enum DeployOutcome {
 /// Step of a deploy that failed, exported as the `stage` label of `kennel_deploy_failures`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FailureStage {
-    /// The commit's build failed or was cancelled
-    Build,
+    /// Substituting the commit's artifact from the binary cache
+    Fetch,
     /// The `kennel.json` schema version does not match this kennel
     Config,
     /// Creating the postgres, valkey, or garage resources the project declares
@@ -47,7 +48,7 @@ pub enum FailureStage {
 
 impl FailureStage {
     pub const ALL: [Self; 8] = [
-        Self::Build,
+        Self::Fetch,
         Self::Config,
         Self::Provision,
         Self::Secrets,
@@ -59,7 +60,7 @@ impl FailureStage {
 
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Build => "build",
+            Self::Fetch => "fetch",
             Self::Config => "config",
             Self::Provision => "provision",
             Self::Secrets => "secrets",
@@ -109,7 +110,7 @@ pub async fn provision_declared(
         return Err(StageError {
             stage: FailureStage::Config,
             error: anyhow::anyhow!(
-                "kennel.json schema version {} does not match expected {}. Run `devenv update` and redeploy.",
+                "kennel.json schema version {} does not match expected {}. Update the project's kennel input and push again.",
                 config.version,
                 kennel_config::constants::KENNEL_CONFIG_SCHEMA_VERSION
             ),
@@ -146,31 +147,43 @@ pub async fn read_kennel_config(
     Ok(serde_json::from_str(&content)?)
 }
 
+/// Substitutes a store path from the binary cache
+pub async fn realise(store_path: &str) -> anyhow::Result<()> {
+    let output = tokio::process::Command::new("nix-store")
+        .args(["--realise", store_path])
+        .output()
+        .await?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "nix-store --realise {store_path} failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(())
+}
+
 pub async fn deploy_request(
     state: &AppState,
     request: &::entity::deploy_requests::Model,
-    build: &::entity::builds::Model,
+    artifact: &::entity::artifacts::Model,
 ) -> anyhow::Result<DeployOutcome> {
     let project = state
         .store
         .projects()
-        .find_by_id(&build.project_id)
+        .find_by_id(&request.project_id)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("project {} not found", build.project_id))?;
-
-    let store_paths: HashMap<String, String> = build
-        .store_paths
-        .as_ref()
-        .map(|v| serde_json::from_value(v.clone()).unwrap_or_default())
-        .unwrap_or_default();
-
-    let kennel_config: kennel_config::KennelConfig = build
-        .kennel_config
-        .as_ref()
-        .map(|v| serde_json::from_value(v.clone()).unwrap_or_default())
-        .unwrap_or_default();
+        .ok_or_else(|| anyhow::anyhow!("project {} not found", request.project_id))?;
 
     let environment = Environment::from_branch(&request.branch).unwrap_or(Environment::Dev);
+
+    realise(&artifact.store_path)
+        .await
+        .at(FailureStage::Fetch)?;
+
+    let config_store_path = artifact.store_path.as_str();
+    let kennel_config = read_kennel_config(config_store_path)
+        .await
+        .at(FailureStage::Config)?;
 
     if environment == Environment::Preview && !kennel_config.preview_deployments {
         return Ok(DeployOutcome::SkippedPreview);
@@ -182,7 +195,7 @@ pub async fn deploy_request(
     let existing = state
         .store
         .deployments()
-        .find_by_project_branch(&build.project_id, &request.branch)
+        .find_by_project_branch(&request.project_id, &request.branch)
         .await?;
     let systemd = crate::systemd::SystemdClient::connect().await?;
 
@@ -198,6 +211,7 @@ pub async fn deploy_request(
         if still_present {
             continue;
         }
+
         if let Err(e) =
             crate::teardown::teardown_deployment(state, deployment, &systemd, &caddy).await
         {
@@ -217,8 +231,9 @@ pub async fn deploy_request(
     let ctx = DeployCtx {
         state,
         caddy: &caddy,
-        project_name: &project.name,
-        build,
+        project: &project,
+        commit_sha: &request.commit_sha,
+        config_store_path,
         branch: &request.branch,
         branch_slug: &branch_slug,
         environment: &environment,
@@ -227,20 +242,20 @@ pub async fn deploy_request(
 
     let deploy_result: Result<(), StageError> = async {
         for (name, site_config) in &kennel_config.static_sites {
-            let Some(store_path) = store_paths.get(name) else {
-                tracing::warn!(site = %name, "no store path, skipping");
-                continue;
-            };
-
+            let store_path = site_config
+                .store_path
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("site '{name}' has no store path"))
+                .at(FailureStage::Config)?;
             deploy_static_site(&ctx, name, store_path, site_config).await?;
         }
 
         for (name, svc_config) in &kennel_config.services {
-            let Some(store_path) = store_paths.get(name) else {
-                tracing::warn!(service = %name, "no store path, skipping");
-                continue;
-            };
-
+            let store_path = svc_config
+                .store_path
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("service '{name}' has no store path"))
+                .at(FailureStage::Config)?;
             deploy_service(&ctx, name, store_path, svc_config).await?;
         }
         Ok(())
@@ -252,7 +267,7 @@ pub async fn deploy_request(
         tracing::error!(
             project = %project.name,
             branch = %request.branch,
-            commit = %build.commit_sha,
+            commit = %request.commit_sha,
             stage = e.stage.as_str(),
             error = %format!("{e:#}"),
             "deploy failed",
@@ -271,14 +286,14 @@ pub async fn deploy_request(
             .grafana_url
             .as_deref()
             .filter(|_| has_logs)
-            .map(|base| deploy_logs_url(base, &project.name, &request.branch, &build.commit_sha));
+            .map(|base| deploy_logs_url(base, &project.name, &request.branch, &request.commit_sha));
 
         let posted = state
             .forgejo
             .create_commit_status(
                 owner,
                 &project.name,
-                &build.commit_sha,
+                &request.commit_sha,
                 CommitStatus {
                     state: status,
                     description: &description,
@@ -291,21 +306,22 @@ pub async fn deploy_request(
         if deploy_result.is_ok() {
             posted?;
         } else if let Err(post_err) = posted {
-            tracing::error!(build_id = %build.id, error = %post_err, "failed to post commit status");
+            tracing::error!(project = %project.name, error = %post_err, "failed to post commit status");
         }
     }
 
     deploy_result?;
 
-    // Deployment roots hold the store paths, so drop the build pins
-    remove_build_gc_roots(&build.id).await;
+    if let Err(e) = state.store.artifacts().prune_superseded(artifact).await {
+        tracing::warn!(project = %project.name, branch = %request.branch, error = %e, "failed to prune superseded artifacts");
+    }
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&request.branch)
         && let Err(e) = post_pr_deployment_comment(
             state,
             &project,
             &request.branch,
-            &build.commit_sha,
+            &request.commit_sha,
             pr_number,
         )
         .await
@@ -367,13 +383,15 @@ async fn deploy_static_site(
     let &DeployCtx {
         state,
         caddy,
-        project_name,
-        build,
+        project,
+        commit_sha,
+        config_store_path,
         branch,
         branch_slug,
         environment,
         kennel_config: _,
     } = ctx;
+    let project_name = project.name.as_str();
     let (domain, custom_domain) = deployment_domains(
         project_name,
         name,
@@ -386,7 +404,7 @@ async fn deploy_static_site(
     let existing = state
         .store
         .deployments()
-        .find_by_project_service_branch(&build.project_id, name, branch)
+        .find_by_project_service_branch(&project.id, name, branch)
         .await
         .at(FailureStage::Internal)?;
     let deployment_id = existing
@@ -394,7 +412,7 @@ async fn deploy_static_site(
         .map_or_else(|| uuid::Uuid::now_v7().to_string(), |d| d.id.clone());
 
     let site_dir = PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
-        .join(&build.project_id)
+        .join(&project.id)
         .join(branch_slug);
     tokio::fs::create_dir_all(&site_dir)
         .await
@@ -418,17 +436,43 @@ async fn deploy_static_site(
         .await
         .at(FailureStage::Internal)?;
 
+    let public = match std::env::var("VAULT_ENDPOINT") {
+        Ok(vault_endpoint) => crate::secrets::resolve_public(
+            std::path::Path::new(config_store_path),
+            &environment.to_string(),
+            &vault_endpoint,
+            project.secret_namespace.as_deref(),
+        )
+        .map_err(|e| StageError {
+            stage: FailureStage::Secrets,
+            error: anyhow::anyhow!("public value resolution failed for site '{name}': {e}"),
+        })?,
+        Err(_) => HashMap::new(),
+    };
+
+    let env_dir = site_env_dir(&project.id, branch_slug, name);
+    write_site_env(&env_dir, &public)
+        .await
+        .at(FailureStage::Internal)?;
+    let env_dir = env_dir.to_string_lossy();
+
     let route_id = format!("kennel-{deployment_id}");
 
     caddy
-        .add_static_route(&route_id, &domain, store_path, site_config.spa)
+        .add_static_route(&route_id, &domain, store_path, &env_dir, site_config.spa)
         .await
         .at(FailureStage::Routing)?;
 
     if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
-            .add_static_route(&custom_route_id, custom_domain, store_path, site_config.spa)
+            .add_static_route(
+                &custom_route_id,
+                custom_domain,
+                store_path,
+                &env_dir,
+                site_config.spa,
+            )
             .await
             .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;
@@ -447,13 +491,13 @@ async fn deploy_static_site(
 
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
-        project_id: Set(build.project_id.clone()),
+        project_id: Set(project.id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("static".to_string()),
         branch: Set(branch.to_string()),
         branch_slug: Set(branch_slug.to_string()),
         environment: Set(environment.to_string()),
-        commit_sha: Set(build.commit_sha.clone()),
+        commit_sha: Set(commit_sha.to_string()),
         store_path: Set(store_path.to_string()),
         domain: Set(domain.clone()),
         custom_domain: Set(custom_domain.map(str::to_string)),
@@ -475,6 +519,30 @@ async fn deploy_static_site(
     Ok(())
 }
 
+/// Paths a site's runtime public values are served at, in SvelteKit's format and as JSON
+pub const SITE_ENV_FILES: [&str; 2] = ["/_app/env.js", "/_kennel/env.json"];
+
+pub fn site_env_dir(project_id: &str, branch_slug: &str, name: &str) -> PathBuf {
+    PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
+        .join(project_id)
+        .join(branch_slug)
+        .join(format!("{name}.env"))
+}
+
+async fn write_site_env(
+    dir: &std::path::Path,
+    values: &HashMap<String, String>,
+) -> anyhow::Result<()> {
+    let json = serde_json::to_string(values)?;
+
+    tokio::fs::create_dir_all(dir.join("_app")).await?;
+    tokio::fs::create_dir_all(dir.join("_kennel")).await?;
+
+    tokio::fs::write(dir.join("_app/env.js"), format!("export const env={json}")).await?;
+    tokio::fs::write(dir.join("_kennel/env.json"), json).await?;
+    Ok(())
+}
+
 async fn deploy_service(
     ctx: &DeployCtx<'_>,
     name: &str,
@@ -484,13 +552,15 @@ async fn deploy_service(
     let &DeployCtx {
         state,
         caddy,
-        project_name,
-        build,
+        project,
+        commit_sha,
+        config_store_path,
         branch,
         branch_slug,
         environment,
         kennel_config,
     } = ctx;
+    let project_name = project.name.as_str();
     let (domain, custom_domain) = deployment_domains(
         project_name,
         name,
@@ -503,24 +573,23 @@ async fn deploy_service(
     let system_user = service_user(&unit_name);
 
     let request = ResourceRequest {
-        project_name: build.project_id.clone(),
+        project_name: project.id.clone(),
         service_name: name.to_string(),
         branch_slug: branch_slug.to_string(),
         environment: *environment,
         system_user: system_user.clone(),
     };
 
-    let mut env_vars = provision_declared(state, kennel_config, &request).await?;
+    let mut env_vars = svc_config.env.clone();
+    env_vars.extend(provision_declared(state, kennel_config, &request).await?);
 
-    if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT")
-        && let Some(ref config_store_path) = build.config_store_path
-    {
+    if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT") {
         let env_str = environment.to_string();
         match crate::secrets::resolve(
             std::path::Path::new(config_store_path),
             &env_str,
             &vault_endpoint,
-            None,
+            project.secret_namespace.as_deref(),
         ) {
             Ok(secrets) => env_vars.extend(secrets),
             Err(e) => {
@@ -532,12 +601,15 @@ async fn deploy_service(
         }
     }
 
-    let exec_start = find_executable(store_path)
-        .await
-        .at(FailureStage::Internal)?;
+    let exec_start = match &svc_config.exec {
+        Some(exec) => exec.clone(),
+        None => find_executable(store_path)
+            .await
+            .at(FailureStage::Internal)?,
+    };
     let port = allocate_port(&unit_name);
     env_vars.insert("PORT".to_string(), port.to_string());
-    env_vars.insert("COMMIT_HASH".to_string(), build.commit_sha.clone());
+    env_vars.insert("COMMIT_HASH".to_string(), commit_sha.to_string());
 
     env_vars
         .entry("APP_URL".to_string())
@@ -546,7 +618,7 @@ async fn deploy_service(
     let existing = state
         .store
         .deployments()
-        .find_by_project_service_branch(&build.project_id, name, branch)
+        .find_by_project_service_branch(&project.id, name, branch)
         .await
         .at(FailureStage::Internal)?;
     let deployment_id = existing
@@ -562,8 +634,8 @@ async fn deploy_service(
             &exec_start,
             &env_vars,
             &system_user,
-            build.config_store_path.as_deref(),
-            &deploy_log_fields(project_name, branch, &build.commit_sha),
+            Some(config_store_path),
+            &deploy_log_fields(project_name, branch, commit_sha),
         )
         .await
         .at(FailureStage::Systemd)?;
@@ -611,20 +683,20 @@ async fn deploy_service(
     // Commit before moving the gc root so the recorded path is never unrooted
     let model = ::entity::deployments::ActiveModel {
         id: Set(deployment_id.clone()),
-        project_id: Set(build.project_id.clone()),
+        project_id: Set(project.id.clone()),
         service_name: Set(name.to_string()),
         service_type: Set("service".to_string()),
         branch: Set(branch.to_string()),
         branch_slug: Set(branch_slug.to_string()),
         environment: Set(environment.to_string()),
-        commit_sha: Set(build.commit_sha.clone()),
+        commit_sha: Set(commit_sha.to_string()),
         store_path: Set(store_path.to_string()),
         domain: Set(domain.clone()),
         custom_domain: Set(custom_domain.map(str::to_string)),
         spa: Set(false),
         unit_name: Set(Some(unit_name)),
         port: Set(Some(i64::from(port))),
-        config_store_path: Set(build.config_store_path.clone()),
+        config_store_path: Set(Some(config_store_path.to_string())),
         ..Default::default()
     };
 
@@ -639,11 +711,9 @@ async fn deploy_service(
     add_gc_root(&deployment_id, store_path)
         .await
         .at(FailureStage::Internal)?;
-    if let Some(config_store_path) = &build.config_store_path {
-        add_gc_root(&format!("{deployment_id}-config"), config_store_path)
-            .await
-            .at(FailureStage::Internal)?;
-    }
+    add_gc_root(&format!("{deployment_id}-config"), config_store_path)
+        .await
+        .at(FailureStage::Internal)?;
 
     tracing::info!(service = %name, domain = %domain, port = port, "deployed service");
     Ok(())
@@ -758,130 +828,40 @@ pub async fn ensure_gc_root(deployment: &::entity::deployments::Model) {
     }
 }
 
-/// Recover a deployment whose store path is gone by stopping its unit and rebuilding
+/// Substitutes a garbage-collected artifact again, stopping the unit if that fails
 pub async fn recover_collected_artifact(
-    state: &AppState,
     deployment: &::entity::deployments::Model,
     systemd: &crate::systemd::SystemdClient,
-) {
-    if let Some(unit_name) = &deployment.unit_name {
-        let _ = systemd.stop_unit(unit_name).await;
-    }
-
-    match enqueue_rebuild(state, deployment).await {
-        Ok(true) => tracing::warn!(
-            deployment = %deployment.id,
-            store_path = %deployment.store_path,
-            commit = %deployment.commit_sha,
-            "artifact missing from store; stopped unit and queued rebuild",
-        ),
-        Ok(false) => {}
-        Err(e) => tracing::error!(
-            deployment = %deployment.id,
-            error = %e,
-            "artifact missing from store; could not queue rebuild",
-        ),
-    }
-}
-
-/// Queue a rebuild of the deployment's commit and mark its branch's request pending
-async fn enqueue_rebuild(
-    state: &AppState,
-    deployment: &::entity::deployments::Model,
-) -> anyhow::Result<bool> {
-    // The git_ref lives on the branch's request
-    let Some(request) = state
-        .store
-        .deploy_requests()
-        .find_by_project_branch(&deployment.project_id, &deployment.branch)
-        .await?
-    else {
-        anyhow::bail!(
-            "no deploy request for {}/{}",
-            deployment.project_id,
-            deployment.branch
-        );
-    };
-
-    // Only recover the running commit when it is still the branch's intent
-    if request.commit_sha != deployment.commit_sha {
-        return Ok(false);
-    }
-
-    let mut enqueued = false;
-    match state
-        .store
-        .builds()
-        .find_by_project_branch_commit(
-            &deployment.project_id,
-            &deployment.branch,
-            &deployment.commit_sha,
-        )
-        .await?
-    {
-        Some(build) => match build.status.as_str() {
-            "queued" | "building" => {}   // A rebuild is already coming
-            "failed" => return Ok(false), // Do not re-queue a build that already failed
-            _ => {
-                // Collected or cancelled build, so rebuild it
-                state.store.builds().requeue(&build.id).await?;
-                remove_build_gc_roots(&build.id).await;
-                enqueued = true;
+) -> bool {
+    match realise(&deployment.store_path).await {
+        Ok(()) => {
+            tracing::warn!(
+                deployment = %deployment.id,
+                store_path = %deployment.store_path,
+                "artifact was missing from the store; fetched it again",
+            );
+            true
+        }
+        Err(e) => {
+            if let Some(unit_name) = &deployment.unit_name {
+                let _ = systemd.stop_unit(unit_name).await;
             }
-        },
-        None => {
-            let model = ::entity::builds::ActiveModel {
-                id: Set(uuid::Uuid::now_v7().to_string()),
-                project_id: Set(deployment.project_id.clone()),
-                branch: Set(deployment.branch.clone()),
-                git_ref: Set(request.git_ref.clone()),
-                commit_sha: Set(deployment.commit_sha.clone()),
-                status: Set("queued".to_string()),
-                ..Default::default()
-            };
-            state.store.builds().create(model).await?;
-            enqueued = true;
+
+            tracing::error!(
+                deployment = %deployment.id,
+                store_path = %deployment.store_path,
+                error = %e,
+                "artifact missing from the store and the binary cache; stopped unit until the next push",
+            );
+            false
         }
     }
-
-    // Force the branch's request pending so the rebuilt artifact deploys
-    if request.status != "pending" {
-        state
-            .store
-            .deploy_requests()
-            .set_status(&request.id, "pending")
-            .await?;
-        enqueued = true;
-    }
-
-    if enqueued {
-        state.build_signal.notify_one();
-    }
-    Ok(enqueued)
 }
 
 pub async fn remove_gc_roots(deployment_id: &str) {
     let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
     let _ = tokio::fs::remove_file(dir.join(deployment_id)).await;
     let _ = tokio::fs::remove_file(dir.join(format!("{deployment_id}-config"))).await;
-}
-
-// Drop every gc root pinned for a build's outputs (named `{build_id}-*`)
-pub async fn remove_build_gc_roots(build_id: &str) {
-    let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
-    let prefix = format!("{build_id}-");
-    let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
-        return;
-    };
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        if entry
-            .file_name()
-            .to_string_lossy()
-            .starts_with(prefix.as_str())
-        {
-            let _ = tokio::fs::remove_file(entry.path()).await;
-        }
-    }
 }
 
 /// Generated domain of a deployment, and its custom domain if it is in prod
@@ -898,7 +878,7 @@ pub fn deployment_domains<'a>(
     (domain, custom_domain)
 }
 
-/// Public URL of a deployment, set as `APP_URL` in builds and services
+/// Public URL of a deployment, set as `APP_URL` in its services
 pub fn app_url(domain: &str, custom_domain: Option<&str>) -> String {
     format!("https://{}", custom_domain.unwrap_or(domain))
 }
@@ -920,14 +900,6 @@ pub fn sanitize(s: &str) -> String {
         .collect()
 }
 
-pub fn build_unit_name(project_name: &str, branch: &str) -> String {
-    format!(
-        "kennel-build-{}-{}",
-        sanitize(project_name),
-        sanitize(branch)
-    )
-}
-
 pub fn service_unit_name(project_name: &str, branch_slug: &str, service: &str) -> String {
     format!(
         "kennel-{}-{}-{}",
@@ -940,14 +912,6 @@ pub fn service_unit_name(project_name: &str, branch_slug: &str, service: &str) -
 /// Loki's full 720h retention
 const LOG_RANGE_PARAMS: &str = "&from=now-30d&to=now";
 
-/// `LogExtraFields` for a build unit
-pub fn build_log_fields(project_name: &str, build_id: &str) -> Vec<String> {
-    vec![
-        format!("KENNEL_PROJECT={project_name}"),
-        format!("KENNEL_BUILD_ID={build_id}"),
-    ]
-}
-
 /// `LogExtraFields` for a service unit, kept across restarts
 pub fn deploy_log_fields(project_name: &str, branch: &str, commit_sha: &str) -> Vec<String> {
     vec![
@@ -955,10 +919,6 @@ pub fn deploy_log_fields(project_name: &str, branch: &str, commit_sha: &str) -> 
         format!("KENNEL_BRANCH={branch}"),
         format!("KENNEL_COMMIT={commit_sha}"),
     ]
-}
-
-pub fn build_logs_url(base: &str, project_name: &str, build_id: &str) -> String {
-    drilldown_project_url(base, project_name, &[("build_id", build_id)])
 }
 
 pub fn deploy_logs_url(base: &str, project_name: &str, branch: &str, commit_sha: &str) -> String {

@@ -1,8 +1,6 @@
-# Builds a rust crate with crane, caching deps separately from the build
 {
   pkgs,
   crane,
-  buildEnv,
 }:
 
 {
@@ -19,7 +17,6 @@ let
   craneLib = crane.mkLib pkgs;
   fromToml = craneLib.crateNameFromCargoToml { cargoToml = src + "/Cargo.toml"; };
 
-  # Scope src to just these workspace members, plus the manifests they need
   scopedSrc =
     if paths == null then
       src
@@ -36,7 +33,7 @@ let
       };
 
   commonArgs = {
-    # Keep secretspec.toml in the source for secretspec_derive's build-time read
+    # secretspec_derive reads secretspec.toml at build time
     src = pkgs.lib.cleanSourceWith {
       src = scopedSrc;
       filter = path: type: craneLib.filterCargoSources path type || baseNameOf path == "secretspec.toml";
@@ -45,19 +42,33 @@ let
     version = if version != null then version else fromToml.version;
     strictDeps = true;
     inherit nativeBuildInputs buildInputs;
+    cargoExtraArgs = buildArgs.cargoExtraArgs or "--locked";
   };
 
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+  package = craneLib.buildPackage (
+    commonArgs
+    // {
+      inherit cargoArtifacts;
+      doCheck = false;
+      meta.mainProgram = commonArgs.pname;
+    }
+    // buildArgs
+  );
 in
-# Kept out of commonArgs so changing buildEnv does not rebuild the deps
-craneLib.buildPackage (
-  commonArgs
-  // {
-    inherit cargoArtifacts;
-    doCheck = false;
-  }
-  // buildArgs
-  // {
-    env = buildEnv // (buildArgs.env or { });
-  }
-)
+package
+// {
+  passthru = (package.passthru or { }) // {
+    checks = {
+      clippy = craneLib.cargoClippy (
+        commonArgs
+        // {
+          inherit cargoArtifacts;
+          cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+        }
+      );
+      test = craneLib.cargoTest (commonArgs // { inherit cargoArtifacts; });
+    };
+  };
+}

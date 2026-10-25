@@ -1,4 +1,3 @@
-mod build;
 mod caddy;
 mod cloudflare;
 mod custom_domains;
@@ -28,8 +27,6 @@ use vault::VaultClient;
 
 pub struct AppState {
     pub store: Store,
-    /// Wakes the build worker when a build is queued
-    pub build_signal: Notify,
     /// Wakes the reconciler when a deploy request may be actionable
     pub reconcile_signal: Notify,
     pub config: AppConfig,
@@ -43,25 +40,15 @@ pub struct AppConfig {
     pub api_host: String,
     pub api_port: u16,
     pub ephemeral_domain: String,
-    pub work_dir: String,
     pub caddy_admin_url: String,
-    pub max_concurrent_builds: usize,
     pub webhook_secret: String,
+    pub nixbot_token: String,
     pub custom_domains_file: Option<String>,
     pub grafana_url: Option<String>,
 }
 
 impl AppConfig {
     fn from_env() -> Result<Self> {
-        let webhook_secret_file =
-            std::env::var("WEBHOOK_SECRET_FILE").expect("WEBHOOK_SECRET_FILE must be set");
-        let webhook_secret = std::fs::read_to_string(&webhook_secret_file)
-            .map_err(|e| {
-                anyhow::anyhow!("failed to read webhook secret from {webhook_secret_file}: {e}")
-            })?
-            .trim()
-            .to_string();
-
         Ok(Self {
             api_host: std::env::var("API_HOST")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_API_HOST.into()),
@@ -71,32 +58,25 @@ impl AppConfig {
                 .unwrap_or(kennel_config::constants::DEFAULT_API_PORT),
             ephemeral_domain: std::env::var("EPHEMERAL_DOMAIN")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_EPHEMERAL_DOMAIN.into()),
-            work_dir: std::env::var("WORK_DIR")
-                .unwrap_or_else(|_| kennel_config::constants::DEFAULT_WORK_DIR.into()),
             caddy_admin_url: std::env::var("CADDY_ADMIN_URL")
                 .unwrap_or_else(|_| "http://localhost:2019".into()),
-            max_concurrent_builds: std::env::var("MAX_CONCURRENT_BUILDS")
-                .ok()
-                .and_then(|n| n.parse().ok())
-                .filter(|&n| n > 0)
-                .unwrap_or(kennel_config::constants::DEFAULT_MAX_CONCURRENT_BUILDS),
-            webhook_secret,
+            webhook_secret: read_secret_file("WEBHOOK_SECRET_FILE")?,
+            nixbot_token: read_secret_file("NIXBOT_TOKEN_FILE")?,
             custom_domains_file: std::env::var("CUSTOM_DOMAINS_FILE").ok(),
             grafana_url: std::env::var("GRAFANA_URL").ok(),
         })
     }
 }
 
+fn read_secret_file(var: &str) -> Result<String> {
+    let path = std::env::var(var).map_err(|_| anyhow::anyhow!("{var} must be set"))?;
+    let value = std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("failed to read {var} from {path}: {e}"))?;
+    Ok(value.trim().to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(String::as_str) == Some("build-exec") {
-        let build_id = args
-            .get(2)
-            .ok_or_else(|| anyhow::anyhow!("build-exec requires a build id"))?;
-        return build::build_exec(build_id).await;
-    }
-
     tracing_subscriber::fmt().json().init();
 
     let config = AppConfig::from_env()?;
@@ -115,7 +95,6 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(AppState {
         store,
-        build_signal: Notify::new(),
         reconcile_signal: Notify::new(),
         config,
         providers,
@@ -126,13 +105,8 @@ async fn main() -> Result<()> {
 
     let cancel = CancellationToken::new();
 
-    // Requeue builds left `building` by a dead previous instance. The worker is
-    // not running yet, so any such row is necessarily orphaned.
-    state.store.builds().reset_stuck().await?;
-
     reconcile::run_once(&state).await?;
 
-    let build_handle = tokio::spawn(build::run_worker(state.clone(), cancel.clone()));
     let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));
 
     let app = http::router(state.clone());
@@ -145,7 +119,7 @@ async fn main() -> Result<()> {
         .await?;
 
     cancel.cancel();
-    let _ = tokio::join!(build_handle, reconcile_handle);
+    let _ = reconcile_handle.await;
 
     tracing::info!("shutdown complete");
     Ok(())

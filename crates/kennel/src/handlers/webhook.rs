@@ -75,9 +75,7 @@ pub async fn handle(
                 return Ok(StatusCode::ACCEPTED);
             }
 
-            let git_ref = format!("refs/heads/{branch}");
-
-            enqueue_deploy(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+            enqueue_deploy(&state, &project, &branch, &commit_sha).await.map_err(|e| {
                 tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "enqueue_deploy failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
@@ -90,11 +88,10 @@ pub async fn handle(
             commit_sha,
         } => {
             let branch = format!("pr-{pr_number}");
-            let git_ref = format!("refs/pull/{pr_number}/head");
 
             match action.as_str() {
                 "opened" | "synchronize" | "synchronized" | "reopened" => {
-                    enqueue_deploy(&state, &project, &branch, &git_ref, &commit_sha).await.map_err(|e| {
+                    enqueue_deploy(&state, &project, &branch, &commit_sha).await.map_err(|e| {
                         tracing::error!(project = %project.name, branch = %branch, commit = %commit_sha, error = %e, "enqueue_deploy failed");
                         StatusCode::INTERNAL_SERVER_ERROR
                     })?;
@@ -124,7 +121,11 @@ async fn teardown_branch(
         .delete_by_project_branch(&project.id, branch)
         .await;
 
-    reap_unreferenced_builds(state, &project.id).await;
+    let _ = state
+        .store
+        .artifacts()
+        .delete_by_project_branch(&project.id, branch)
+        .await;
 
     let deployments = state
         .store
@@ -215,85 +216,21 @@ async fn find_or_create_project(
     Ok(project)
 }
 
-/// Ensure the commit's artifacts are built and record the branch's deploy intent
+/// Records the commit a branch should run, which deploys once nixbot reports its artifact
 async fn enqueue_deploy(
     state: &AppState,
     project: &::entity::projects::Model,
     branch: &str,
-    git_ref: &str,
     commit_sha: &str,
 ) -> anyhow::Result<()> {
-    match state
-        .store
-        .builds()
-        .find_by_project_branch_commit(&project.id, branch, commit_sha)
-        .await?
-    {
-        Some(existing) => {
-            if matches!(existing.status.as_str(), "failed" | "cancelled") {
-                state.store.builds().requeue(&existing.id).await?;
-                crate::deploy::remove_build_gc_roots(&existing.id).await;
-                tracing::info!(
-                    project = %project.name,
-                    commit = %commit_sha,
-                    previous_status = %existing.status,
-                    "requeued build for redelivery"
-                );
-            }
-        }
-        None => {
-            let model = ::entity::builds::ActiveModel {
-                id: Set(uuid::Uuid::now_v7().to_string()),
-                project_id: Set(project.id.clone()),
-                branch: Set(branch.to_string()),
-                git_ref: Set(git_ref.to_string()),
-                commit_sha: Set(commit_sha.to_string()),
-                status: Set("queued".to_string()),
-                ..Default::default()
-            };
-            state.store.builds().create(model).await?;
-        }
-    }
-
     state
         .store
         .deploy_requests()
-        .upsert(&project.id, branch, git_ref, commit_sha)
+        .upsert(&project.id, branch, commit_sha)
         .await?;
 
-    reap_unreferenced_builds(state, &project.id).await;
-
-    state.build_signal.notify_one();
     state.reconcile_signal.notify_one();
     Ok(())
-}
-
-// Cancel superseded builds and reap the gc roots pinning their outputs
-async fn reap_unreferenced_builds(state: &AppState, project_id: &str) {
-    let Ok(referenced) = state
-        .store
-        .deploy_requests()
-        .active_targets(project_id)
-        .await
-    else {
-        return;
-    };
-
-    let Ok(stale) = state
-        .store
-        .builds()
-        .cancel_unreferenced(project_id, &referenced)
-        .await
-    else {
-        return;
-    };
-    for build_id in &stale {
-        crate::deploy::remove_build_gc_roots(build_id).await;
-    }
-
-    if !stale.is_empty() {
-        tracing::info!(project_id = %project_id, count = stale.len(), "reaped superseded build gc roots");
-    }
 }
 
 struct ParsedEvent {

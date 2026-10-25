@@ -4,26 +4,18 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "builds")]
+#[sea_orm(table_name = "artifacts")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    #[sea_orm(unique_key = "idx_builds_project_branch_commit")]
+    #[sea_orm(unique_key = "idx_artifacts_project_branch_commit")]
     pub project_id: String,
-    #[sea_orm(unique_key = "idx_builds_project_branch_commit")]
+    #[sea_orm(unique_key = "idx_artifacts_project_branch_commit")]
     pub branch: String,
-    pub git_ref: String,
-    #[sea_orm(unique_key = "idx_builds_project_branch_commit")]
+    #[sea_orm(unique_key = "idx_artifacts_project_branch_commit")]
     pub commit_sha: String,
-    pub status: String,
-    pub store_paths: Option<Json>,
-    pub kennel_config: Option<Json>,
-    pub started_at: Option<DateTimeUtc>,
-    pub finished_at: Option<DateTimeUtc>,
+    pub store_path: String,
     pub created_at: DateTimeUtc,
-    pub config_store_path: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub log: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

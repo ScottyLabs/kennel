@@ -5,11 +5,12 @@ use axum::{
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::handlers::{deployments, metrics, webhook};
+use crate::handlers::{deployments, metrics, nixbot, webhook};
 
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/webhook", post(webhook::handle))
+        .route("/nixbot", post(nixbot::handle))
         .route("/metrics", get(metrics::scrape))
         .route("/deployments/{id}/health", get(deployments::health))
         .with_state(state)

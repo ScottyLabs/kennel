@@ -14,48 +14,63 @@ impl CaddyClient {
         }
     }
 
+    /// Serves the site at `store_path`, with its runtime env files from `env_dir`
     pub async fn add_static_route(
         &self,
         route_id: &str,
         domain: &str,
         store_path: &str,
+        env_dir: &str,
         spa: bool,
     ) -> anyhow::Result<()> {
-        let config = if spa {
+        let site = if spa {
             serde_json::json!({
-                "@id": route_id,
-                "match": [{"host": [domain]}],
-                "handle": [{
-                    "handler": "subroute",
-                    "routes": [{
-                        "handle": [{
-                            "handler": "rewrite",
-                            "uri": "{http.matchers.file.relative}"
-                        }],
-                        "match": [{
-                            "file": {
-                                "root": store_path,
-                                "try_files": ["{http.request.uri.path}", "/index.html"]
-                            }
-                        }]
-                    }, {
-                        "handle": [{
-                            "handler": "file_server",
-                            "root": store_path
-                        }]
+                "handler": "subroute",
+                "routes": [{
+                    "handle": [{
+                        "handler": "rewrite",
+                        "uri": "{http.matchers.file.relative}"
+                    }],
+                    "match": [{
+                        "file": {
+                            "root": store_path,
+                            "try_files": ["{http.request.uri.path}", "/index.html"]
+                        }
+                    }]
+                }, {
+                    "handle": [{
+                        "handler": "file_server",
+                        "root": store_path
                     }]
                 }]
             })
         } else {
             serde_json::json!({
-                "@id": route_id,
-                "match": [{"host": [domain]}],
-                "handle": [{
-                    "handler": "file_server",
-                    "root": store_path
-                }]
+                "handler": "file_server",
+                "root": store_path
             })
         };
+
+        let config = serde_json::json!({
+            "@id": route_id,
+            "match": [{"host": [domain]}],
+            "handle": [{
+                "handler": "subroute",
+                "routes": [{
+                    "match": [{"path": crate::deploy::SITE_ENV_FILES}],
+                    "handle": [{
+                        "handler": "headers",
+                        "response": {"set": {"Cache-Control": ["no-cache"]}}
+                    }, {
+                        "handler": "file_server",
+                        "root": env_dir
+                    }],
+                    "terminal": true
+                }, {
+                    "handle": [site]
+                }]
+            }]
+        });
 
         self.add_route(&config).await
     }

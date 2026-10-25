@@ -1,22 +1,22 @@
 # Architecture
 
-Kennel runs as a single binary with four main responsibilities: receiving webhooks, building Nix packages, deploying them, and reconciling desired state against actual state.
+Kennel runs as a single binary with four main responsibilities: receiving webhooks, recording the artifacts nixbot builds, deploying them, and reconciling desired state against actual state.
 
 ## Request flow
 
 ```
-Git push -> Webhook -> Build (nix) -> Deploy (systemd + Caddy) -> Live
+Git push -> nixbot (eval, build, push to cache) -> kennel (substitute, deploy with systemd + Caddy) -> Live
 ```
 
-1. Forgejo sends a webhook to kennel's `/webhook` endpoint.
-1. Kennel parses the repository name from the payload, verifies the HMAC signature, ensures a build record for the branch's commit, and records a deploy request for the branch. When the same commit is on more than one branch, such as after fast-forwarding `main` to `staging`, kennel builds it once per branch, because the [build environment](../guides/deploying.md#build-environment) differs between branches.
-1. The build worker resolves the project's secretspec `build` scope from OpenBao, when it declares one, then runs the build in a per-project/branch systemd unit, as a dynamic user with no daemon credentials. Up to `builder.maxConcurrentBuilds` builds run at once, oldest queued first, and at most one per project/branch, since builds of the same branch share a unit name. The unit clones the repo, runs `devenv build scottylabs.kennel.config` to discover declared services and sites, and runs `nix build` for each package, streaming output to journald under the unit and on to Loki. The resolved values reach each package through `--override-input` on the kennel flake's `build-env` input. The daemon collects the result, pushes artifacts to cachix, and stores the log in the `builds.log` column.
-1. For each pending deploy request whose build has finished, the reconciler reuses the build's artifacts to provision resources (database, cache, storage), resolve secrets from OpenBao, start a systemd transient unit for services, and add a Caddy route. Requests for a preview branch are skipped when the project disables `previewDeployments`.
+1. Forgejo sends a webhook to kennel's `/webhook` endpoint. Kennel verifies the HMAC signature, registers the project if it is new, and records a deploy request naming the commit the branch should run. Pull requests become the branch `pr-{number}`.
+1. Forgejo also notifies nixbot, which evaluates the project's flake once per commit and builds its `checks` on the build farm. One of them is `checks.<system>.kennel`, which holds a `kennel.json` listing the store paths of the project's services and sites, and a copy of `secretspec.toml`. nixbot pushes the outputs to the binary cache.
+1. A nixbot post-build step posts that attribute's `out_path` to kennel's `/nixbot` endpoint with a bearer token, along with the project, branch, commit, and pull request number. Kennel records it as the artifact for that branch and commit.
+1. For each pending deploy request with an artifact, the reconciler substitutes the artifact with `nix-store --realise`, reads its `kennel.json`, provisions resources (database, cache, storage), and resolves secrets from OpenBao for the branch's profile (`main` is `prod`, pull requests are `preview`). It starts a systemd transient unit for each service, writes each site's [public values](../guides/deploying.md#public-values), and adds Caddy routes. A request whose artifact has not reached the cache yet stays pending for up to 15 minutes before it fails at the `fetch` stage. Requests for a preview branch are skipped when the project disables `previewDeployments`.
 1. Cloudflare's edge terminates public TLS and routes each request through the host's tunnel to Caddy.
 
 ## Delegation
 
-Kennel delegates process supervision to systemd and HTTP routing to Caddy, keeping the core focused on build orchestration and resource provisioning.
+Kennel delegates process supervision to systemd and HTTP routing to Caddy, keeping the core focused on deployment and resource provisioning.
 
 Systemd transient units are created via D-Bus using the zbus crate. Units are placed in the `kennel.slice` cgroup for aggregate accounting, with `CPUAccounting`, `MemoryAccounting`, `IOAccounting`, and `TasksAccounting` enabled so per-deployment resource usage is queryable from cgroup metrics by anything scraping `systemd_unit_*` or `systemd_slice_*` (e.g. `prometheus-systemd-exporter` filtered to `kennel-*` units). Each unit runs sandboxed as a `DynamicUser` with no daemon credentials, a read-only filesystem (`ProtectSystem=strict`, `ProtectHome=yes`) except a private `/tmp` (`PrivateTmp=yes`), and `NoNewPrivileges`. Transient units survive kennel crashes since they are independent of the kennel process.
 
@@ -33,10 +33,11 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | Method | Path | Purpose |
 | ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
-| GET | `/metrics` | Prometheus exposition: `kennel_builds{status=...}`, `kennel_deployments`, `kennel_projects`, and `kennel_deploy_failures{stage=...}` gauges. |
+| POST | `/nixbot` | nixbot's post-build reports, a form with `project`, `attr`, `branch`, `revision`, `pr_number`, and `out_path`, authenticated with a bearer token. Attributes other than `checks.<system>.kennel` are ignored. |
+| GET | `/metrics` | Prometheus exposition: `kennel_deploy_requests{status=...}`, `kennel_deployments`, `kennel_projects`, and `kennel_deploy_failures{stage=...}` gauges. |
 | GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/api/health`) from the unit's D-Bus properties. |
 
-All endpoints other than `/webhook` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
+All endpoints other than `/webhook` and `/nixbot` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
 
 Routes are mounted in `http.rs`; per-resource handlers live under `handlers/`.
 
@@ -44,7 +45,7 @@ Routes are mounted in `http.rs`; per-resource handlers live under `handlers/`.
 
 | Stage | Failed while |
 | ----- | ------------ |
-| `build` | building the commit |
+| `fetch` | substituting the commit's artifact from the binary cache |
 | `config` | checking the `kennel.json` schema version |
 | `provision` | creating postgres, sqlite, valkey, or garage resources |
 | `secrets` | resolving secrets from OpenBao |
@@ -57,47 +58,44 @@ A request stops counting once it is redeployed or its branch is closed. Stages w
 
 ## Reconciliation
 
-A single reconciliation loop handles all deployment convergence. It runs on startup, when signaled by a webhook or build completion, and on a periodic 30-second timer.
+A single reconciliation loop handles all deployment convergence. It runs on startup, when signaled by a webhook or a nixbot report, and on a periodic 30-second timer.
 
 The reconciler compares desired state (deployment rows in the database) against actual state (systemd units and Caddy routes) and converges:
 
-- A pending deploy request gets deployed once its build finishes.
+- A pending deploy request gets deployed once nixbot reports its artifact.
 - A deployment row whose unit is not running gets it restarted, unless systemd has given up on a crash loop (`failed`), in which case it is left stopped.
 - A running unit with no deployment row gets stopped.
 - All Caddy routes are re-added on each pass since Caddy config is ephemeral.
 - The custom domains of all live deployments are written to `customDomainsFile`, if configured.
 - Each deployment's gc root is re-asserted against its recorded store path.
-- A deployment whose artifact is missing from the store is rebuilt from its recorded commit.
+- A deployment whose artifact is missing from the store is fetched again from the binary cache, and its unit is stopped if the cache no longer has it.
 
 ## Artifact lifecycle and gc roots
 
-Every store path a build produces or a deployment runs is protected from `nix-gc` by a gc root under `/nix/var/nix/gcroots/kennel/`. Without a root, the nightly `nix.gc --delete-older-than` sweep would reclaim the path, including one a live service is executing, which then fails it with `203/EXEC`.
+Every store path a deployment runs is protected from `nix-gc` by a gc root under `/nix/var/nix/gcroots/kennel/`. Without a root, the nightly `nix.gc --delete-older-than` sweep would reclaim the path, including one a live service is executing, which then fails it with `203/EXEC`.
 
-Roots come in two kinds, with a handoff between them:
+Services run from their profile's directory in the artifact, which contains `kennel.json` and `secretspec.toml`. From a successful deploy until teardown, kennel keeps two roots for each deployment, `{deployment_id}` for the service or site and `{deployment_id}-config` for that directory. If `nix-gc` deletes an artifact before it is deployed, kennel fetches it from the binary cache again.
 
-- Build roots, named `{build_id}-{service}` per output plus `{build_id}-config`, are created when a build finishes so its outputs survive until they are deployed. `remove_build_gc_roots` drops them once the deploy request succeeds (the deployment roots have taken over), and they are reaped when a build is cancelled or superseded.
-- Deployment roots, named `{deployment_id}` plus `{deployment_id}-config`, own the artifact a deployment currently runs. A successful deploy writes them; teardown removes them.
+Each row in the `deployments` table names the store path its deployment runs. On every pass, reconcile reads each deployment's gc root and moves any root that points elsewhere back to the path in the table. When that path is missing from the Nix store, reconcile downloads the path from the binary cache again, and when the cache has lost the path as well, reconcile stops the unit until a later push deploys a new artifact.
 
-Deploys hold one invariant: the `deployments` record is committed before the deployment gc root is moved onto the new artifact. The recorded store path is therefore always rooted, by the build root before the record lands and by the deployment root after. A deploy that fails partway (a Caddy error, a database error, the process dying) leaves the previous revision's record and root intact and mutually consistent, and never advances the root off a path the record still names.
-
-Reconcile enforces the same invariant on every pass. It re-asserts each deployment's gc root against its recorded store path (a no-op `readlink` when they already agree), so drift is corrected before a sweep can act on it. If a recorded artifact is missing from the store entirely the deployment cannot run, so reconcile stops the unit and rebuilds from the recorded commit, and the normal build and deploy flow then re-pins a fresh artifact.
+Because reconcile repairs roots from the table, a deploy writes the new store path to the table before moving the gc root. A deploy that crashes before the write leaves the old deployment untouched, while one that crashes between the write and the root move leaves the next reconcile pass to move the root.
 
 ## State
 
 Kennel stores state in SQLite with four tables:
 
 - `projects` -- registered repositories with webhook secrets
-- `builds` -- per-branch-and-commit build queue and history (queued, building, built, failed, cancelled), plus the captured per-phase `log` of subprocess output
+- `artifacts` -- the deploy manifests nixbot reported, per branch and commit, pruned once a newer one deploys
 - `deploy_requests` -- per-branch deploy intents naming the commit each branch wants, with status pending/deployed/skipped/failed
 - `deployments` -- active deployments with store paths, domains, unit names, and ports
 
-Runtime process state (running, stopped, failed) is owned by systemd and queried via D-Bus. Routing state is owned by Caddy and queried via the admin API. Kennel's database only tracks intent plus the historical build artifacts (logs) systemd doesn't keep.
+Runtime process state (running, stopped, failed) is owned by systemd and queried via D-Bus. Routing state is owned by Caddy and queried via the admin API.
 
-Artifact retention is likewise external: gc roots under `/nix/var/nix/gcroots/kennel/`, keyed by build id and deployment id, are what stop `nix-gc` from reclaiming the store paths builds and deployments depend on.
+Artifact retention is likewise external: gc roots under `/nix/var/nix/gcroots/kennel/`, keyed by deployment id, are what stop `nix-gc` from reclaiming the store paths deployments depend on.
 
 ## Crate structure
 
-- `kennel` -- main binary. HTTP router lives in `src/http.rs`, request handlers under `src/handlers/{webhook,metrics,deployments,caddy}.rs`. Build orchestration in `src/build.rs`, deploy in `src/deploy.rs`, reconciliation in `src/reconcile.rs`. Systemd, Caddy, and OpenBao clients each have their own module.
+- `kennel` -- main binary. HTTP router lives in `src/http.rs`, request handlers under `src/handlers/{webhook,nixbot,metrics,deployments}.rs`. Deploy in `src/deploy.rs`, reconciliation in `src/reconcile.rs`. Systemd, Caddy, and OpenBao clients each have their own module.
 - `kennel-config` -- shared types, constants, environment enum
 - `kennel-provision` -- resource provisioning trait and implementations (PostgreSQL, SQLite, Valkey, Garage)
 - `entity` -- SeaORM generated entities
