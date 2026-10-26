@@ -26,6 +26,7 @@ prod_monthly_budget = 20.0
 - `ai_gateway` mints budgeted [LiteLLM](https://docs.litellm.ai) API keys under your team and writes `LITELLM_API_KEY` and `LITELLM_BASE_URL` to Vault on every profile
 - `docs` publishes the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org)
 - `mobile_app` grants your team access to its Play Console app and, if `app_store` is set, to App Store Connect
+- `email` sends mail from a project domain, forwards replies to the project's `sl-<project>` group, and writes `EMAIL_FROM` and SMTP credentials to Vault on the `prod` profile
 
 ### OIDC
 
@@ -147,6 +148,28 @@ CDN_PUBLIC_URL = { description = "Public base URL for the bucket" }
 ```
 
 Upload assets with the S3 credentials; they are publicly readable under `CDN_PUBLIC_URL` (`https://cdn.scottylabs.org/<repo>/`).
+
+### Email
+
+If your service sends mail, add `email` with the address it sends from. The address must be on a domain the project owns in Cloudflare, and the project needs an `sl-<project>` [Google Group](#google-groups) of kind `contact`:
+
+```toml
+[team.projects.repos.features.email]
+from = "info@<domain>"
+```
+
+Replies to `from` go to the `sl-<project>` group. Declare the address and SMTP credentials on the `prod` profile:
+
+```toml
+[profiles.prod]
+EMAIL_FROM = { description = "Sending address" }
+SMTP_HOST = { description = "SMTP server" }
+SMTP_PORT = { description = "SMTP port, using implicit TLS" }
+SMTP_USERNAME = { description = "SMTP username" }
+SMTP_PASSWORD = { description = "SMTP password" }
+```
+
+Someone in the group must confirm Cloudflare's verification email before replies are forwarded.
 
 ### AI Gateway
 
