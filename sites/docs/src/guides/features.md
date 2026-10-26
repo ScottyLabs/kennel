@@ -151,14 +151,15 @@ Upload assets with the S3 credentials; they are publicly readable under `CDN_PUB
 
 ### Email
 
-If your service sends mail, add `email` with the address it sends from. The address must be on a domain the project owns in Cloudflare, and the project needs an `sl-<project>` [Google Group](#google-groups) of kind `contact`:
+If your service sends mail, add `email` with the address it sends from and the [Google Group](#google-groups) that receives replies. The address must be on a domain the project owns in Cloudflare, and the group must be one of the project's `contact` groups:
 
 ```toml
 [team.projects.repos.features.email]
 from = "info@<domain>"
+inbox = "sl-<project>@andrew.cmu.edu"
 ```
 
-Replies to `from` go to the `sl-<project>` group. Declare the address and SMTP credentials on the `prod` profile:
+Declare the address and SMTP credentials on the `prod` profile:
 
 ```toml
 [profiles.prod]
