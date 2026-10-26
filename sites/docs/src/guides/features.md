@@ -193,6 +193,26 @@ On the App Store, governance invites everyone on the team at the email of the Ap
 - everyone can view analytics and sign builds, and since Apple shows every app to anyone who can sign, access isn't limited to your team's app
 - service keys such as MapKit and push notification keys are created by the tech director
 
+## Google Groups
+
+A project can list CMU Google Groups for governance to keep in sync with its leads and members. Each group has a `kind` that decides who can post to it and who manages its members:
+
+```toml
+[[team.projects.google_groups]]
+email = "sl-<project>@andrew.cmu.edu"
+kind = "contact"
+```
+
+| Kind | Managers | Who can post | People outside the project |
+| --- | --- | --- | --- |
+| `contact` | tech director | Anyone on the web | never |
+| `discussion` | tech director, leads, and members | Anyone on the web | added by managers |
+| `announce` | tech director, leads, and members | Group managers | added by managers |
+
+Every kind has the project's leads and members as members, including the parent team's. A project's `sl-<project>` group is its inbox and should be a `contact` group.
+
+When you add a group, set its "Who can post" in [Google Groups](https://groups.google.com) to match its kind. The group must already exist with `scottylabs-svc@andrew.cmu.edu` as one of its managers.
+
 ## Documentation
 
 Add `docs` to publish the repository's `docs/` directory to the [documentation hub](https://docs.scottylabs.org).
