@@ -235,7 +235,35 @@ kind = "contact"
 
 Every kind has the project's leads and members as members, including the parent team's. A project's `sl-<project>` group is its inbox and should be a `contact` group.
 
-When you add a group, set its "Who can post" in [Google Groups](https://groups.google.com) to match its kind. The group must already exist with `scottylabs-svc@andrew.cmu.edu` as one of its managers.
+The group must already exist with `scottylabs-svc@andrew.cmu.edu` as one of its managers. Governance doesn't manage the group's settings, so set them manually in [Google Groups](https://groups.google.com) to match its kind before adding it:
+
+| Setting | `contact` | `discussion` | `announce` |
+| --- | --- | --- | --- |
+| Who can see group | Organization members | Organization members | Organization members |
+| Who can join group | Only invited users | Only invited users | Only invited users |
+| Who can modify group details | Group managers | Group managers | Group managers |
+| Who can view conversations | Group members | Group members | Group members |
+| Who can post | Anyone on the web | Anyone on the web | Group managers |
+| Who can view members | Group members | Group members | Group members |
+| Who can manage members | Group managers | Group managers | Group managers |
+| Who can modify custom roles | Group managers | Group managers | Group managers |
+| Who can contact group owners | Group members | Group members | Group members |
+| Who can view member email addresses | Group members | Group members | Group members |
+| Allow email posting | On | On | On |
+| Allow web posting | On | On | On |
+| Conversation history | On | On | On |
+| Collaborative inbox | On | Off | Off |
+| Who can reply privately to authors | Group members | Group members | Group members |
+| Who can attach files | Anyone on the web | Anyone on the web | Group managers |
+| Who can moderate content | Group managers | Group managers | Group managers |
+| Who can moderate metadata | Group members | Group managers | Group managers |
+| Who can post as group | Group members | Group managers | Group managers |
+| Default sender | Group address | Author's address | Group address |
+| Subject prefix | `[sl-<project>]` | `[<group>]` | `[<group>]` |
+| Post replies to | The author of the message only | All group members | The author of the message only |
+| Conversation mode | On | On | On |
+
+Replies sent with Reply all also reach the group, so other members see them.
 
 ## Documentation
 
