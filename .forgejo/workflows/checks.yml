@@ -1,0 +1,12 @@
+name: CI
+on:
+  workflow_call:
+
+jobs:
+  checks:
+    runs-on: native
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v7
+
+      - name: Run network checks
+        run: nix run .#ci

@@ -1,12 +1,45 @@
 name: CI
 on:
   workflow_call:
+    inputs:
+      build:
+        type: boolean
+        default: true
+      secretspec-profile:
+        type: string
+        default: ci
+
+env:
+  SECRETSPEC_PROFILE: ${{ inputs.secretspec-profile }}
+
+enable-openid-connect: true
 
 jobs:
-  checks:
+  check:
     runs-on: native
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v7
+      - uses: https://git.cmu.dev/ScottyLabs/kennel/.forgejo/actions/prepare@main
 
-      - name: Run network checks
-        run: nix run .#ci
+      - name: Run checks
+        run: devenv shell -- prek run --all-files
+
+      - name: Run security scans
+        run: |
+          if ! devenv -v tasks run security > security-scan.log 2>&1; then
+            cat security-scan.log
+            exit 1
+          fi
+
+  build:
+    if: ${{ inputs.build }}
+    runs-on: native
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v7
+      - uses: https://git.cmu.dev/ScottyLabs/kennel/.forgejo/actions/prepare@main
+
+      - name: Build
+        run: |
+          config=$(devenv build scottylabs.kennel.config | jq -r '."scottylabs.kennel.config"')
+          packages=$(jq -r '[(.services // {} | keys[]), (.static_sites // {} | keys[])] | .[] | ".#" + .' "$config/kennel.json")
+          devenv shell -- nix build $packages
