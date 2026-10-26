@@ -92,7 +92,7 @@ impl SystemdClient {
 
         let mut properties: Vec<(&str, zbus::Variant)> = vec![
             ("Description", format!("Kennel: {unit_name}").into()),
-            ("Slice", "kennel.slice".into()),
+            ("Slice", kennel_config::constants::UNIT_SLICE.into()),
             ("Restart", "on-failure".into()),
             ("RestartUSec", 5_000_000u64.into()),
             (
@@ -238,6 +238,7 @@ impl SystemdClient {
         })
     }
 
+    /// kennel-* units in kennel.slice
     pub async fn list_kennel_units(&self) -> anyhow::Result<Vec<String>> {
         let proxy = self.manager_proxy().await?;
 
@@ -248,10 +249,23 @@ impl SystemdClient {
             )
             .await?;
 
-        Ok(units
-            .into_iter()
-            .map(|(name, ..)| name.trim_end_matches(".service").to_string())
-            .collect())
+        let mut names = Vec::new();
+        for (name, _, _, _, _, _, unit_path, ..) in units {
+            let service = Proxy::new(
+                &self.conn,
+                "org.freedesktop.systemd1",
+                unit_path,
+                "org.freedesktop.systemd1.Service",
+            )
+            .await?;
+            let slice: String = service.get_property("Slice").await.unwrap_or_default();
+
+            if slice == kennel_config::constants::UNIT_SLICE {
+                names.push(name.trim_end_matches(".service").to_string());
+            }
+        }
+
+        Ok(names)
     }
 }
 

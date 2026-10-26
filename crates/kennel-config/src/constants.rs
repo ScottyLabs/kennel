@@ -28,6 +28,7 @@ pub const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_INTERVAL: Duration = Duration::from_secs(2);
 pub const HEALTHCHECK_STARTUP_GRACE: Duration = Duration::from_secs(60);
 
+pub const UNIT_SLICE: &str = "kennel.slice";
 pub const UNIT_START_LIMIT_BURST: u32 = 5;
 pub const UNIT_START_LIMIT_INTERVAL: Duration = Duration::from_secs(300);
 
