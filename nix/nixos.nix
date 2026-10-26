@@ -237,6 +237,18 @@ in
       }
     ];
 
+    # Skip kennel.slice units in switch-to-configuration's failed-unit sweep
+    nixpkgs.overlays = [
+      (_: prev: {
+        switch-to-configuration-ng = prev.switch-to-configuration-ng.overrideAttrs (old: {
+          postPatch = (old.postPatch or "") + ''
+            substituteInPlace src/main.rs \
+              --replace-fail 'for (unit, unit_state) in new_active_units {' 'for (unit, unit_state) in new_active_units { if unit.ends_with(".service") { let slice: Result<String, _> = unit_state.proxy.get("org.freedesktop.systemd1.Service", "Slice"); if matches!(slice, Ok(s) if s == "kennel.slice") { continue; } }'
+          '';
+        });
+      })
+    ];
+
     users = {
       users.${cfg.user} = mkIf (cfg.user == "kennel") {
         isSystemUser = true;
