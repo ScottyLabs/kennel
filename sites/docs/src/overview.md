@@ -19,4 +19,4 @@ Every deployment gets a URL at `{project}-{branch}.scottylabs.net`. Production d
 
 ## Getting started
 
-See the [enabling features](./guides/features.md) and [deploying a project](./guides/deploying.md) guides.
+See the [enabling features](https://docs.governance.scottylabs.org/features/) and [deploying a project](./guides/deploying.md) guides.

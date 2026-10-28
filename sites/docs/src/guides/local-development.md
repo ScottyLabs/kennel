@@ -38,7 +38,7 @@ scottylabs.ricochet = {
 };
 ```
 
-Governance already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so `enable` only runs Ricochet locally. `appUrl` is your service's local URL, the port your dev server listens on, exported as `APP_URL` so the relay can return to it. It only applies to development, since kennel sets `APP_URL` for deployed services (see [Runtime environment](./deploying.md#runtime-environment)), so leave `APP_URL` out of `secretspec.toml`.
+[Governance](https://docs.governance.scottylabs.org/features/#oidc) already seeds the correct `OAUTH_RELAY_URL` for `profiles.dev`, so `enable` only runs Ricochet locally. `appUrl` is your service's local URL, the port your dev server listens on, exported as `APP_URL` so the relay can return to it. It only applies to development, since kennel sets `APP_URL` for deployed services (see [Runtime environment](./deploying.md#runtime-environment)), so leave `APP_URL` out of `secretspec.toml`.
 
 ## Scripts
 

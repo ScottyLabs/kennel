@@ -4,7 +4,6 @@
 
 # Guides
 
-- [Enabling Features](./guides/features.md)
 - [Deploying a Project](./guides/deploying.md)
 - [Local Development](./guides/local-development.md)
 - [Continuous Integration](./guides/ci.md)

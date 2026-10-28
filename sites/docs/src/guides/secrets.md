@@ -36,6 +36,8 @@ providers = ["openbao"]
 
 `[project] name` must be the slug governance stores your secrets under, which is the project's slug, or the team's slug for a team without projects. A deploy fails at the `secrets` stage when the name doesn't match.
 
+Features enabled in governance write their own secrets to OpenBao. [Enabling features](https://docs.governance.scottylabs.org/features/) lists which secrets each feature writes and on which profile.
+
 `[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for every environment.
 
 The `[providers]` table defines `openbao`, which logs in with your local `bao` token, and `local`, a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` makes local development read from `openbao`. Deployed profiles need no `providers`, since kennel sets its own.
