@@ -56,7 +56,13 @@ Type: `listOf package`, default: `[ ]`
 
 Options forwarded to crane's `buildPackage`. `doCheck` defaults to `false` and `meta.mainProgram` to `pname`. `cargoExtraArgs` defaults to `"--locked"` and applies to the dependency build, clippy, and tests as well as the package. In a workspace, set it to `"--locked -p kennel"` to build one member.
 
-The package carries `passthru.checks.clippy` and `passthru.checks.test`, which the flake module adds to `checks` for every service and site, so nixbot runs clippy (denying warnings) and `cargo test` on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
+The package carries `passthru.checks.clippy`, `passthru.checks.test`, and `passthru.checks.mutants`, which the flake module adds to `checks` for every service and site, so nixbot runs clippy (denying warnings), `cargo test`, and [cargo-mutants](https://mutants.rs) on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
+
+The `mutants` check makes small changes to the code, such as replacing a function body with `Ok(())`, and fails if `cargo test` still passes for any of them. It mutates the whole workspace regardless of `cargoExtraArgs`. Exclude generated code or files you don't intend to test in `.cargo/mutants.toml` (see [filtering files](https://mutants.rs/skip_files.html)). If `.gitignore` lists `.cargo/`, replace it with `.cargo/*` and `!.cargo/mutants.toml` so the file is committed:
+
+```toml
+exclude_globs = ["crates/entity/**"]
+```
 
 Type: `attrs`, default: `{ }`
 

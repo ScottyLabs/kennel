@@ -47,6 +47,13 @@ let
 
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
+  # cargo-mutants builds the dev profile, keep deps cached across commits
+  mutantsArgs = commonArgs // {
+    CARGO_PROFILE = "";
+    CARGO_PROFILE_DEV_DEBUG = "0";
+  };
+  mutantsArtifacts = craneLib.buildDepsOnly mutantsArgs;
+
   # the sandbox has no system CA store for TLS clients built in tests
   testEnv.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
 
@@ -72,6 +79,18 @@ package
         }
       );
       test = craneLib.cargoTest (commonArgs // testEnv // { inherit cargoArtifacts; });
+      mutants = craneLib.mkCargoDerivation (
+        mutantsArgs
+        // testEnv
+        // {
+          cargoArtifacts = mutantsArtifacts;
+          pnameSuffix = "-mutants";
+          nativeBuildInputs = nativeBuildInputs ++ [ pkgs.cargo-mutants ];
+          buildPhaseCargoCommand = "cargo mutants --in-place --no-shuffle";
+          installPhaseCommand = "cp -r mutants.out $out";
+          doInstallCargoArtifacts = false;
+        }
+      );
     };
   };
 }

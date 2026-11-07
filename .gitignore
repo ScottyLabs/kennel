@@ -3,7 +3,8 @@
 
 # Rust
 target/
-.cargo/
+.cargo/*
+!.cargo/mutants.toml
 rustc-ice-*.txt
 
 # Build
