@@ -181,7 +181,7 @@ PUBLIC_POSTHOG_KEY = { description = "PostHog project key" }
 secrets = ["PUBLIC_API_URL", "PUBLIC_POSTHOG_KEY"]
 ```
 
-When kennel deploys a site, it resolves these values for the branch's profile and serves them next to the site's files:
+When kennel deploys a site or service, it resolves these values for the branch's profile and serves them on the deployment's domain, ahead of the site's files or the service itself:
 
 - `/_app/env.js`, which SvelteKit loads for `$env/dynamic/public`
 - `/_kennel/env.json`, a JSON object other frameworks can fetch on load

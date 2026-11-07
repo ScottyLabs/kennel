@@ -436,24 +436,8 @@ async fn deploy_static_site(
         .await
         .at(FailureStage::Internal)?;
 
-    let public = match std::env::var("VAULT_ENDPOINT") {
-        Ok(vault_endpoint) => crate::secrets::resolve_public(
-            std::path::Path::new(config_store_path),
-            &environment.to_string(),
-            &vault_endpoint,
-            project.secret_namespace.as_deref(),
-        )
-        .map_err(|e| StageError {
-            stage: FailureStage::Secrets,
-            error: anyhow::anyhow!("public value resolution failed for site '{name}': {e}"),
-        })?,
-        Err(_) => HashMap::new(),
-    };
-
-    let env_dir = site_env_dir(&project.id, branch_slug, name);
-    write_site_env(&env_dir, &public)
-        .await
-        .at(FailureStage::Internal)?;
+    let env_dir =
+        publish_public_env(project, config_store_path, environment, branch_slug, name).await?;
     let env_dir = env_dir.to_string_lossy();
 
     let route_id = format!("kennel-{deployment_id}");
@@ -519,17 +503,47 @@ async fn deploy_static_site(
     Ok(())
 }
 
-/// Paths a site's runtime public values are served at, in SvelteKit's format and as JSON
-pub const SITE_ENV_FILES: [&str; 2] = ["/_app/env.js", "/_kennel/env.json"];
+/// Paths a deployment's public values are served at, in SvelteKit's format and as JSON
+pub const PUBLIC_ENV_FILES: [&str; 2] = ["/_app/env.js", "/_kennel/env.json"];
 
-pub fn site_env_dir(project_id: &str, branch_slug: &str, name: &str) -> PathBuf {
+pub fn public_env_dir(project_id: &str, branch_slug: &str, name: &str) -> PathBuf {
     PathBuf::from(kennel_config::constants::SITES_BASE_DIR)
         .join(project_id)
         .join(branch_slug)
         .join(format!("{name}.env"))
 }
 
-async fn write_site_env(
+/// Writes a target's `[scopes.public]` values to the directory its Caddy route serves them from
+async fn publish_public_env(
+    project: &::entity::projects::Model,
+    config_store_path: &str,
+    environment: &Environment,
+    branch_slug: &str,
+    name: &str,
+) -> Result<PathBuf, StageError> {
+    let public = match std::env::var("VAULT_ENDPOINT") {
+        Ok(vault_endpoint) => crate::secrets::resolve_public(
+            std::path::Path::new(config_store_path),
+            &environment.to_string(),
+            &vault_endpoint,
+            project.secret_namespace.as_deref(),
+        )
+        .map_err(|e| StageError {
+            stage: FailureStage::Secrets,
+            error: anyhow::anyhow!("public value resolution failed for '{name}': {e}"),
+        })?,
+        Err(_) => HashMap::new(),
+    };
+
+    let dir = public_env_dir(&project.id, branch_slug, name);
+    write_public_env(&dir, &public)
+        .await
+        .at(FailureStage::Internal)?;
+
+    Ok(dir)
+}
+
+async fn write_public_env(
     dir: &std::path::Path,
     values: &HashMap<String, String>,
 ) -> anyhow::Result<()> {
@@ -601,6 +615,10 @@ async fn deploy_service(
         }
     }
 
+    let env_dir =
+        publish_public_env(project, config_store_path, environment, branch_slug, name).await?;
+    let env_dir = env_dir.to_string_lossy();
+
     let exec_start = match &svc_config.exec {
         Some(exec) => exec.clone(),
         None => find_executable(store_path)
@@ -656,14 +674,14 @@ async fn deploy_service(
     let route_id = format!("kennel-{deployment_id}");
 
     caddy
-        .add_proxy_route(&route_id, &domain, port)
+        .add_proxy_route(&route_id, &domain, port, &env_dir)
         .await
         .at(FailureStage::Routing)?;
 
     if let Some(custom_domain) = custom_domain {
         let custom_route_id = format!("kennel-{deployment_id}-custom");
         caddy
-            .add_proxy_route(&custom_route_id, custom_domain, port)
+            .add_proxy_route(&custom_route_id, custom_domain, port, &env_dir)
             .await
             .at(FailureStage::Routing)?;
         ensure_dns_record(state, project_name, custom_domain).await;

@@ -153,7 +153,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
     for deployment in &deployments {
         let route_id = format!("kennel-{}", deployment.id);
-        let env_dir = deploy::site_env_dir(
+        let env_dir = deploy::public_env_dir(
             &deployment.project_id,
             &deployment.branch_slug,
             &deployment.service_name,
@@ -173,7 +173,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                     .await;
             } else if let Some(port) = deployment.port {
                 let _ = caddy
-                    .add_proxy_route(&route_id, &deployment.domain, port as u16)
+                    .add_proxy_route(&route_id, &deployment.domain, port as u16, &env_dir)
                     .await;
             }
         }
@@ -193,7 +193,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                         .await;
                 } else if let Some(port) = deployment.port {
                     let _ = caddy
-                        .add_proxy_route(&custom_route_id, custom_domain, port as u16)
+                        .add_proxy_route(&custom_route_id, custom_domain, port as u16, &env_dir)
                         .await;
                 }
             }

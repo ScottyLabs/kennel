@@ -14,7 +14,7 @@ impl CaddyClient {
         }
     }
 
-    /// Serves the site at `store_path`, with its runtime env files from `env_dir`
+    /// Serves the site at `store_path`, with its public values from `env_dir`
     pub async fn add_static_route(
         &self,
         route_id: &str,
@@ -51,53 +51,35 @@ impl CaddyClient {
             })
         };
 
-        let config = serde_json::json!({
-            "@id": route_id,
-            "match": [{"host": [domain]}],
-            "handle": [{
-                "handler": "subroute",
-                "routes": [{
-                    "match": [{"path": crate::deploy::SITE_ENV_FILES}],
-                    "handle": [{
-                        "handler": "headers",
-                        "response": {"set": {"Cache-Control": ["no-cache"]}}
-                    }, {
-                        "handler": "file_server",
-                        "root": env_dir
-                    }],
-                    "terminal": true
-                }, {
-                    "handle": [site]
-                }]
-            }]
-        });
-
-        self.add_route(&config).await
+        self.add_route(&with_public_env(route_id, domain, env_dir, vec![site]))
+            .await
     }
 
+    /// Proxies to the service on `port`, with its public values from `env_dir`
     pub async fn add_proxy_route(
         &self,
         route_id: &str,
         domain: &str,
         port: u16,
+        env_dir: &str,
     ) -> anyhow::Result<()> {
-        let config = serde_json::json!({
-            "@id": route_id,
-            "match": [{"host": [domain]}],
+        let service = vec![
             // Nix-store epoch mtimes defeat HTML cache validators
-            "handle": [{
+            serde_json::json!({
                 "handler": "headers",
                 "response": {
                     "require": {"headers": {"Content-Type": ["text/html*"]}},
                     "set": {"Cache-Control": ["no-store"]}
                 }
-            }, {
+            }),
+            serde_json::json!({
                 "handler": "reverse_proxy",
                 "upstreams": [{"dial": format!("localhost:{port}")}]
-            }]
-        });
+            }),
+        ];
 
-        self.add_route(&config).await
+        self.add_route(&with_public_env(route_id, domain, env_dir, service))
+            .await
     }
 
     pub async fn add_redirect_route(
@@ -184,4 +166,33 @@ impl CaddyClient {
         );
         Ok(())
     }
+}
+
+/// Route for `domain` that answers the public env files from `env_dir` and everything else with `handle`
+fn with_public_env(
+    route_id: &str,
+    domain: &str,
+    env_dir: &str,
+    handle: Vec<serde_json::Value>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "@id": route_id,
+        "match": [{"host": [domain]}],
+        "handle": [{
+            "handler": "subroute",
+            "routes": [{
+                "match": [{"path": crate::deploy::PUBLIC_ENV_FILES}],
+                "handle": [{
+                    "handler": "headers",
+                    "response": {"set": {"Cache-Control": ["no-cache"]}}
+                }, {
+                    "handler": "file_server",
+                    "root": env_dir
+                }],
+                "terminal": true
+            }, {
+                "handle": handle
+            }]
+        }]
+    })
 }
