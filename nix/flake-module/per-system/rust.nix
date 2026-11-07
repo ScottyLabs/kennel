@@ -74,6 +74,7 @@ in
         "aws-lc-sys"
         "aws-lc-rs"
         "rustls"
+        "zmij"
       ];
       description = "Crates built with LLVM instead of cranelift";
     };
