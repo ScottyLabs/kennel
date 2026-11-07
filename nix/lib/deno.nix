@@ -87,7 +87,7 @@ in
     '';
 
   # patchelf linux addons, dropping musl packages it cannot fix
-  patchAddons = lib.optionalString stdenv.isLinux ''
+  patchAddons = lib.optionalString stdenv.hostPlatform.isLinux ''
     if [ -d node_modules ]; then
       find node_modules -type d -name '*musl*' -prune -exec rm -rf {} +
       autoPatchelf node_modules

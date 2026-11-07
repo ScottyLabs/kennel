@@ -114,7 +114,7 @@ in
           fi
         ''
         # native wheels from uv look for these outside the store
-        + lib.optionalString pkgs.stdenv.isLinux ''
+        + lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
           export LD_LIBRARY_PATH=${
             lib.makeLibraryPath [
               pkgs.stdenv.cc.cc.lib

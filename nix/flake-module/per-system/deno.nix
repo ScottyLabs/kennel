@@ -89,8 +89,11 @@ in
   config = lib.mkIf cfg.enable {
     scottylabs = {
       hooksCheck = {
-        nativeBuildInputs = [ pkgs.deno ] ++ lib.optional pkgs.stdenv.isLinux pkgs.autoPatchelfHook;
-        buildInputs = lib.optional pkgs.stdenv.isLinux pkgs.stdenv.cc.cc.lib;
+        nativeBuildInputs = [
+          pkgs.deno
+        ]
+        ++ lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.autoPatchelfHook;
+        buildInputs = lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.stdenv.cc.cc.lib;
         setup = ''
           export DENO_DIR="$TMPDIR/deno"
           export OXLINT_TSGOLINT_PATH=${lib.getExe pkgs.tsgolint}

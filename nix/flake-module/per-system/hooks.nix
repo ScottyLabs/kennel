@@ -120,11 +120,16 @@ in
       };
     };
 
-    # .git/hooks call prek by store path
-    scottylabs.shell.hook = ''
-      ${config.pre-commit.installationScript}
-      mkdir -p "$SCOTTYLABS_STATE/gcroots"
-      nix-store --add-root "$SCOTTYLABS_STATE/gcroots/prek" --realise ${config.pre-commit.settings.package} >/dev/null
-    '';
+    scottylabs.shell = {
+      # treefmt with the hook's config
+      packages = [ config.treefmt.build.wrapper ];
+
+      # .git/hooks call prek by store path
+      hook = ''
+        ${config.pre-commit.installationScript}
+        mkdir -p "$SCOTTYLABS_STATE/gcroots"
+        nix-store --add-root "$SCOTTYLABS_STATE/gcroots/prek" --realise ${config.pre-commit.settings.package} >/dev/null
+      '';
+    };
   };
 }

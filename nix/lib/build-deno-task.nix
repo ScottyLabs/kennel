@@ -30,8 +30,8 @@ in
 stdenv.mkDerivation {
   inherit pname version src;
 
-  nativeBuildInputs = [ deno ] ++ lib.optional stdenv.isLinux autoPatchelfHook;
-  buildInputs = lib.optionals stdenv.isLinux [ stdenv.cc.cc.lib ];
+  nativeBuildInputs = [ deno ] ++ lib.optional stdenv.hostPlatform.isLinux autoPatchelfHook;
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
   dontAutoPatchelf = true;
   # strip/patchelf would corrupt the trailer deno compile appends
   dontStrip = compile;
