@@ -47,6 +47,9 @@ let
 
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
+  # the sandbox has no system CA store for TLS clients built in tests
+  testEnv.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+
   package = craneLib.buildPackage (
     commonArgs
     // {
@@ -68,7 +71,7 @@ package
           cargoClippyExtraArgs = "--all-targets -- --deny warnings";
         }
       );
-      test = craneLib.cargoTest (commonArgs // { inherit cargoArtifacts; });
+      test = craneLib.cargoTest (commonArgs // testEnv // { inherit cargoArtifacts; });
     };
   };
 }
