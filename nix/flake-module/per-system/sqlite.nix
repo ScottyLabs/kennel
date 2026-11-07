@@ -23,7 +23,7 @@ in
     scottylabs = {
       shell = {
         packages = [ pkgs.sqlite ];
-        hook = ''
+        exports = ''
           export DATABASE_PATH="$SCOTTYLABS_STATE/${projectName}.db"
         '';
       };

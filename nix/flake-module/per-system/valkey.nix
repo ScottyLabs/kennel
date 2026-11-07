@@ -22,7 +22,7 @@ in
     scottylabs = {
       shell = {
         packages = [ pkgs.valkey ];
-        hook = ''
+        exports = ''
           export VALKEY_URL="redis+unix://$SCOTTYLABS_RUNTIME/valkey.sock?db=0"
         '';
       };

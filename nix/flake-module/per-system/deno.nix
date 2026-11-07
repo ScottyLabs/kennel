@@ -115,10 +115,11 @@ in
         # oxlint prefers node_modules/.bin/tsgolint over PATH
         env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
 
-        hook = ''
+        exports = ''
           export DENO_DIR="$SCOTTYLABS_STATE/deno"
-        ''
-        + lib.concatMapStrings (dir: ''
+        '';
+
+        hook = lib.concatMapStrings (dir: ''
           (cd "$SCOTTYLABS_ROOT"/${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && deno run -A npm:@sveltejs/kit/svelte-kit sync"})
         '') cfg.dirs;
       };

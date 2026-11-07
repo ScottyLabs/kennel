@@ -39,7 +39,7 @@ in
     scottylabs = {
       shell = {
         packages = [ postgres ];
-        hook = ''
+        exports = ''
           export DATABASE_URL="postgresql:///${projectName}?host=$SCOTTYLABS_RUNTIME/postgres"
         '';
       };

@@ -95,12 +95,17 @@ in
           UV_PYTHON_DOWNLOADS = "never";
         };
 
-        hook = ''
+        exports = ''
           export UV_CACHE_DIR="$SCOTTYLABS_STATE/uv"
           if [ -f "$SCOTTYLABS_ROOT/pyproject.toml" ]; then
-            (cd "$SCOTTYLABS_ROOT" && uv sync --quiet)
             export VIRTUAL_ENV="$SCOTTYLABS_ROOT/.venv"
             export PATH="$VIRTUAL_ENV/bin:$PATH"
+          fi
+        '';
+
+        hook = ''
+          if [ -f "$SCOTTYLABS_ROOT/pyproject.toml" ]; then
+            (cd "$SCOTTYLABS_ROOT" && uv sync --quiet)
           fi
         '';
       };

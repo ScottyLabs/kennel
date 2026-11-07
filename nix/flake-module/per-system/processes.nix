@@ -32,7 +32,8 @@ let
   script =
     name: body:
     pkgs.writeShellScript name ''
-      source ${config.scottylabs.shell.paths}
+      source ${config.scottylabs.shell.environment}
+      cd "$SCOTTYLABS_ROOT"
       ${body}
     '';
 
@@ -94,8 +95,9 @@ in
     default = { };
     description = ''
       Local services started by [pitchfork](https://pitchfork.jdx.dev) with
-      `pitchfork start --local`. Scripts see `$SCOTTYLABS_ROOT`,
-      `$SCOTTYLABS_STATE`, and `$SCOTTYLABS_RUNTIME`.
+      `pitchfork start --local`. Each script runs from the project root with the
+      dev shell's packages, `env`, and `exports`, but without its secrets, so a
+      process that needs them runs under `secretspec run`.
     '';
   };
 

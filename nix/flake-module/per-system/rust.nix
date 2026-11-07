@@ -10,6 +10,7 @@ let
   cfg = config.scottylabs.rust;
   projectName = config.scottylabs.project.name;
   inherit (pkgs.stdenv) hostPlatform;
+  readOnlyKeyId = "GK86a1015b84fc446d260e66b9";
 
   rustBin = kennelInputs.rust-overlay.lib.mkRustBin { } pkgs.buildPackages;
   toolchain = rustBin.selectLatestNightlyWith (
@@ -122,21 +123,21 @@ in
         "CARGO_TARGET_${hostPlatform.rust.cargoEnvVarTarget}_LINKER" = lib.getExe pkgs.clang;
       };
 
-      # Default to the read-only sccache key, upgrading to read-write when OpenBao answers
-      hook = ''
+      exports = ''
         export CARGO_TARGET_DIR="$SCOTTYLABS_STATE/target"
         export CARGO_INSTALL_ROOT="$SCOTTYLABS_STATE/cargo-install"
         export PATH="$PATH:$CARGO_INSTALL_ROOT/bin:''${CARGO_HOME:-$HOME/.cargo}/bin"
+        export AWS_ACCESS_KEY_ID="''${AWS_ACCESS_KEY_ID:-${readOnlyKeyId}}"
+        export AWS_SECRET_ACCESS_KEY="''${AWS_SECRET_ACCESS_KEY:-298e02b2ee7eb97c8112ee97876feea9894e7916457efee2fbf255ffdb676b38}" # gitleaks:allow nosemgrep: detected-aws-secret-access-key
+      '';
 
-        if [ -z "''${AWS_ACCESS_KEY_ID:-}" ]; then
-          export AWS_ACCESS_KEY_ID=GK86a1015b84fc446d260e66b9
-          export AWS_SECRET_ACCESS_KEY=298e02b2ee7eb97c8112ee97876feea9894e7916457efee2fbf255ffdb676b38 # gitleaks:allow nosemgrep: detected-aws-secret-access-key
-          if _ak=$(${lib.getExe' pkgs.openbao "bao"} kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache 2>/dev/null); then
-            export AWS_ACCESS_KEY_ID=$_ak
-            export AWS_SECRET_ACCESS_KEY=$(${lib.getExe' pkgs.openbao "bao"} kv get -field=AWS_SECRET_ACCESS_KEY secret/shared/sccache)
-          fi
-          unset _ak
+      # upgrade the read-only sccache key when OpenBao answers
+      hook = ''
+        if [ "$AWS_ACCESS_KEY_ID" = ${readOnlyKeyId} ] && _ak=$(${lib.getExe' pkgs.openbao "bao"} kv get -field=AWS_ACCESS_KEY_ID secret/shared/sccache 2>/dev/null); then
+          export AWS_ACCESS_KEY_ID=$_ak
+          export AWS_SECRET_ACCESS_KEY=$(${lib.getExe' pkgs.openbao "bao"} kv get -field=AWS_SECRET_ACCESS_KEY secret/shared/sccache)
         fi
+        unset _ak
       '';
 
       files.".cargo/config.toml" = cargoConfig;

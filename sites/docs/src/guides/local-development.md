@@ -20,12 +20,12 @@ scottylabs.processes = {
   };
   worker = {
     run = "cargo run -p worker";
-    depends = [ "postgres" ];
+    depends = [ "postgres-setup" ];
   };
 };
 ```
 
-The [flake options](../reference/flake-options.md) list every field a process takes.
+Each process runs from the project root with the dev shell's tools and variables, such as `DATABASE_URL`, but without your secrets. A process that needs them runs under `secretspec run`, for example `secretspec run -- cargo run -p worker`. The [flake options](../reference/flake-options.md) list every field a process takes.
 
 ## OAuth relay
 
