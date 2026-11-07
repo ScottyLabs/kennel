@@ -9,6 +9,7 @@ kennelInputs:
 let
   cfg = config.scottylabs.python;
   inherit (config.scottylabs) root;
+  project = root + "/${cfg.dir}";
 
   # every locked dependency group so ty and pytest see the dev tools
   devEnv =
@@ -20,7 +21,7 @@ let
             inherit (kennelInputs) uv2nix pyproject-nix pyproject-build-systems;
           }
           {
-            src = root;
+            src = project;
             python = cfg.package;
             inherit (cfg) overrides;
           }
@@ -33,6 +34,7 @@ let
 
   # pytest exits 5 when it collects no tests
   pytest = pkgs.writeShellScript "pytest" ''
+    cd ${lib.escapeShellArg cfg.dir}
     python -m pytest "$@"
     rc=$?
     [ "$rc" -eq 5 ] && exit 0
@@ -50,6 +52,15 @@ in
         [ty](https://github.com/astral-sh/ty). Runs `uv sync` on shell entry and
         ruff, ty, and [pytest](https://docs.pytest.org) on every commit. pytest
         must be in the project's dev dependencies.
+      '';
+    };
+
+    dir = lib.mkOption {
+      type = lib.types.str;
+      default = ".";
+      description = ''
+        Directory, relative to the project root, holding the `pyproject.toml`
+        and `uv.lock` that the shell syncs and the hooks check.
       '';
     };
 
@@ -77,7 +88,7 @@ in
 
   config = lib.mkIf cfg.enable {
     scottylabs = {
-      hooksCheck.setup = lib.optionalString (builtins.pathExists (root + "/uv.lock")) ''
+      hooksCheck.setup = lib.optionalString (builtins.pathExists (project + "/uv.lock")) ''
         export VIRTUAL_ENV=${devEnv}
         export PATH="$VIRTUAL_ENV/bin:$PATH"
       '';
@@ -97,15 +108,25 @@ in
 
         exports = ''
           export UV_CACHE_DIR="$SCOTTYLABS_STATE/uv"
-          if [ -f "$SCOTTYLABS_ROOT/pyproject.toml" ]; then
-            export VIRTUAL_ENV="$SCOTTYLABS_ROOT/.venv"
+          if [ -f "$SCOTTYLABS_ROOT/${cfg.dir}/pyproject.toml" ]; then
+            export VIRTUAL_ENV="$SCOTTYLABS_ROOT/${cfg.dir}/.venv"
             export PATH="$VIRTUAL_ENV/bin:$PATH"
           fi
+        ''
+        # native wheels from uv look for these outside the store
+        + lib.optionalString pkgs.stdenv.isLinux ''
+          export LD_LIBRARY_PATH=${
+            lib.makeLibraryPath [
+              pkgs.stdenv.cc.cc.lib
+              pkgs.zlib
+            ]
+          }''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
         '';
 
+        # every extra and group, matching the hooks check
         hook = ''
-          if [ -f "$SCOTTYLABS_ROOT/pyproject.toml" ]; then
-            (cd "$SCOTTYLABS_ROOT" && uv sync --quiet)
+          if [ -f "$SCOTTYLABS_ROOT/${cfg.dir}/pyproject.toml" ]; then
+            (cd "$SCOTTYLABS_ROOT/${cfg.dir}" && uv sync --quiet --all-extras --all-groups)
           fi
         '';
       };
@@ -118,6 +139,10 @@ in
       ty = {
         enable = true;
         pass_filenames = false;
+        args = [
+          "--project"
+          cfg.dir
+        ];
       };
       pytest = {
         enable = true;
