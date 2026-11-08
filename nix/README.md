@@ -2,10 +2,10 @@
 
 Projects import `flakeModules.default` into a [flake-parts](https://flake.parts) flake to get their dev shell, git hooks, local services, and the outputs kennel deploys from.
 
-- [Deploying a Project](https://docs.kennel.scottylabs.org/guides/deploying.html)
-- [Secrets](https://docs.kennel.scottylabs.org/guides/secrets.html)
-- [Flake Options Reference](https://docs.kennel.scottylabs.org/reference/flake-options.html)
-- [Build Helpers](https://docs.kennel.scottylabs.org/reference/build-helpers.html)
+- [Deploying a Project](https://docs.kennel.scottylabs.org/guides/deploying/)
+- [Secrets](https://docs.kennel.scottylabs.org/guides/secrets/)
+- [Flake Options Reference](https://docs.kennel.scottylabs.org/reference/flake-options/)
+- [Build Helpers](https://docs.kennel.scottylabs.org/reference/build-helpers/)
 
 `flake-module/default.nix` defines the flake-level outputs, while everything a project configures lives as `scottylabs.*` options in the perSystem modules under `flake-module/per-system/`.
 
