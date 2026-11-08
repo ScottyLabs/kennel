@@ -64,6 +64,8 @@ in
       nativeBuildInputs = old.nativeBuildInputs ++ cfg.hooksCheck.nativeBuildInputs;
       buildInputs = old.buildInputs ++ cfg.hooksCheck.buildInputs;
       SKIP = lib.concatStringsSep "," cfg.hooksCheck.skip;
+      # the sandbox has no system CA store for TLS clients built in tests
+      SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       preConfigure = cfg.hooksCheck.setup;
     });
 
