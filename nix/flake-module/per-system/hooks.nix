@@ -14,7 +14,7 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ ];
       internal = true;
-      description = "Hook ids the `hooks` check skips because another check already runs them.";
+      description = "Hook ids to leave out of the `hooks` check.";
     };
 
     setup = lib.mkOption {

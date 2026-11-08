@@ -111,6 +111,8 @@ helpers.buildHaskellService {
 
 Builds a Deno project, or a single member of a Deno workspace, that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
 
+If `deno.lock` pins JSR packages, `src` also needs the `deno.jsr.hash` beside it. The `deno-jsr-hash` commit hook writes it whenever `deno.lock` changes.
+
 ### `src`
 
 Directory holding `deno.lock` and `deno.json`. In a Deno workspace this is the workspace root that holds the single `deno.lock`, and `cwd` selects the member to build.

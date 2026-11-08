@@ -40,6 +40,34 @@ let
       inherit lockfile;
     }
   ) lockfiles;
+
+  # update deno.jsr.hash next to each staged deno.lock
+  jsrHash = pkgs.writeShellApplication {
+    name = "deno-jsr-hash";
+    runtimeInputs = [
+      denoLib.fetchJsr
+      pkgs.jq
+    ];
+    text = ''
+      status=0
+      for lock in "$@"; do
+        file="$(dirname "$lock")/deno.jsr.hash"
+        if [ "$(jq '.jsr // {} | length' "$lock")" = 0 ]; then
+          continue
+        fi
+        tmp=$(mktemp -d)
+        fetch-jsr "$lock" "$tmp/cache"
+        hash=$(nix --extra-experimental-features nix-command hash path "$tmp/cache")
+        rm -rf "$tmp"
+        if [ "$(cat "$file" 2>/dev/null)" != "$hash" ]; then
+          echo "$hash" > "$file"
+          echo "updated $file"
+          status=1
+        fi
+      done
+      exit "$status"
+    '';
+  };
 in
 {
   options.scottylabs.deno = {
@@ -90,6 +118,8 @@ in
   config = lib.mkIf cfg.enable {
     scottylabs = {
       hooksCheck = {
+        # needs network
+        skip = [ "deno-jsr-hash" ];
         nativeBuildInputs = [
           pkgs.deno
         ]
@@ -170,6 +200,12 @@ in
         files = "\\.(ts|tsx|mts|cts)$";
         pass_filenames = false;
         language = "system";
+      };
+      deno-jsr-hash = {
+        enable = true;
+        name = "deno-jsr-hash";
+        entry = lib.getExe jsrHash;
+        files = "(^|/)deno\\.lock$";
       };
       deno-test = {
         enable = true;

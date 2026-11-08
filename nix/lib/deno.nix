@@ -5,6 +5,10 @@
   fetchurl,
   runCommand,
   writeText,
+  writeShellApplication,
+  curl,
+  jq,
+  cacert,
 }:
 
 let
@@ -18,8 +22,53 @@ let
       name = builtins.elemAt m 0;
       version = builtins.elemAt m 1;
     };
+
+  # fetch the JSR files in deno.lock into deno's cache layout
+  fetchJsr = writeShellApplication {
+    name = "fetch-jsr";
+    runtimeInputs = [
+      curl
+      jq
+    ];
+    # $p and $url are jq variables
+    excludeShellChecks = [ "SC2016" ];
+    text = ''
+      lock=$1
+      out=$2
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
+      mkdir -p "$out"
+
+      fetch() {
+        curl -fsSL --retry 3 "$1" -o "$tmp/file"
+        echo "$2  $tmp/file" | sha256sum -c --quiet -
+        # deno's http cache keys each file by the hash of its URL path
+        key=$(printf '%s' "''${1#https://jsr.io}" | sha256sum | cut -d' ' -f1)
+        {
+          cat "$tmp/file"
+          printf '\n// denoCacheMetadata=%s' "$(jq -cn --arg url "$1" '{headers: {}, time: 0, url: $url}')"
+        } > "$out/$key"
+      }
+
+      jq -r '.jsr // {} | to_entries[]
+        | (.key | capture("^(?<name>@?[^@]+)@(?<version>[^_]+)")) as $p
+        | [$p.name, $p.version, .value.integrity] | @tsv' "$lock" |
+        while IFS=$'\t' read -r name version integrity; do
+          base="https://jsr.io/$name/$version"
+          # deno.lock pins _meta.json, which lists every file's checksum
+          fetch "''${base}_meta.json" "$integrity"
+          cp "$tmp/file" "$tmp/meta"
+          jq -r '.manifest | to_entries[] | [.key, (.value.checksum | ltrimstr("sha256-"))] | @tsv' "$tmp/meta" |
+            while IFS=$'\t' read -r path checksum; do
+              fetch "$base$path" "$checksum"
+            done
+        done
+    '';
+  };
 in
 {
+  inherit fetchJsr;
+
   mkCache =
     { name, lockfile }:
     let
@@ -69,36 +118,19 @@ in
         )
       ) (lib.groupBy (e: e.name) npmEntries);
 
-      # the locked version metadata pins every file's hash
-      jsrEntries = lib.mapAttrsToList (
-        key: info:
-        let
-          p = parse key;
-          base = "https://jsr.io/${p.name}/${p.version}";
-          meta = fetchurl {
-            name = "jsr-meta";
-            url = "${base}_meta.json";
-            sha256 = info.integrity;
-          };
-        in
-        {
-          inherit (p) name version;
-          files = [
-            {
-              url = "${base}_meta.json";
-              file = meta;
-            }
-          ]
-          ++ lib.mapAttrsToList (path: entry: {
-            url = "${base}${path}";
-            file = fetchurl {
-              name = "jsr-file";
-              url = "${base}${path}";
-              sha256 = lib.removePrefix "sha256-" entry.checksum;
-            };
-          }) (lib.importJSON meta).manifest;
-        }
-      ) (lock.jsr or { });
+      jsrEntries = map parse (lib.attrNames (lock.jsr or { }));
+      jsrHashFile = dirOf lockfile + "/deno.jsr.hash";
+
+      jsrCache = runCommand "${name}-jsr" {
+        nativeBuildInputs = [ fetchJsr ];
+        SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
+        outputHashMode = "recursive";
+        outputHash =
+          if builtins.pathExists jsrHashFile then
+            lib.trim (builtins.readFile jsrHashFile)
+          else
+            throw "missing ${toString jsrHashFile}; run `prek run deno-jsr-hash --all-files`";
+      } ''fetch-jsr ${lockfile} "$out"'';
 
       # unpinned package metadata listing only the locked versions
       jsrPackages = lib.mapAttrsToList (
@@ -118,9 +150,6 @@ in
           );
         }
       ) (lib.groupBy (e: e.name) jsrEntries);
-
-      # deno's http cache keys each file by the hash of its URL path
-      jsrFiles = jsrPackages ++ lib.concatMap (e: e.files) jsrEntries;
     in
     # The npm cache deno reads is the extracted tarball plus a packument per package
     runCommand "${name}-deno-cache" { } ''
@@ -151,8 +180,9 @@ in
               )
             }
           } > "$out/remote/https/jsr.io/${builtins.hashString "sha256" (lib.removePrefix "https://jsr.io" f.url)}"
-        '') jsrFiles
+        '') jsrPackages
       )}
+      ${lib.optionalString (jsrEntries != [ ]) ''cp -r ${jsrCache}/. "$out/remote/https/jsr.io/"''}
     '';
 
   # patchelf linux addons, dropping musl packages it cannot fix
