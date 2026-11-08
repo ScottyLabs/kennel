@@ -6,4 +6,4 @@ These options are provided by the [shared ScottyLabs flake module](https://git.c
 imports = [ inputs.scottylabs.flakeModules.default ];
 ```
 
-{{#include generated/flake-options.md}}
+--8<-- "generated/flake-options.md"

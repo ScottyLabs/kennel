@@ -34,7 +34,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
 
 ## Options
 
-{{#include generated/nixos-module.md}}
+--8<-- "generated/nixos-module.md"
 
 ## What the module configures
 

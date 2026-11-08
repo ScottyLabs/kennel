@@ -23,7 +23,7 @@ Kennel can also publish the hosts of its live deployments to a file. [ricochet](
 - `nix/flake-module`: the flake-parts module projects build on
 - `nix/lib`: the build helpers projects get as the `helpers` module argument
 - `nix/nixos.nix`: NixOS module to run the daemon on a host
-- `sites/docs`: documentation (mdBook)
+- `sites/docs`: documentation
 
 Adding options, checks, or build helpers is documented in [`nix/README.md`](nix/README.md).
 

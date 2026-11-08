@@ -1,5 +1,5 @@
-# Mdbook source tree with the options references generated from module
-# declarations, pulled into the reference pages via {{#include}}
+# Zensical source tree with the options references generated from module
+# declarations, pulled into the reference pages as snippets
 {
   pkgs,
   helpers,
@@ -26,11 +26,10 @@ let
   };
 in
 rec {
-  # Unescape dots in generated headings (nixpkgs#224661)
   generated = pkgs.runCommand "kennel-docs-generated" { } ''
     mkdir $out
-    sed 's/\\\././g' ${flakeOptionsMd} > $out/flake-options.md
-    sed 's/\\\././g' ${nixosOptionsMd} > $out/nixos-module.md
+    cp ${flakeOptionsMd} $out/flake-options.md
+    cp ${nixosOptionsMd} $out/nixos-module.md
   '';
 
   src = pkgs.runCommand "kennel-docs-src" { } ''

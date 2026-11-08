@@ -107,7 +107,10 @@
             sqlite.enable = true;
 
             shell = {
-              packages = [ pkgs.sea-orm-cli ];
+              packages = [
+                pkgs.sea-orm-cli
+                pkgs.zensical
+              ];
               scripts = {
                 server = "cargo run -p kennel";
                 migration = ''sea-orm-cli migrate generate "$1" -d crates/migration'';
@@ -115,14 +118,20 @@
                 generate-entities = ''DATABASE_URL="sqlite://$DATABASE_PATH" sea-orm-cli generate entity -o crates/entity/src --with-serde both --lib'';
                 docs = ''
                   nix build .#docs-options --out-link sites/docs/src/reference/generated
-                  cd sites/docs && mdbook serve
+                  cd sites/docs && zensical serve
                 '';
               };
             };
           };
 
+          # mdformat escapes the < in snippet markers
+          treefmt.programs.mdformat.excludes = [
+            "sites/docs/src/reference/flake-options.md"
+            "sites/docs/src/reference/nixos-module.md"
+          ];
+
           sites.docs = {
-            package = helpers.buildMdbook {
+            package = helpers.buildZensical {
               inherit (docsGen) src;
               name = "kennel-docs";
             };
