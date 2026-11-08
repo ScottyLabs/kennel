@@ -9,7 +9,7 @@ kennelInputs:
 let
   cfg = config.scottylabs.python;
   inherit (config.scottylabs) root;
-  project = root + "/${cfg.dir}";
+  project = if cfg.dir == "." then root else "${root}/${cfg.dir}";
 
   # every locked dependency group so ty and pytest see the dev tools
   devEnv =

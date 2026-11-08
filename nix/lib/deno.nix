@@ -129,7 +129,7 @@ in
         map (e: ''
           dest="$out/npm/registry.npmjs.org/${e.name}/${e.version}"
           mkdir -p "$dest"
-          tar -xzf ${e.tarball} -C "$dest" --strip-components=1
+          tar -xzf ${e.tarball} -C "$dest" --strip-components=1 --delay-directory-restore
         '') npmEntries
       )}
       ${lib.concatStringsSep "\n" (
