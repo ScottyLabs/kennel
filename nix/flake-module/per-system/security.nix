@@ -88,7 +88,7 @@ in
       '';
     })
     (lib.mkIf cfg.semgrep.enable {
-      semgrep = "${lib.getExe semgrep} --config auto --error --exclude .forgejo .";
+      semgrep = "${lib.getExe' semgrep "semgrep"} --config auto --error --exclude .forgejo .";
     })
     (lib.mkIf (cfg.vulnix.enable && targets != [ ]) {
       vulnix = "${lib.getExe pkgs.vulnix} --closure ${
