@@ -101,7 +101,8 @@ in
           mkdir -p "$DENO_DIR"
         ''
         + lib.concatMapStrings (cache: ''
-          cp -rn --no-preserve=mode ${cache}/. "$DENO_DIR/"
+          cp -rn ${cache}/. "$DENO_DIR/"
+          chmod -R u+w "$DENO_DIR"
         '') caches
         + lib.concatMapStrings (dir: ''
           (
