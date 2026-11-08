@@ -42,7 +42,7 @@ stdenv.mkDerivation {
     export HOME="$TMPDIR"
     export DENO_DIR="$TMPDIR/deno"
     mkdir -p "$DENO_DIR"
-    cp -r ${denoCache}/npm "$DENO_DIR/npm"
+    cp -r ${denoCache}/. "$DENO_DIR"
     chmod -R u+w "$DENO_DIR"
     ${lib.optionalString compile ''export DENORT_BIN="${deno.denort}/bin/denort"''}
     deno install --cached-only --frozen${

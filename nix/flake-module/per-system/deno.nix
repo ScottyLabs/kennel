@@ -97,10 +97,10 @@ in
         setup = ''
           export DENO_DIR="$TMPDIR/deno"
           export OXLINT_TSGOLINT_PATH=${lib.getExe pkgs.tsgolint}
-          mkdir -p "$DENO_DIR/npm"
+          mkdir -p "$DENO_DIR"
         ''
         + lib.concatMapStrings (cache: ''
-          cp -rn --no-preserve=mode ${cache}/npm/. "$DENO_DIR/npm/"
+          cp -rn --no-preserve=mode ${cache}/. "$DENO_DIR/"
         '') caches
         + lib.concatMapStrings (dir: ''
           (
