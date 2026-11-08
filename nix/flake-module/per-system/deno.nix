@@ -81,7 +81,8 @@ in
       description = ''
         Add the
         [`svelte-check`](https://github.com/sveltejs/language-tools/tree/master/packages/svelte-check)
-        hook and run `svelte-kit sync` in each of `dirs` on shell entry.
+        hook and run `svelte-kit sync` in each of `dirs` with a `svelte.config.js`
+        on shell entry.
       '';
     };
   };
@@ -106,7 +107,7 @@ in
           (
             cd ${lib.escapeShellArg dir}
             deno install --cached-only --frozen
-            ${lib.optionalString cfg.svelte.enable "deno run -A --cached-only npm:@sveltejs/kit/svelte-kit sync"}
+            ${lib.optionalString cfg.svelte.enable "[ ! -f svelte.config.js ] || deno run -A --cached-only npm:@sveltejs/kit/svelte-kit sync"}
             ${denoLib.patchAddons}
           )
         '') cfg.dirs;
@@ -123,7 +124,7 @@ in
         '';
 
         hook = lib.concatMapStrings (dir: ''
-          (cd "$SCOTTYLABS_ROOT"/${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && deno run -A npm:@sveltejs/kit/svelte-kit sync"})
+          (cd "$SCOTTYLABS_ROOT"/${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && { [ ! -f svelte.config.js ] || deno run -A npm:@sveltejs/kit/svelte-kit sync; }"})
         '') cfg.dirs;
       };
     };
