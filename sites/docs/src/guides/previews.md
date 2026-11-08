@@ -4,7 +4,7 @@ Every pull request and feature branch gets its own isolated deployment with its 
 
 ## Lifecycle
 
-1. PR opened: nixbot builds the PR merged into its target branch, and kennel provisions resources and deploys the `preview` profile. The deployment is available at `{project}-pr-{number}.scottylabs.net`.
+1. PR opened: nixbot builds the PR merged into its target branch, and kennel provisions resources and deploys the `preview` profile. Each service and site is available at `{project}-{target}-pr-{number}.scottylabs.net`.
 1. Push to PR: nixbot builds the new commit, rebuilding only derivations that changed, and kennel redeploys.
 1. PR closed: kennel tears down all deployments for the branch, deprovisions resources (drops the database, flushes the cache, deletes the storage bucket), and removes the Caddy route.
 
@@ -31,4 +31,4 @@ PR deployments that have had no activity for 7 days are hibernated: the process 
 
 ## URLs
 
-PR URLs follow the flat scheme `{project}-pr-{number}.scottylabs.net`, covered by a single wildcard DNS record. No per-deployment DNS management is needed.
+Preview URLs follow `{project}-{target}-pr-{number}.scottylabs.net` and all resolve through a single wildcard DNS record for `*.scottylabs.net`.
