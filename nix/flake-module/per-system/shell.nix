@@ -1,3 +1,4 @@
+kennelInputs:
 {
   lib,
   config,
@@ -126,7 +127,10 @@ in
       cfg.packages
       ++ scripts
       ++ config.pre-commit.settings.enabledPackages
-      ++ [ config.pre-commit.settings.package ];
+      ++ [
+        config.pre-commit.settings.package
+        kennelInputs.collar.packages.${pkgs.stdenv.hostPlatform.system}.collar
+      ];
 
     shellHook = ''
       source ${paths}

@@ -59,6 +59,12 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    collar = {
+      url = "git+https://git.cmu.dev/ScottyLabs/collar";
+      # collar's kennel input is this flake
+      inputs.scottylabs.follows = "";
+    };
   };
 
   outputs =
