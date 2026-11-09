@@ -8,6 +8,7 @@
   pname ? null,
   version ? null,
   paths ? null,
+  extraSources ? [ ],
   nativeBuildInputs ? [ ],
   buildInputs ? [ ],
   buildArgs ? { },
@@ -28,15 +29,18 @@ let
             (src + "/Cargo.toml")
             (src + "/Cargo.lock")
           ]
-          ++ map (p: src + "/${p}") paths
+          ++ map (p: src + "/${p}") (paths ++ extraSources)
         );
       };
 
+  extraPrefixes = map (p: "${toString scopedSrc}/${p}") extraSources;
+  isExtraSource =
+    path: pkgs.lib.any (prefix: path == prefix || pkgs.lib.hasPrefix "${prefix}/" path) extraPrefixes;
+
   commonArgs = {
-    # secretspec_derive reads secretspec.toml at build time
     src = pkgs.lib.cleanSourceWith {
       src = scopedSrc;
-      filter = path: type: craneLib.filterCargoSources path type || baseNameOf path == "secretspec.toml";
+      filter = path: type: craneLib.filterCargoSources path type || isExtraSource (toString path);
     };
     pname = if pname != null then pname else fromToml.pname;
     version = if version != null then version else fromToml.version;

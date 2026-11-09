@@ -18,7 +18,7 @@ Builds a Rust crate with [crane](https://crane.dev), caching dependencies separa
 
 ### `src`
 
-Crate or workspace root. Passed through `craneLib.cleanCargoSource`, so only Cargo-relevant files enter the build.
+Crate or workspace root. Only Cargo-relevant files and `extraSources` enter the build.
 
 Type: `path`, required
 
@@ -39,6 +39,12 @@ Type: `nullOr str`, default: `null`
 Scopes `src` to just these workspace-member paths plus `Cargo.toml`/`Cargo.lock`, so changes elsewhere in the workspace don't invalidate the build.
 
 Type: `nullOr (listOf str)`, default: `null`
+
+### `extraSources`
+
+Files or directories, relative to `src`, to keep in the build besides the Cargo sources. List files the build reads, such as files embedded with `include_str!` or `include_bytes!` and test fixtures.
+
+Type: `listOf str`, default: `[ ]`
 
 ### `nativeBuildInputs`
 
