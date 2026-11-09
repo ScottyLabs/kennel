@@ -1,4 +1,5 @@
 use futures_util::stream::StreamExt;
+use kennel_config::api::Health;
 use std::collections::HashMap;
 use zbus::Connection;
 use zbus::proxy::Proxy;
@@ -17,18 +18,6 @@ type UnitListEntry = (
     String,
     zbus::OwnedObjectPath,
 );
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct UnitHealth {
-    pub active: bool,
-    pub active_state: String,
-    pub sub_state: String,
-    pub result: String,
-    pub active_enter_usec: u64,
-    pub n_restarts: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub app_healthy: Option<bool>,
-}
 
 pub struct SystemdClient {
     conn: Connection,
@@ -226,7 +215,7 @@ impl SystemdClient {
             .collect())
     }
 
-    pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<UnitHealth> {
+    pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<Health> {
         let proxy = self.manager_proxy().await?;
         let unit_path: zbus::OwnedObjectPath = proxy
             .call("GetUnit", &(format!("{unit_name}.service"),))
@@ -255,7 +244,7 @@ impl SystemdClient {
         let n_restarts: u32 = unit_proxy.get_property("NRestarts").await.unwrap_or(0);
         let result: String = unit_proxy.get_property("Result").await.unwrap_or_default();
 
-        Ok(UnitHealth {
+        Ok(Health {
             active: active_state == "active",
             active_state,
             sub_state,

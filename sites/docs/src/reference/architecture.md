@@ -36,10 +36,9 @@ Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 | POST | `/nixbot` | nixbot's post-build reports, a form with `project`, `attr`, `branch`, `revision`, `pr_number`, and `out_path`, authenticated with a bearer token. Attributes other than `checks.<system>.kennel` are ignored. |
 | GET | `/metrics` | Prometheus exposition: `kennel_deploy_requests{status=...}`, `kennel_deployments`, `kennel_projects`, and `kennel_deploy_failures{stage=...}` gauges. |
 | GET | `/deployments/:id/health` | JSON: `active`, `active_state`, `sub_state`, `result`, `active_enter_usec`, `n_restarts`, and `app_healthy` (a live probe of the service's `/api/health`) from the unit's D-Bus properties. |
+| GET | `/projects/:project/branches/:branch` | JSON: the branch's deploy `request` and its `deployments`, typed in `kennel_config::api`. |
 
-All endpoints other than `/webhook` and `/nixbot` are unauthenticated and read-only. Caddy's `services.kennel.domain` virtualhost reverse-proxies these to the kennel API server, which only listens on localhost; the trust boundary is the host firewall plus tailnet, not application-level auth.
-
-Routes are mounted in `http.rs`; per-resource handlers live under `handlers/`.
+The endpoints other than `/webhook` and `/nixbot` are unauthenticated and read-only.
 
 `kennel_deploy_failures` is the number of deploy requests currently marked failed, with a `stage` label for where the deploy stopped:
 

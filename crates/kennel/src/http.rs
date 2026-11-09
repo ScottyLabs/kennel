@@ -13,5 +13,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/nixbot", post(nixbot::handle))
         .route("/metrics", get(metrics::scrape))
         .route("/deployments/{id}/health", get(deployments::health))
+        .route(
+            "/projects/{project}/branches/{branch}",
+            get(deployments::branch),
+        )
         .with_state(state)
 }
