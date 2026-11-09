@@ -7,7 +7,7 @@ kennelInputs: [
   ./checks.nix
   ./secrets.nix
   ./ci.nix
-  ./security.nix
+  (import ./security.nix kennelInputs)
   (import ./rust.nix kennelInputs)
   ./deno.nix
   (import ./python.nix kennelInputs)

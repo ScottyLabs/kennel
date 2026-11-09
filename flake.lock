@@ -163,6 +163,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-semgrep": {
+      "locked": {
+        "lastModified": 1794177463,
+        "narHash": "sha256-2k9vPqWGbNsR1hcYDkH3kJ8MR9kOGPYYrDorxQ0ECFw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "91c7535628c543445974573b6a394f7b65263788",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "91c7535628c543445974573b6a394f7b65263788",
+        "type": "github"
+      }
+    },
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
@@ -239,6 +255,7 @@
         "nixpkgs": "nixpkgs",
         "nixpkgs-garage": "nixpkgs-garage",
         "nixpkgs-pitchfork": "nixpkgs-pitchfork",
+        "nixpkgs-semgrep": "nixpkgs-semgrep",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",

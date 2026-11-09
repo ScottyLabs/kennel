@@ -14,6 +14,8 @@
     nixpkgs-pitchfork.url = "github:ap-1/nixpkgs/pitchfork";
     # TODO: https://github.com/NixOS/nixpkgs/pull/585360
     nixpkgs-garage.url = "github:ap-1/nixpkgs/garage-darwin";
+    # TODO: https://github.com/NixOS/nixpkgs/pull/585157
+    nixpkgs-semgrep.url = "github:NixOS/nixpkgs/91c7535628c543445974573b6a394f7b65263788";
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";

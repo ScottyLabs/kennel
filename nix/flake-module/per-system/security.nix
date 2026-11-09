@@ -1,3 +1,4 @@
+kennelInputs:
 {
   lib,
   config,
@@ -7,35 +8,7 @@
 
 let
   cfg = config.scottylabs.security;
-
-  inherit (pkgs.stdenv) hostPlatform;
-
-  # patchelf crashes rewriting the bundled rpath
-  semgrepCore = pkgs.semgrep-core.overrideAttrs {
-    postFixup = ''
-      patchelf --set-interpreter "$(cat ${pkgs.stdenv.cc}/nix-support/dynamic-linker)" $out/bin/semgrep-core
-    '';
-  };
-
-  # semgrep still imports mcp 1's FastMCP
-  semgrepPackage = pkgs.python3.pkgs.toPythonApplication (
-    pkgs.python3.pkgs.semgrep.override (
-      {
-        mcp = pkgs.python3.pkgs.mcp_1;
-      }
-      // lib.optionalAttrs hostPlatform.isLinux { semgrep-core = semgrepCore; }
-    )
-  );
-
-  # TODO: https://github.com/NixOS/nixpkgs/pull/569851
-  semgrep =
-    if hostPlatform.isLinux && hostPlatform.isAarch64 then
-      semgrepPackage.overridePythonAttrs (_: {
-        doCheck = false;
-      })
-    else
-      semgrepPackage;
-
+  semgrep = kennelInputs.nixpkgs-semgrep.legacyPackages.${pkgs.stdenv.hostPlatform.system}.semgrep;
   targets = map (t: t.package) (
     builtins.attrValues config.services ++ builtins.attrValues config.sites
   );
