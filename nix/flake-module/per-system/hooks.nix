@@ -7,6 +7,16 @@
 
 let
   cfg = config.scottylabs;
+
+  # ast-grep config for comment-wrap
+  commentWrapConfig = (pkgs.formats.yaml { }).generate "sgconfig.yml" {
+    ruleDirs = [ "${./comment-wrap}" ];
+    customLanguages.toml = {
+      libraryPath = "${pkgs.tree-sitter-grammars.tree-sitter-toml}/parser";
+      extensions = [ "toml" ];
+    };
+    languageGlobs.json = [ "*.jsonc" ];
+  };
 in
 {
   options.scottylabs.hooksCheck = {
@@ -49,12 +59,49 @@ in
       flakeCheck = false;
       programs = {
         nixfmt.enable = true;
-        mdformat.enable = true;
+        mdformat = {
+          enable = true;
+          plugins = ps: [ ps.mdformat-gfm ];
+          settings.wrap = "no";
+        };
         taplo.enable = true;
         yamlfmt = {
           enable = true;
           settings.formatter.retain_line_breaks_single = true;
         };
+      };
+
+      # prevent mdformat-gfm from padding tables
+      settings.formatter.mdformat.options = [ "--compact-tables" ];
+
+      settings.formatter.comment-wrap = {
+        command = lib.getExe pkgs.python3;
+        options = [
+          "${./comment-wrap/comment_wrap.py}"
+          (lib.getExe pkgs.ast-grep)
+          "${commentWrapConfig}"
+        ];
+        includes = [
+          "*.rs"
+          "*.nix"
+          "*.py"
+          "*.pyi"
+          "*.ts"
+          "*.mts"
+          "*.cts"
+          "*.tsx"
+          "*.js"
+          "*.jsx"
+          "*.mjs"
+          "*.cjs"
+          "*.hs"
+          "*.yml"
+          "*.yaml"
+          "*.sh"
+          "*.bash"
+          "*.toml"
+          "*.jsonc"
+        ];
       };
     };
 

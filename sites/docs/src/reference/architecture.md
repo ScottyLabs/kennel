@@ -31,7 +31,7 @@ Nix-store files carry epoch modification times, so a frozen `Last-Modified` stra
 Kennel exposes a small set of HTTP endpoints alongside the webhook receiver:
 
 | Method | Path | Purpose |
-| ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| -- | -- | -- |
 | POST | `/webhook` | Git push and pull request events from Forgejo, HMAC-verified. |
 | POST | `/nixbot` | nixbot's post-build reports, a form with `project`, `attr`, `branch`, `revision`, `pr_number`, and `out_path`, authenticated with a bearer token. Attributes other than `checks.<system>.kennel` are ignored. |
 | GET | `/metrics` | Prometheus exposition: `kennel_deploy_requests{status=...}`, `kennel_deployments`, `kennel_projects`, and `kennel_deploy_failures{stage=...}` gauges. |
@@ -43,7 +43,7 @@ The endpoints other than `/webhook` and `/nixbot` are unauthenticated and read-o
 `kennel_deploy_failures` is the number of deploy requests currently marked failed, with a `stage` label for where the deploy stopped:
 
 | Stage | Failed while |
-| ----- | ------------ |
+| -- | -- |
 | `fetch` | substituting the commit's artifact from the binary cache |
 | `config` | checking the `kennel.json` schema version |
 | `provision` | creating postgres, sqlite, valkey, or garage resources |

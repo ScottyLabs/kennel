@@ -15,8 +15,7 @@ pub struct ResourceRequest {
     pub system_user: String,
 }
 
-// Dispatched concretely through the `Provider` enum, never behind `dyn` or a
-// spawning generic, so the futures' un-nameable `Send` bound is never required.
+// Permit async methods whose futures aren't `Send`
 #[allow(async_fn_in_trait)]
 pub trait ResourceProvider {
     fn name(&self) -> &str;

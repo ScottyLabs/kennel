@@ -1,0 +1,81 @@
+# comment locations for comment_wrap.py
+id: comment-rust
+language: rust
+severity: hint
+message: comment
+rule:
+  kind: line_comment
+---
+id: comment-nix
+language: nix
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-python
+language: python
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-typescript
+language: typescript
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-tsx
+language: tsx
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-javascript
+language: javascript
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-haskell
+language: haskell
+severity: hint
+message: comment
+rule:
+  any:
+    - kind: comment
+    - kind: haddock
+---
+id: comment-yaml
+language: yaml
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+id: comment-bash
+language: bash
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+# custom language from the ast-grep config in hooks.nix
+id: comment-toml
+language: toml
+severity: hint
+message: comment
+rule:
+  kind: comment
+---
+# *.jsonc mapped to json in the ast-grep config in hooks.nix
+id: comment-jsonc
+language: json
+severity: hint
+message: comment
+rule:
+  kind: comment

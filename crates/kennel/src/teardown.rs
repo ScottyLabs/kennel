@@ -3,8 +3,7 @@ use crate::caddy::CaddyClient;
 use crate::systemd::SystemdClient;
 use kennel_provision::{ResourceProvider, ResourceRequest};
 
-/// Tear down a single deployment by stopping its unit, removing its caddy
-/// route and DNS record, deprovisioning resources, and deleting the row.
+/// Tear down a single deployment by stopping its unit, removing its caddy route and DNS record, deprovisioning resources, and deleting the row.
 pub async fn teardown_deployment(
     state: &AppState,
     deployment: &::entity::deployments::Model,

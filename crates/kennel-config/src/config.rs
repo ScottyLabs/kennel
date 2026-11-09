@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Deployment manifest a project's flake builds, read from `kennel.json` in
-/// the artifact kennel receives from nixbot.
+/// Deployment manifest a project's flake builds, read from `kennel.json` in the artifact kennel receives from nixbot.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct KennelConfig {
     #[serde(default)]

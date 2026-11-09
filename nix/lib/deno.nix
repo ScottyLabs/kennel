@@ -91,7 +91,7 @@ in
         }
       ) (lock.npm or { });
 
-      # deno 2.9+ only treats a packument as cached when it carries the _deno markers
+      # deno 2.9+ only treats a packument as cached when it carries the _deno markers,
       # so synthesize one per package from the lock beside the extracted tarballs
       packuments = lib.mapAttrs (
         pkg: entries:

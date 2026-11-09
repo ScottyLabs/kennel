@@ -983,8 +983,8 @@ fn drilldown_project_url(base: &str, project_name: &str, metadata: &[(&str, &str
     url
 }
 
-/// Stable login name for a unit. The unit runs under this name as a `DynamicUser`
-/// and postgres maps it to a same-named role over peer auth.
+/// Stable login name for a unit.
+/// The unit runs under this name as a `DynamicUser` and postgres maps it to a same-named role over peer auth.
 pub fn service_user(unit_name: &str) -> String {
     use sha2::{Digest, Sha256};
     let digest = Sha256::digest(unit_name.as_bytes());

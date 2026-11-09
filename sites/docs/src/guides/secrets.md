@@ -105,7 +105,7 @@ secretspec check -P prod
 Kennel authenticates to OpenBao with a service token provided via `VAULT_TOKEN` in its environment file. It resolves secrets for each deployment using the profile matching the branch:
 
 | Branch | Profile |
-|--------|---------|
+| -- | -- |
 | `main` | `prod` |
 | `staging` | `staging` |
 | `dev` | `dev` |

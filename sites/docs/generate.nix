@@ -1,5 +1,4 @@
-# Zensical source tree with the options references generated from module
-# declarations, pulled into the reference pages as snippets
+# Zensical source tree with the options references generated from module declarations, pulled into the reference pages as snippets
 {
   pkgs,
   helpers,

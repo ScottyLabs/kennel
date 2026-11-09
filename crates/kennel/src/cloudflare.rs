@@ -67,8 +67,7 @@ impl CloudflareClient {
     }
 
     /// Upsert a proxied CNAME for the given fqdn pointing at the host's Cloudflare Tunnel.
-    /// Returns Ok(true) if a record was created or updated, Ok(false) if no
-    /// configured zone covers the fqdn (the domain cannot be served).
+    /// Returns Ok(true) if a record was created or updated, Ok(false) if no configured zone covers the fqdn (the domain cannot be served).
     pub async fn upsert_record(&self, project_name: &str, fqdn: &str) -> Result<bool> {
         let Some((zone_name, zone_id)) = self.match_zone(fqdn) else {
             return Ok(false);

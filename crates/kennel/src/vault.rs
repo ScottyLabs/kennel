@@ -4,9 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-/// Minimal Vault/OpenBao client for writes that secretspec's resolver
-/// cannot perform. Authenticates via AppRole (the same one the kennel
-/// systemd unit uses for everything else) and caches the resulting token.
+/// Minimal Vault/OpenBao client for writes that secretspec's resolver cannot perform.
+/// Authenticates via AppRole (the same one the kennel systemd unit uses for everything else) and caches the resulting token.
 pub struct VaultClient {
     client: Client,
     /// Vault/OpenBao server URL.
@@ -100,8 +99,8 @@ pub fn build_from_env() -> Result<Option<VaultClient>> {
     let Ok(endpoint) = std::env::var("VAULT_ENDPOINT") else {
         return Ok(None);
     };
-    // VAULT_ENDPOINT is the full secretspec provider URI of the form
-    // vault://<host>/<mount>?<query>, e.g. ?auth=approle.
+
+    // VAULT_ENDPOINT is the full secretspec provider URI of the form vault://<host>/<mount>?<query>, e.g. ?auth=approle.
     let stripped = endpoint
         .strip_prefix("vault://")
         .or_else(|| endpoint.strip_prefix("openbao://"))
@@ -110,8 +109,10 @@ pub fn build_from_env() -> Result<Option<VaultClient>> {
     let (host, mount) = without_query
         .split_once('/')
         .ok_or_else(|| anyhow!("VAULT_ENDPOINT must include a mount path"))?;
+
     ensure!(!host.is_empty(), "VAULT_ENDPOINT host is empty");
     ensure!(!mount.is_empty(), "VAULT_ENDPOINT mount is empty");
+
     let base = format!("https://{host}");
 
     let role_id = std::env::var("VAULT_ROLE_ID")
