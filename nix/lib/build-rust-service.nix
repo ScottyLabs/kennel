@@ -34,7 +34,7 @@ let
         );
       };
 
-  extraPrefixes = map (p: "${toString scopedSrc}/${p}") extraSources;
+  extraPrefixes = map (p: "${toString src}/${p}") extraSources;
   isExtraSource =
     path: pkgs.lib.any (prefix: path == prefix || pkgs.lib.hasPrefix "${prefix}/" path) extraPrefixes;
 
