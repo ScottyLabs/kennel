@@ -43,7 +43,7 @@ Kennel's flake exports a [flake-parts](https://flake.parts) module that sets up 
 
 Set `project.name` to your governance slug, the same value as `[project] name` in `secretspec.toml`.
 
-Follow kennel's nixpkgs so that your builds can reuse the outputs other projects have already pushed to the binary cache. Renovate updates every flake input by opening a `nix flake update` pull request each week and after every push to kennel. To update sooner, run `nix flake update scottylabs` and commit the new `flake.lock`.
+Follow kennel's nixpkgs so that your builds can reuse the outputs other projects have already pushed to the binary cache. Renovate updates every flake input by opening a `nix flake update` pull request each week. To update sooner, run `nix flake update scottylabs` and commit the new `flake.lock`.
 
 Load the shell with `nix develop`, which resolves your secrets from OpenBao on entry. If that fails, run the one-time [OpenBao setup](./secrets.md).
 
