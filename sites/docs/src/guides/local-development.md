@@ -43,6 +43,10 @@ in
 }
 ```
 
+## collar
+
+The dev shell includes [collar](https://docs.collar.scottylabs.org), the ScottyLabs command-line tool for pull requests, issues, CI, previews and project ownership. Its [getting started guide](https://docs.collar.scottylabs.org/getting-started/#sign-in) shows how to sign in and use it.
+
 ## Local services
 
 The dev shell includes [pitchfork](https://pitchfork.jdx.dev) when the project enables a local service such as `scottylabs.postgres`. Use it to start and stop those services:

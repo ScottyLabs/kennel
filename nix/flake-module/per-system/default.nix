@@ -1,6 +1,6 @@
 kennelInputs: [
   (import ./core.nix kennelInputs)
-  ./shell.nix
+  (import ./shell.nix kennelInputs)
   ./hooks.nix
   ./processes.nix
   ./kennel.nix
