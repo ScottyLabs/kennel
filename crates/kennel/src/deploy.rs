@@ -557,6 +557,24 @@ async fn write_public_env(
     Ok(())
 }
 
+/// Rewrites a target's public values if they differ from the ones it serves, returning whether they changed
+pub async fn refresh_public_env(
+    dir: &std::path::Path,
+    values: &HashMap<String, String>,
+) -> anyhow::Result<bool> {
+    let served: Option<HashMap<String, String>> =
+        tokio::fs::read_to_string(dir.join("_kennel/env.json"))
+            .await
+            .ok()
+            .and_then(|json| serde_json::from_str(&json).ok());
+    if served.as_ref() == Some(values) {
+        return Ok(false);
+    }
+
+    write_public_env(dir, values).await?;
+    Ok(true)
+}
+
 async fn deploy_service(
     ctx: &DeployCtx<'_>,
     name: &str,

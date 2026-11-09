@@ -20,6 +20,7 @@ pub const KENNEL_CONFIG_SCHEMA_VERSION: u32 = 1;
 pub const ARTIFACT_FETCH_GRACE: Duration = Duration::from_secs(15 * 60);
 pub const TEARDOWN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
+pub const SECRET_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(300);
 pub const UNIT_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 

@@ -232,6 +232,8 @@ Your deployment will be available at `{project}-{target}-{branch}.scottylabs.net
 
 Progress shows up as commit statuses on the pushed commit. nixbot reports one status per built attribute, with a link to the build log, and `kennel/deploy` reports success once the deployment passes its health check.
 
+Because kennel deploys the exact artifact nixbot built and picks up [secret changes](./secrets.md#production) without a deploy, there's never a reason to redeploy a commit.
+
 ### Disabling preview deployments
 
 If a second running copy would cause trouble, as with a Discord bot that would answer every message twice while a preview runs next to production, turn off preview deployments, which are on by default:

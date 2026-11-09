@@ -115,6 +115,8 @@ If a required secret cannot be resolved, the deployment fails. Deployed services
 
 Values a browser frontend reads go in a `[scopes.public]` table, which kennel serves to the site for the branch's profile. Only values safe to publish belong there (see [Public values](./deploying.md#public-values)).
 
+Kennel compares each deployment's secrets and public values with OpenBao every five minutes. It restarts a service whose secrets changed and rewrites a site's public values in place, so a change in OpenBao reaches running deployments without a new deploy.
+
 ## Runtime loading
 
 Use the typed secretspec SDKs to load secrets in your application code. Environment variables work but lose type safety and expose every secret to every process. The SDKs generate typed accessors from your `secretspec.toml` at build time.

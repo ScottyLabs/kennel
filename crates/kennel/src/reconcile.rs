@@ -255,11 +255,18 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
 pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
     let mut interval = tokio::time::interval(kennel_config::constants::RECONCILE_INTERVAL);
+    let mut refresh = tokio::time::interval(kennel_config::constants::SECRET_REFRESH_INTERVAL);
 
     loop {
         tokio::select! {
             _ = interval.tick() => {}
             _ = state.reconcile_signal.notified() => {}
+            _ = refresh.tick() => {
+                if let Err(e) = refresh_secrets(&state).await {
+                    tracing::error!(error = %e, "secret refresh failed");
+                }
+                continue;
+            }
             _ = cancel.cancelled() => break,
         }
 
@@ -267,6 +274,82 @@ pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {
             tracing::error!(error = %e, "reconciliation failed");
         }
     }
+}
+
+/// Applies secrets and public values changed in OpenBao to the deployments already running
+async fn refresh_secrets(state: &AppState) -> anyhow::Result<()> {
+    let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT") else {
+        return Ok(());
+    };
+    let systemd = SystemdClient::connect().await?;
+
+    for deployment in state.store.deployments().list_all().await? {
+        let Some(config_store_path) = deployment.config_store_path.as_deref() else {
+            continue;
+        };
+        let Some(project) = state
+            .store
+            .projects()
+            .find_by_id(&deployment.project_id)
+            .await?
+        else {
+            continue;
+        };
+        let dir = std::path::Path::new(config_store_path);
+        let environment = kennel_config::Environment::from_branch(&deployment.branch)
+            .unwrap_or(kennel_config::Environment::Dev)
+            .to_string();
+        let namespace = project.secret_namespace.as_deref();
+
+        let public_dir = deploy::public_env_dir(
+            &project.id,
+            &deployment.branch_slug,
+            &deployment.service_name,
+        );
+        match crate::secrets::resolve_public(dir, &environment, &vault_endpoint, namespace) {
+            Ok(public) => match deploy::refresh_public_env(&public_dir, &public).await {
+                Ok(true) => tracing::info!(deployment = %deployment.id, "public values changed"),
+                Ok(false) => {}
+                Err(e) => {
+                    tracing::warn!(deployment = %deployment.id, error = %e, "could not write public values")
+                }
+            },
+            Err(e) => {
+                tracing::warn!(deployment = %deployment.id, error = %e, "could not resolve public values")
+            }
+        }
+
+        let Some(unit_name) = &deployment.unit_name else {
+            continue;
+        };
+        if !systemd.is_active(unit_name).await {
+            continue; // run_once restarts down units with fresh secrets
+        }
+
+        let secrets = match crate::secrets::resolve(dir, &environment, &vault_endpoint, namespace) {
+            Ok(secrets) => secrets,
+            Err(e) => {
+                tracing::warn!(unit = %unit_name, error = %e, "could not resolve secrets, leaving the unit running");
+                continue;
+            }
+        };
+        let running = match systemd.unit_environment(unit_name).await {
+            Ok(running) => running,
+            Err(e) => {
+                tracing::warn!(unit = %unit_name, error = %e, "could not read the unit's environment");
+                continue;
+            }
+        };
+
+        if secrets
+            .iter()
+            .any(|(key, value)| running.get(key) != Some(value))
+        {
+            tracing::info!(unit = %unit_name, "secrets changed, restarting");
+            restart_service(state, &systemd, &deployment).await;
+        }
+    }
+    Ok(())
 }
 
 /// Relaunch a down service unit from its recorded state

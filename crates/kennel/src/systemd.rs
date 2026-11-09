@@ -198,6 +198,34 @@ impl SystemdClient {
         matches!(state.as_str(), "active" | "activating" | "reloading")
     }
 
+    /// The environment a running unit was started with
+    pub async fn unit_environment(
+        &self,
+        unit_name: &str,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        let proxy = self.manager_proxy().await?;
+        let unit_path: zbus::OwnedObjectPath = proxy
+            .call("GetUnit", &(format!("{unit_name}.service"),))
+            .await?;
+
+        let service = Proxy::new(
+            &self.conn,
+            "org.freedesktop.systemd1",
+            unit_path,
+            "org.freedesktop.systemd1.Service",
+        )
+        .await?;
+        let entries: Vec<String> = service.get_property("Environment").await?;
+
+        Ok(entries
+            .into_iter()
+            .filter_map(|entry| {
+                let (key, value) = entry.split_once('=')?;
+                Some((key.to_string(), value.to_string()))
+            })
+            .collect())
+    }
+
     pub async fn get_health(&self, unit_name: &str) -> anyhow::Result<UnitHealth> {
         let proxy = self.manager_proxy().await?;
         let unit_path: zbus::OwnedObjectPath = proxy
