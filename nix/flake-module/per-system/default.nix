@@ -2,7 +2,7 @@ kennelInputs: [
   (import ./core.nix kennelInputs)
   (import ./shell.nix kennelInputs)
   ./hooks.nix
-  ./processes.nix
+  (import ./processes.nix kennelInputs)
   ./kennel.nix
   ./checks.nix
   ./secrets.nix

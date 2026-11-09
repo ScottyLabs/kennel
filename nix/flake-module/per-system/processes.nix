@@ -1,3 +1,4 @@
+kennelInputs:
 {
   lib,
   config,
@@ -8,26 +9,8 @@
 let
   cfg = config.scottylabs.processes;
 
-  # TODO: https://github.com/NixOS/nixpkgs/pull/578689
-  pitchfork = pkgs.pitchfork.overrideAttrs (
-    final: _: {
-      version = "2.32.0";
-      src = pkgs.fetchFromGitHub {
-        owner = "jdx";
-        repo = "pitchfork";
-        tag = "v${final.version}";
-        hash = "sha256-QUi3fjUL2Gme0DQxLq2c1S6bxtaNqYrWLROl1ZibUF8=";
-      };
-      cargoHash = "sha256-ZKF3cSIkp0SUVbdsNEhXea/FDW+rjbKNL/2D0GTUacI=";
-      pnpmDeps = pkgs.fetchPnpmDeps {
-        inherit (final) pname version src;
-        pnpm = pkgs.pnpm_10;
-        sourceRoot = "${final.src.name}/ui";
-        fetcherVersion = 3;
-        hash = "sha256-SATk+Pd7avNDHx/Sx1/ndJtWyh1BL1e9gIoz6EXslmA=";
-      };
-    }
-  );
+  pitchfork =
+    kennelInputs.nixpkgs-pitchfork.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pitchfork;
 
   script =
     name: body:

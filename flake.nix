@@ -10,6 +10,8 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # TODO: https://github.com/NixOS/nixpkgs/pull/578689
+    nixpkgs-pitchfork.url = "github:ap-1/nixpkgs/pitchfork";
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";

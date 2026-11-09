@@ -131,6 +131,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-pitchfork": {
+      "locked": {
+        "lastModified": 1794174645,
+        "narHash": "sha256-JxwKVhDG+EEUhpkSULBAv+f0APglnWOArg227J1EWUo=",
+        "owner": "ap-1",
+        "repo": "nixpkgs",
+        "rev": "009e3966fd020815a3b251c3f45e1bc74019d7b3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ap-1",
+        "ref": "pitchfork",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
@@ -205,6 +221,7 @@
         "flake-parts": "flake-parts",
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-pitchfork": "nixpkgs-pitchfork",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",
