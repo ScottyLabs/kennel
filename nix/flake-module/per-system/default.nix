@@ -15,6 +15,6 @@ kennelInputs: [
   ./postgres.nix
   ./sqlite.nix
   ./valkey.nix
-  ./garage.nix
+  (import ./garage.nix kennelInputs)
   (import ./ricochet.nix kennelInputs)
 ]

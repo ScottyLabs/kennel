@@ -131,6 +131,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-garage": {
+      "locked": {
+        "lastModified": 1794219129,
+        "narHash": "sha256-g92k252bVL1UDzpud2tzOLmOKANmCf6FkMG2nmvGO7I=",
+        "owner": "ap-1",
+        "repo": "nixpkgs",
+        "rev": "da94e00dee59f9c562068a55fb5b03efc75bff05",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ap-1",
+        "ref": "garage-darwin",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixpkgs-pitchfork": {
       "locked": {
         "lastModified": 1794174645,
@@ -221,6 +237,7 @@
         "flake-parts": "flake-parts",
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-garage": "nixpkgs-garage",
         "nixpkgs-pitchfork": "nixpkgs-pitchfork",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",

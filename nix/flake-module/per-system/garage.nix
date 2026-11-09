@@ -1,3 +1,4 @@
+kennelInputs:
 {
   lib,
   config,
@@ -17,7 +18,8 @@ let
   adminPort = toString (basePort + 2);
   adminToken = builtins.substring 32 32 digest;
 
-  garage = "${lib.getExe pkgs.garage} -c \"$SCOTTYLABS_STATE/garage/garage.toml\"";
+  package = kennelInputs.nixpkgs-garage.legacyPackages.${pkgs.stdenv.hostPlatform.system}.garage_2;
+  garage = "${lib.getExe package} -c \"$SCOTTYLABS_STATE/garage/garage.toml\"";
 in
 {
   options.scottylabs.garage = {
@@ -50,7 +52,7 @@ in
   config = lib.mkIf cfg.enable {
     scottylabs = {
       shell = {
-        packages = [ pkgs.garage ];
+        packages = [ package ];
         env = {
           S3_ENDPOINT = "http://127.0.0.1:${s3Port}";
           S3_REGION = "garage";
