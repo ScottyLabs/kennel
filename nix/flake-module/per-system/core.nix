@@ -1,6 +1,7 @@
 kennelInputs:
 {
   lib,
+  config,
   pkgs,
   ...
 }:
@@ -41,5 +42,8 @@ kennelInputs:
     };
   };
 
-  config._module.args.helpers = import ../../lib { inherit pkgs kennelInputs; };
+  config._module.args.helpers = import ../../lib {
+    inherit pkgs kennelInputs;
+    rustCheckSetup = config.scottylabs.rust.checkSetup;
+  };
 }

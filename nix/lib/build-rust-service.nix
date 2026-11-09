@@ -1,6 +1,7 @@
 {
   pkgs,
   crane,
+  checkSetup,
 }:
 
 {
@@ -58,8 +59,11 @@ let
   };
   mutantsArtifacts = craneLib.buildDepsOnly mutantsArgs;
 
-  # the sandbox has no system CA store for TLS clients built in tests
-  testEnv.SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  testArgs = {
+    preConfigure = checkSetup.setup;
+    # the sandbox has no system CA store for TLS clients built in tests
+    SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  };
 
   package = craneLib.buildPackage (
     commonArgs
@@ -82,14 +86,21 @@ package
           cargoClippyExtraArgs = "--all-targets -- --deny warnings";
         }
       );
-      test = craneLib.cargoTest (commonArgs // testEnv // { inherit cargoArtifacts; });
+      test = craneLib.cargoTest (
+        commonArgs
+        // testArgs
+        // {
+          inherit cargoArtifacts;
+          nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs;
+        }
+      );
       mutants = craneLib.mkCargoDerivation (
         mutantsArgs
-        // testEnv
+        // testArgs
         // {
           cargoArtifacts = mutantsArtifacts;
           pnameSuffix = "-mutants";
-          nativeBuildInputs = nativeBuildInputs ++ [ pkgs.cargo-mutants ];
+          nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs ++ [ pkgs.cargo-mutants ];
           buildPhaseCargoCommand = "cargo mutants --in-place --no-shuffle";
           installPhaseCommand = "cp -r mutants.out $out";
           doInstallCargoArtifacts = false;

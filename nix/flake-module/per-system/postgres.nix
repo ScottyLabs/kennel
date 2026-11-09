@@ -14,6 +14,19 @@ let
     pgvector = "vector";
   };
   sqlName = pkg: sqlNames.${lib.getName pkg} or (lib.getName pkg);
+
+  # a throwaway database for tests in checks
+  checkSetup = {
+    nativeBuildInputs = [ postgres ];
+    setup = ''
+      initdb --no-instructions --auth=trust -D "$TMPDIR/postgres-data" >/dev/null
+      mkdir -p "$TMPDIR/postgres"
+      pg_ctl -D "$TMPDIR/postgres-data" -l "$TMPDIR/postgres.log" -o "-k $TMPDIR/postgres -c listen_addresses=" -w start >/dev/null
+      createdb -h "$TMPDIR/postgres" ${lib.escapeShellArg projectName}
+      export DATABASE_URL="postgresql:///${projectName}?host=$TMPDIR/postgres"
+      export PGUSER="$(id -un)"
+    '';
+  };
 in
 {
   options.scottylabs.postgres = {
@@ -23,8 +36,9 @@ in
       description = ''
         Run PostgreSQL 18 locally over a Unix socket, with a database named
         after `scottylabs.project.name`, and export `DATABASE_URL`. The `hooks`
-        check gets an empty database of its own the same way. Kennel provisions
-        a database for each deployment.
+        check and `buildRustService`'s `test` and `mutants` checks each get an
+        empty database of their own the same way. Kennel provisions a database
+        for each deployment.
       '';
     };
 
@@ -38,18 +52,8 @@ in
 
   config = lib.mkIf cfg.enable {
     scottylabs = {
-      # a throwaway database for tests run by the hooks
-      hooksCheck = {
-        nativeBuildInputs = [ postgres ];
-        setup = ''
-          initdb --no-instructions --auth=trust -D "$TMPDIR/postgres-data" >/dev/null
-          mkdir -p "$TMPDIR/postgres"
-          pg_ctl -D "$TMPDIR/postgres-data" -l "$TMPDIR/postgres.log" -o "-k $TMPDIR/postgres -c listen_addresses=" -w start >/dev/null
-          createdb -h "$TMPDIR/postgres" ${lib.escapeShellArg projectName}
-          export DATABASE_URL="postgresql:///${projectName}?host=$TMPDIR/postgres"
-          export PGUSER="$(id -un)"
-        '';
-      };
+      hooksCheck = checkSetup;
+      rust.checkSetup = checkSetup;
 
       shell = {
         packages = [ postgres ];

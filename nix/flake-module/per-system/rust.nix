@@ -86,6 +86,22 @@ in
       readOnly = true;
       description = "The Rust toolchain in the dev shell";
     };
+
+    checkSetup = {
+      setup = lib.mkOption {
+        type = lib.types.lines;
+        default = "";
+        internal = true;
+        description = "Shell run before `buildRustService`'s `test` and `mutants` checks, to start the services their tests use.";
+      };
+
+      nativeBuildInputs = lib.mkOption {
+        type = lib.types.listOf lib.types.package;
+        default = [ ];
+        internal = true;
+        description = "Extra build tools for `buildRustService`'s `test` and `mutants` checks.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {

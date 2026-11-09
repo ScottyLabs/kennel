@@ -1,4 +1,8 @@
-{ pkgs, kennelInputs }:
+{
+  pkgs,
+  kennelInputs,
+  rustCheckSetup,
+}:
 
 {
   buildDenoTask = pkgs.callPackage ./build-deno-task.nix { };
@@ -6,6 +10,7 @@
   buildRustService = import ./build-rust-service.nix {
     inherit pkgs;
     inherit (kennelInputs) crane;
+    checkSetup = rustCheckSetup;
   };
 
   buildHaskellService = import ./build-haskell-service.nix { inherit pkgs; };

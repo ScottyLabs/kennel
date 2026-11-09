@@ -64,6 +64,8 @@ Options forwarded to crane's `buildPackage`. `doCheck` defaults to `false` and `
 
 The package carries `passthru.checks.clippy`, `passthru.checks.test`, and `passthru.checks.mutants`, which the flake module adds to `checks` for every service and site, so nixbot runs clippy (denying warnings), `cargo test`, and [cargo-mutants](https://mutants.rs) on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
 
+With `scottylabs.postgres.enable`, the `test` and `mutants` checks start an empty PostgreSQL server in the build sandbox and export `DATABASE_URL` and `PGUSER` for tests that need a database. `cargo test` runs a file's tests in parallel, so each test that uses the database must isolate itself, for example by creating its own schema and dropping it when it finishes.
+
 The `mutants` check makes small changes to the code, such as replacing a function body with `Ok(())`, and fails if `cargo test` still passes for any of them. It mutates the whole workspace regardless of `cargoExtraArgs`. Exclude generated code or files you don't intend to test in `.cargo/mutants.toml` (see [filtering files](https://mutants.rs/skip_files.html)). If `.gitignore` lists `.cargo/`, replace it with `.cargo/*` and `!.cargo/mutants.toml` so the file is committed:
 
 ```toml
