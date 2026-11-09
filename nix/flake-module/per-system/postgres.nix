@@ -47,6 +47,7 @@ in
           pg_ctl -D "$TMPDIR/postgres-data" -l "$TMPDIR/postgres.log" -o "-k $TMPDIR/postgres -c listen_addresses=" -w start >/dev/null
           createdb -h "$TMPDIR/postgres" ${lib.escapeShellArg projectName}
           export DATABASE_URL="postgresql:///${projectName}?host=$TMPDIR/postgres"
+          export PGUSER="$(id -un)"
         '';
       };
 
@@ -54,6 +55,8 @@ in
         packages = [ postgres ];
         exports = ''
           export DATABASE_URL="postgresql:///${projectName}?host=$SCOTTYLABS_RUNTIME/postgres"
+          # initdb's superuser
+          export PGUSER="$(id -un)"
         '';
       };
 

@@ -200,7 +200,7 @@ If your project needs a database:
 scottylabs.postgres.enable = true;
 ```
 
-This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases.
+This gives you a local PostgreSQL instance in development and a provisioned per-deployment database in production. Your app reads `DATABASE_URL` from the environment in both cases, and `PGUSER` names the role to log in as.
 
 List the PostgreSQL extensions your app uses:
 

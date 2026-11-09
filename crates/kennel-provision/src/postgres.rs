@@ -185,6 +185,7 @@ impl ResourceProvider for PostgresProvider {
             "DATABASE_URL".into(),
             format!("postgresql:///{db_name}?host={}", self.socket_dir),
         );
+        env.insert("PGUSER".into(), user.clone());
         Ok(env)
     }
 
