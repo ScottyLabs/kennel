@@ -36,7 +36,7 @@ A service module should:
 ## Adding a check
 
 - A fast check that only reads the source, such as `cargo-machete` or `gitleaks`, goes in `pre-commit.settings.hooks`. It runs on every commit and again in nixbot's `hooks` check.
-- A check that compiles against a dependency build goes in the target's `passthru.checks`, like clippy, `cargo test`, and cargo-mutants in `buildRustService`. Add its hook, if it has one, to `scottylabs.hooksCheck.skip` so the `hooks` check skips it.
+- A check that compiles against a dependency build goes in the target's `passthru.checks`, like clippy and `cargo test` in `buildRustService`. Add its hook, if it has one, to `scottylabs.hooksCheck.skip` so the `hooks` check skips it.
 - A check that needs the network, such as a vulnerability scan, goes in `scottylabs.ci.checks`, which the Forgejo Actions workflow runs with `nix run .#ci`.
 
 ## Adding a build helper

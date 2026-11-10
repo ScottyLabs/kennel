@@ -94,18 +94,18 @@ package
           nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs;
         }
       );
-      mutants = craneLib.mkCargoDerivation (
-        mutantsArgs
-        // testArgs
-        // {
-          cargoArtifacts = mutantsArtifacts;
-          pnameSuffix = "-mutants";
-          nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs ++ [ pkgs.cargo-mutants ];
-          buildPhaseCargoCommand = "cargo mutants --in-place --no-shuffle";
-          installPhaseCommand = "cp -r mutants.out $out";
-          doInstallCargoArtifacts = false;
-        }
-      );
     };
+    mutants = craneLib.mkCargoDerivation (
+      mutantsArgs
+      // testArgs
+      // {
+        cargoArtifacts = mutantsArtifacts;
+        pnameSuffix = "-mutants";
+        nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs ++ [ pkgs.cargo-mutants ];
+        buildPhaseCargoCommand = "cargo mutants --in-place --no-shuffle";
+        installPhaseCommand = "cp -r mutants.out $out";
+        doInstallCargoArtifacts = false;
+      }
+    );
   };
 }

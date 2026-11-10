@@ -36,9 +36,9 @@ in
       description = ''
         Run PostgreSQL 18 locally over a Unix socket, with a database named
         after `scottylabs.project.name`, and export `DATABASE_URL`. The `hooks`
-        check and `buildRustService`'s `test` and `mutants` checks each get an
-        empty database of their own the same way. Kennel provisions a database
-        for each deployment.
+        check, `buildRustService`'s `test` check, and its `mutants` build each
+        get an empty database of their own the same way. Kennel provisions a
+        database for each deployment.
       '';
     };
 

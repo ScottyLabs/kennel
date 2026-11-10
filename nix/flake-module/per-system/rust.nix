@@ -92,14 +92,14 @@ in
         type = lib.types.lines;
         default = "";
         internal = true;
-        description = "Shell run before `buildRustService`'s `test` and `mutants` checks, to start the services their tests use.";
+        description = "Shell run before `buildRustService`'s `test` check and `mutants` build, to start the services their tests use.";
       };
 
       nativeBuildInputs = lib.mkOption {
         type = lib.types.listOf lib.types.package;
         default = [ ];
         internal = true;
-        description = "Extra build tools for `buildRustService`'s `test` and `mutants` checks.";
+        description = "Extra build tools for `buildRustService`'s `test` check and `mutants` build.";
       };
     };
   };

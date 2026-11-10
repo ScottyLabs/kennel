@@ -5,7 +5,7 @@ On each push and pull request, [nixbot](https://nixbot.scottylabs.org) builds ev
 The shared module's checks are:
 
 - `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests), run in the build sandbox without network access, with an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. Clippy and `cargo-test` run in the Rust checks below, and the commit message hooks run only locally
-- `clippy` (denying warnings), `test`, and `mutants` ([cargo-mutants](https://mutants.rs), which fails when a mutated function still passes the tests) for each `buildRustService` target, built against its cached dependencies. `test` and `mutants` also get an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled
+- `clippy` (denying warnings) and `test` for each `buildRustService` target, built against its cached dependencies. `test` also gets an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. cargo-mutants runs only on demand (see [`buildRustService`](../reference/build-helpers.md#buildrustservice))
 - `kennel`: the deploy manifest, which builds every service and site
 - `devShell`: the dev shell for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`, so it can come from the binary cache
 
