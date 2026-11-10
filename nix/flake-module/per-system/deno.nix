@@ -168,6 +168,7 @@ in
     pre-commit.settings.hooks = {
       oxlint = {
         enable = true;
+        args = [ "--no-error-on-unmatched-pattern" ];
         settings = {
           plugins = oxlintPlugins;
           deny = [
