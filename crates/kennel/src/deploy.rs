@@ -186,6 +186,17 @@ pub async fn deploy_request(
         .at(FailureStage::Config)?;
 
     if environment == Environment::Preview && !kennel_config.preview_deployments {
+        // Merging requires `kennel/deploy` even when skipped
+        post_deploy_status(
+            state,
+            &project,
+            &request.commit_sha,
+            "success",
+            "skipped: preview deployments disabled",
+            None,
+        )
+        .await?;
+
         return Ok(DeployOutcome::SkippedPreview);
     }
 
@@ -274,40 +285,33 @@ pub async fn deploy_request(
         );
     }
 
-    if let Some(owner) = project.owner.as_deref() {
-        let (status, description) = match &deploy_result {
-            Ok(()) => ("success", "deployment healthy".to_string()),
-            Err(e) => ("failure", format!("{e:#}")),
-        };
-        // Static sites write no logs
-        let has_logs = !kennel_config.services.is_empty() || deploy_result.is_err();
-        let target_url = state
-            .config
-            .grafana_url
-            .as_deref()
-            .filter(|_| has_logs)
-            .map(|base| deploy_logs_url(base, &project.name, &request.branch, &request.commit_sha));
+    let (status, description) = match &deploy_result {
+        Ok(()) => ("success", "deployment healthy".to_string()),
+        Err(e) => ("failure", format!("{e:#}")),
+    };
+    // Static sites write no logs
+    let has_logs = !kennel_config.services.is_empty() || deploy_result.is_err();
+    let target_url = state
+        .config
+        .grafana_url
+        .as_deref()
+        .filter(|_| has_logs)
+        .map(|base| deploy_logs_url(base, &project.name, &request.branch, &request.commit_sha));
 
-        let posted = state
-            .forgejo
-            .create_commit_status(
-                owner,
-                &project.name,
-                &request.commit_sha,
-                CommitStatus {
-                    state: status,
-                    description: &description,
-                    context: "kennel/deploy",
-                    target_url: target_url.as_deref(),
-                },
-            )
-            .await;
+    let posted = post_deploy_status(
+        state,
+        &project,
+        &request.commit_sha,
+        status,
+        &description,
+        target_url.as_deref(),
+    )
+    .await;
 
-        if deploy_result.is_ok() {
-            posted?;
-        } else if let Err(post_err) = posted {
-            tracing::error!(project = %project.name, error = %post_err, "failed to post commit status");
-        }
+    if deploy_result.is_ok() {
+        posted?;
+    } else if let Err(post_err) = posted {
+        tracing::error!(project = %project.name, error = %post_err, "failed to post commit status");
     }
 
     deploy_result?;
@@ -330,6 +334,34 @@ pub async fn deploy_request(
     }
 
     Ok(DeployOutcome::Deployed)
+}
+
+async fn post_deploy_status(
+    state: &AppState,
+    project: &::entity::projects::Model,
+    commit_sha: &str,
+    status: &str,
+    description: &str,
+    target_url: Option<&str>,
+) -> anyhow::Result<()> {
+    let Some(owner) = project.owner.as_deref() else {
+        return Ok(());
+    };
+
+    state
+        .forgejo
+        .create_commit_status(
+            owner,
+            &project.name,
+            commit_sha,
+            CommitStatus {
+                state: status,
+                description,
+                context: "kennel/deploy",
+                target_url,
+            },
+        )
+        .await
 }
 
 async fn post_pr_deployment_comment(

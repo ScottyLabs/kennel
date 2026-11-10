@@ -242,4 +242,4 @@ If a second running copy would cause trouble, as with a Discord bot that would a
 scottylabs.previewDeployments = false;
 ```
 
-With previews off, nixbot still builds pull requests, but kennel doesn't deploy them.
+With previews off, nixbot still builds pull requests, but kennel doesn't deploy them. `kennel/deploy` still reports success on the pull request, marked as skipped, because governance requires it before merging.

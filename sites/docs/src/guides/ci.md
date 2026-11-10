@@ -28,6 +28,8 @@ jobs:
     uses: ScottyLabs/kennel/.forgejo/workflows/checks.yml@main
 ```
 
+Governance requires the resulting `CI / checks` and `CI / checks-1` statuses, along with `nixbot/nix-eval`, before anything merges into `main`.
+
 The workflow runs `nix run .#ci`, which runs every check in `scottylabs.ci.checks`. By default these are security scans of the lockfiles with [osv-scanner](https://github.com/google/osv-scanner) and of the code with [semgrep](https://semgrep.dev). [vulnix](https://github.com/nix-community/vulnix) can also scan each service and site's runtime closure once `scottylabs.security.vulnix.enable` is set. Add a check of your own as a shell script:
 
 ```nix
