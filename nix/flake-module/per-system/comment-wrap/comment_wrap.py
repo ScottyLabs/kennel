@@ -18,6 +18,10 @@ FENCE = re.compile(r"^(```|~~~)")
 ENDS_BLOCK = re.compile(r"[.,:!?;{\[=|\\]$")
 # a lowercase start means the previous line broke mid-sentence
 CONTINUES = re.compile(r"^[a-z(`'\"]")
+# suppression comments like nosemgrep: and eslint-disable-next-line
+DIRECTIVE = re.compile(
+    r"^[a-z][\w.]*:|^[a-z][\w.]*-[\w-]*?(?:disable|ignore|enable|expect|allow|suppress)"
+)
 
 
 def parse(line):
@@ -75,6 +79,8 @@ def joinable(a, b):
     if FENCE.match(a_body) or FENCE.match(b_body):
         return False
     if ENDS_BLOCK.search(a_body) or not CONTINUES.match(b_body):
+        return False
+    if DIRECTIVE.match(a_body) or DIRECTIVE.match(b_body):
         return False
     marker = MARKER.match(a_body)
     # list items continue at the item text's column
