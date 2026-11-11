@@ -63,10 +63,11 @@ rustc-ice-*.txt
 
 ## 2. Declare what to deploy
 
-Kennel deploys two flake outputs:
+Kennel reads three flake outputs:
 
-- `services`: backend services, run as systemd units
-- `sites`: static sites, served by Caddy
+- `services`: backend services, deployed as systemd units
+- `sites`: static sites, deployed behind Caddy
+- `tools`: CLIs and other packages kennel doesn't deploy
 
 Build each target's package with the shared [build helpers](../reference/build-helpers.md), which every `perSystem` module receives as `helpers`:
 
@@ -93,10 +94,16 @@ perSystem =
       };
       spa = true;
     };
+
+    tools.cli.package = helpers.buildRustService {
+      src = ./.;
+      pname = "cli";
+      buildArgs.cargoExtraArgs = "--locked -p cli";
+    };
   };
 ```
 
-The attribute name is the target's name, so this deploys an `api` service and an `app` site. You can use `nix build .#services.x86_64-linux.api.package` to build one locally.
+The attribute name is the target's name, so this deploys an `api` service and an `app` site. Kennel never deploys the `cli` tool, though nixbot still runs its clippy and tests on every push. You can use `nix build .#services.x86_64-linux.api.package` to build one locally.
 
 A service unit runs the package's `meta.mainProgram`, which `buildRustService` and `buildHaskellService` set to `pname`. Without one, kennel runs the first executable in `bin/`.
 
@@ -105,6 +112,7 @@ Besides `package`, a target takes:
 - `customDomain`: a domain the target is also served on in production
 - `spa`: for sites, serve `index.html` for unmatched routes (single-page apps). It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
 - `env`: for services, extra variables in the service's environment (see [Runtime environment](#runtime-environment))
+- `checks`: extra checks nixbot builds alongside the package's own (see [Continuous Integration](./ci.md))
 
 Custom domains that are not already in use must first have their Cloudflare Zone IDs registered with kennel in the [infrastructure repository](https://git.cmu.dev/ScottyLabs/infrastructure). Kennel creates the DNS record itself for registered zones, so a domain whose zone is missing does not resolve until the zone is registered.
 

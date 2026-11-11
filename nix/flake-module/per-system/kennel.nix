@@ -32,6 +32,13 @@ let
     '';
   };
 
+  checks = lib.mkOption {
+    type = lib.types.lazyAttrsOf lib.types.package;
+    default = { };
+    example = lib.literalExpression "{ inherit generated; }";
+    description = "More checks for nixbot to build, named `<target>-<check>`";
+  };
+
   service.options = {
     package = lib.mkOption {
       type = lib.types.package;
@@ -40,6 +47,7 @@ let
         executable in `bin/`, which must answer `/api/health` on `$PORT`.
       '';
     };
+    inherit checks;
     inherit customDomain;
     env = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
@@ -58,6 +66,7 @@ let
       type = lib.types.package;
       description = "The site's files, served from the root of the store path";
     };
+    inherit checks;
     spa = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -68,6 +77,14 @@ let
       '';
     };
     inherit customDomain;
+  };
+
+  tool.options = {
+    package = lib.mkOption {
+      type = lib.types.package;
+      description = "The tool's package";
+    };
+    inherit checks;
   };
 
   kennelJson = pkgs.writeText "kennel.json" (
@@ -102,6 +119,12 @@ in
       type = lib.types.lazyAttrsOf (lib.types.submodule site);
       default = { };
       description = "Static sites kennel serves through Caddy";
+    };
+
+    tools = lib.mkOption {
+      type = lib.types.lazyAttrsOf (lib.types.submodule tool);
+      default = { };
+      description = "Packages kennel checks but does not deploy, such as CLIs";
     };
 
     scottylabs = {

@@ -62,11 +62,13 @@ Type: `listOf package`, default: `[ ]`
 
 Options forwarded to crane's `buildPackage`. `doCheck` defaults to `false` and `meta.mainProgram` to `pname`. `cargoExtraArgs` defaults to `"--locked"` and applies to the dependency build, clippy, and tests as well as the package. In a workspace, set it to `"--locked -p kennel"` to build one member.
 
-The package carries `passthru.checks.clippy` and `passthru.checks.test`, which the flake module adds to `checks` for every service and site, so nixbot runs clippy (denying warnings) and `cargo test` on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
+The package carries `passthru.checks.clippy` and `passthru.checks.test`, which the flake module adds to `checks` for every service, site, and tool, so nixbot runs clippy (denying warnings) and `cargo test` on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
 
 With `scottylabs.postgres.enable`, the `test` check and the `mutants` build start an empty PostgreSQL server in the build sandbox and export `DATABASE_URL` and `PGUSER` for tests that need a database. `cargo test` runs a file's tests in parallel, so each test that uses the database must isolate itself, for example by creating its own schema and dropping it when it finishes.
 
-The package also carries `passthru.mutants`, which runs [cargo-mutants](https://mutants.rs). The flake module exposes `passthru.mutants` as the `<service>-mutants` package for each service in `scottylabs.services`. For a package your flake exposes itself, the attribute is `<package>.passthru.mutants`. cargo-mutants makes small changes to the code, such as replacing a function body with `Ok(())`, and fails if `cargo test` still passes for any of them. cargo-mutants mutates the whole workspace regardless of `cargoExtraArgs`. Exclude generated code or files you don't intend to test in `.cargo/mutants.toml` (see [filtering files](https://mutants.rs/skip_files.html)). If `.gitignore` lists `.cargo/`, replace it with `.cargo/*` and `!.cargo/mutants.toml` so the file is committed:
+The package also carries `passthru.mutants`, which runs [cargo-mutants](https://mutants.rs) on demand with `nix build .#<target>-mutants` for each service and tool. cargo-mutants makes small changes to the code, such as replacing a function body with `Ok(())`, and fails if `cargo test` still passes for any of them.
+
+It mutates the whole workspace regardless of `cargoExtraArgs`. Exclude generated code and other files you don't test in `.cargo/mutants.toml` (see [filtering files](https://mutants.rs/skip_files.html)). If `.gitignore` lists `.cargo/`, replace it with `.cargo/*` and `!.cargo/mutants.toml` so the file is committed:
 
 ```toml
 exclude_globs = ["crates/entity/**"]

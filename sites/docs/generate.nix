@@ -11,7 +11,12 @@ let
   flakeOptionsMd = helpers.buildOptionsDoc {
     module.imports = import ../../nix/flake-module/per-system inputs;
     subtree = options: {
-      inherit (options) scottylabs services sites;
+      inherit (options)
+        scottylabs
+        services
+        sites
+        tools
+        ;
     };
     root = ../..;
     inherit repoUrl;

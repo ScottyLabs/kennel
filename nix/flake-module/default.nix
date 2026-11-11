@@ -21,6 +21,7 @@ kennelInputs:
     transposition = {
       services = { };
       sites = { };
+      tools = { };
     };
 
     perSystem =
