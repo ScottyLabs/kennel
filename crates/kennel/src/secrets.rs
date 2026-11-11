@@ -1,6 +1,20 @@
-use secrecy::ExposeSecret;
+use serde::Deserialize;
+use serde::de::IgnoredAny;
 use std::collections::HashMap;
 use std::path::Path;
+
+/// The parts of secretspec.toml kennel checks before resolving it
+#[derive(Deserialize)]
+struct SpecFile {
+    project: SpecProject,
+    #[serde(default)]
+    scopes: HashMap<String, IgnoredAny>,
+}
+
+#[derive(Deserialize)]
+struct SpecProject {
+    name: String,
+}
 
 /// Resolves the secretspec.toml in `dir` from OpenBao once its project matches `namespace`
 pub fn resolve(
@@ -34,13 +48,10 @@ fn resolve_scope(
         return Ok(HashMap::new());
     }
 
-    let config: secretspec::Config = std::fs::read_to_string(&secretspec_path)?.parse()?;
-    check_namespace(&config.project.name, namespace)?;
+    let file: SpecFile = toml::from_str(&std::fs::read_to_string(&secretspec_path)?)?;
+    check_namespace(&file.project.name, namespace)?;
     if let Some(scope) = scope
-        && !config
-            .scopes
-            .as_ref()
-            .is_some_and(|s| s.contains_key(scope))
+        && !file.scopes.contains_key(scope)
     {
         return Ok(HashMap::new());
     }
@@ -53,12 +64,12 @@ fn resolve_scope(
     }
     let validated = spec.ensure_secrets(None, None, false)?;
 
-    Ok(validated
+    validated
         .resolved
         .secrets
         .iter()
-        .map(|(k, v)| (k.clone(), v.expose_secret().to_string()))
-        .collect())
+        .map(|(k, v)| Ok((k.clone(), v.try_as_utf8()?.to_owned())))
+        .collect()
 }
 
 fn check_namespace(project_name: &str, namespace: Option<&str>) -> anyhow::Result<()> {

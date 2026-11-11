@@ -15,6 +15,9 @@ revision = "1.0"
 local = "dotenv://.env"
 openbao = "openbao://secrets.scottylabs.org/secret"
 
+[defaults]
+providers = ["openbao"]
+
 [profiles.default]
 AWS_ACCESS_KEY_ID = { description = "sccache S3 access key ID", ref = { item = "shared/sccache", field = "AWS_ACCESS_KEY_ID" } }
 AWS_SECRET_ACCESS_KEY = { description = "sccache S3 secret access key", ref = { item = "shared/sccache", field = "AWS_SECRET_ACCESS_KEY" } }
@@ -28,9 +31,6 @@ STRIPE_KEY = { description = "Stripe API key" }
 [profiles.preview]
 STRIPE_KEY = { description = "Stripe test key", required = false }
 
-[profiles.dev.defaults]
-providers = ["openbao"]
-
 [profiles.dev]
 ```
 
@@ -40,7 +40,7 @@ Features enabled in governance write their own secrets to OpenBao. [Enabling fea
 
 `[profiles.default]` holds the secrets shared across profiles; named profiles inherit from it and may override an entry, for example `preview` making `STRIPE_KEY` optional. Declare a `[profiles.<name>]` header for every environment.
 
-The `[providers]` table defines `openbao`, which logs in with your local `bao` token, and `local`, a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[profiles.dev.defaults]` makes local development read from `openbao`. Deployed profiles need no `providers`, since kennel sets its own.
+The `[providers]` table defines `openbao`, which logs in with your local `bao` token, and `local`, a gitignored `.env` for [per-developer secrets](#per-developer-secrets). `[defaults]` makes every profile read from and write to `openbao`. Kennel uses its own OpenBao login instead when it deploys.
 
 Forgejo Actions jobs that need secrets use an `openbao-ci` provider, set up in [Custom workflows](./ci.md#custom-workflows).
 

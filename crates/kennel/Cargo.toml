@@ -27,8 +27,7 @@ sea-orm-migration = { version = "2.0.4", features = [
   "runtime-tokio-rustls",
   "sqlx-sqlite",
 ] }
-secrecy = "0.10.3"
-secretspec = { version = "0.18.0", features = [
+secretspec = { version = "0.21.1", features = [
   "openbao",
 ], default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -36,6 +35,7 @@ serde_json = "1.0.149"
 sha2 = "0.11.0"
 tokio = { version = "1.51.1", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["rt", "io"] }
+toml = "1.2.1"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
 urlencoding = "2.1.3"
