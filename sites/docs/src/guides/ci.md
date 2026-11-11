@@ -2,12 +2,15 @@
 
 On each push and pull request, [nixbot](https://nixbot.scottylabs.org) builds every flake `check` on the build farm, pushes the results to the binary cache, and posts one commit status per check. nixbot picks up every repository in the organization with the `nixbot` topic, which is set automatically on repos registered in governance.
 
-The shared module's checks are:
+On every system in the flake's `systems`, the shared module checks:
+
+- `devShell`: the dev shell, so developers on `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` can get it from the binary cache
+
+On `scottylabs.ci.system` (`x86_64-linux` by default), it also checks:
 
 - `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests), run in the build sandbox without network access, with an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. Clippy and `cargo-test` run in the Rust checks below, and the commit message hooks run only locally
 - `clippy` (denying warnings) and `test` for each `buildRustService` target, built against its cached dependencies. `test` also gets an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. cargo-mutants runs only on demand (see [`buildRustService`](../reference/build-helpers.md#buildrustservice))
 - `kennel`: the deploy manifest, which builds every service and site
-- `devShell`: the dev shell for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`, so it can come from the binary cache
 
 Tests within a check run in parallel against its one database, so each test that uses it must isolate itself, for example by creating its own schema and dropping it when it finishes.
 

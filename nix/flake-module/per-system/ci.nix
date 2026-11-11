@@ -32,6 +32,12 @@ in
     '';
   };
 
+  options.scottylabs.ci.system = lib.mkOption {
+    type = lib.types.str;
+    default = "x86_64-linux";
+    description = "System that gets all checks, with other systems getting only `devShell`.";
+  };
+
   config.apps.ci = {
     type = "app";
     program = "${run}";

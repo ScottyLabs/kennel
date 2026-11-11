@@ -93,7 +93,14 @@
       };
 
       perSystem =
-        { pkgs, helpers, ... }:
+        {
+          lib,
+          config,
+          pkgs,
+          system,
+          helpers,
+          ...
+        }:
         let
           kennel = helpers.buildRustService {
             src = ./.;
@@ -156,7 +163,7 @@
             docs-options = docsGen.generated;
           };
 
-          checks = kennel.passthru.checks;
+          checks = lib.mkIf (system == config.scottylabs.ci.system) kennel.passthru.checks;
 
           apps.login = {
             type = "app";

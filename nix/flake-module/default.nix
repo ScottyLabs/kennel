@@ -26,7 +26,6 @@ kennelInputs:
     perSystem =
       {
         config,
-        pkgs,
         system,
         ...
       }:
@@ -41,7 +40,7 @@ kennelInputs:
 
         scottylabs.root = self.outPath;
 
-        checks = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+        checks = lib.mkIf (system == config.scottylabs.ci.system) {
           kennel = config.scottylabs.kennel.manifest;
         };
       };
