@@ -46,7 +46,9 @@ Forgejo Actions jobs that need secrets use an `openbao-ci` provider, set up in [
 
 ## Enabling resolution
 
-The flake module resolves secrets whenever the project has a `secretspec.toml` (`scottylabs.secrets.enable`, on by default). It adds the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell with `secretspec export`, using the profile in `SECRETSPEC_PROFILE` (`dev` when unset). Kennel chooses the profile per branch when it deploys.
+The flake module resolves secrets whenever the project has a `secretspec.toml` (`scottylabs.secrets.enable`, on by default). It adds the `bao` and `secretspec` CLIs, sets `BAO_ADDR`, and exports every resolved secret into your shell with `secretspec export`. Kennel chooses the profile per branch when it deploys.
+
+Locally, `secretspec` uses the `dev` profile in the dev shell and in [local processes](./local-development.md). Set `SECRETSPEC_PROFILE` to use a different one.
 
 ## Per-developer secrets
 
