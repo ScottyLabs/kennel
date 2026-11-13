@@ -163,7 +163,7 @@ pub async fn realise(store_path: &str) -> anyhow::Result<()> {
 }
 
 async fn pin_artifact(
-    cachix: &crate::CachixConfig,
+    cache: &str,
     name: &str,
     store_path: &str,
     environment: &Environment,
@@ -179,9 +179,8 @@ async fn pin_artifact(
         ],
     };
     let output = tokio::process::Command::new("cachix")
-        .args(["pin", &cachix.cache, name, store_path])
+        .args(["pin", cache, name, store_path])
         .args(keep)
-        .env("CACHIX_AUTH_TOKEN", &cachix.auth_token)
         .output()
         .await?;
 
@@ -351,9 +350,9 @@ pub async fn deploy_request(
         tracing::warn!(project = %project.name, branch = %request.branch, error = %e, "failed to prune superseded artifacts");
     }
 
-    if let Some(cachix) = &state.config.cachix {
+    if let Some(cache) = &state.config.cachix_cache {
         let pin = format!("{}-{branch_slug}", project.name);
-        if let Err(e) = pin_artifact(cachix, &pin, &artifact.store_path, &environment).await {
+        if let Err(e) = pin_artifact(cache, &pin, &artifact.store_path, &environment).await {
             tracing::warn!(project = %project.name, branch = %request.branch, error = %e, "failed to pin artifact in cachix");
         }
     }
