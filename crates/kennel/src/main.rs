@@ -23,6 +23,8 @@ use std::sync::Arc;
 use store::Store;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::filter::LevelFilter;
 use vault::VaultClient;
 
 pub struct AppState {
@@ -79,7 +81,14 @@ fn read_secret_file(var: &str) -> Result<String> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().json().init();
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
 
     let config = AppConfig::from_env()?;
     let db_path = std::env::var("DATABASE_PATH")
