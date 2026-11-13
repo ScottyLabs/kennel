@@ -160,7 +160,10 @@ in
       files.".cargo/config.toml" = cargoConfig;
     };
 
-    treefmt.programs.rustfmt.enable = true;
+    treefmt.programs.rustfmt = {
+      enable = true;
+      package = toolchain;
+    };
 
     # buildRustService checks run these against cached dependencies
     scottylabs.hooksCheck.skip = [
