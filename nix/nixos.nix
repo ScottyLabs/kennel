@@ -124,6 +124,24 @@ in
       '';
     };
 
+    cachix = {
+      cache = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "scottylabs";
+        description = ''
+          Cachix cache where kennel pins every deployed manifest to keep it out
+          of Cachix garbage collection, or null to disable pinning.
+        '';
+      };
+
+      authTokenFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to a file containing a Cachix auth token with write access to the cache";
+      };
+    };
+
     resources = {
       postgres = {
         enable = mkOption {
@@ -235,6 +253,10 @@ in
         assertion = cfg.resources.garage.enable -> cfg.environmentFile != null;
         message = "An environmentFile containing GARAGE_ADMIN_TOKEN is required when Garage is enabled";
       }
+      {
+        assertion = cfg.cachix.cache != null -> cfg.cachix.authTokenFile != null;
+        message = "services.kennel.cachix.authTokenFile is required when cachix.cache is set";
+      }
     ];
 
     # Skip kennel.slice units in switch-to-configuration's failed-unit sweep
@@ -298,7 +320,8 @@ in
           cfg.nixPackage
         ]
         ++ optional cfg.resources.postgres.enable pkgs.postgresql
-        ++ optional cfg.resources.valkey.enable pkgs.valkey;
+        ++ optional cfg.resources.valkey.enable pkgs.valkey
+        ++ optional (cfg.cachix.cache != null) pkgs.cachix;
 
         environment = {
           HOME = "/var/lib/kennel";
@@ -335,6 +358,10 @@ in
         }
         // optionalAttrs (cfg.grafanaUrl != null) {
           GRAFANA_URL = cfg.grafanaUrl;
+        }
+        // optionalAttrs (cfg.cachix.cache != null) {
+          CACHIX_CACHE = cfg.cachix.cache;
+          CACHIX_AUTH_TOKEN_FILE = cfg.cachix.authTokenFile;
         };
 
         serviceConfig = {

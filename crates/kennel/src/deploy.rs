@@ -162,6 +162,37 @@ pub async fn realise(store_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn pin_artifact(
+    cachix: &crate::CachixConfig,
+    name: &str,
+    store_path: &str,
+    environment: &Environment,
+) -> anyhow::Result<()> {
+    // Replace the branch's pin on each deploy, and expire it for branches that stop deploying
+    let keep = match environment {
+        Environment::Prod | Environment::Staging => {
+            ["--keep-revisions".to_string(), "1".to_string()]
+        }
+        Environment::Dev | Environment::Preview => [
+            "--keep-days".to_string(),
+            kennel_config::constants::DEPLOYMENT_EXPIRY_DAYS.to_string(),
+        ],
+    };
+    let output = tokio::process::Command::new("cachix")
+        .args(["pin", &cachix.cache, name, store_path])
+        .args(keep)
+        .env("CACHIX_AUTH_TOKEN", &cachix.auth_token)
+        .output()
+        .await?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "cachix pin {name} failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(())
+}
+
 pub async fn deploy_request(
     state: &AppState,
     request: &::entity::deploy_requests::Model,
@@ -318,6 +349,13 @@ pub async fn deploy_request(
 
     if let Err(e) = state.store.artifacts().prune_superseded(artifact).await {
         tracing::warn!(project = %project.name, branch = %request.branch, error = %e, "failed to prune superseded artifacts");
+    }
+
+    if let Some(cachix) = &state.config.cachix {
+        let pin = format!("{}-{branch_slug}", project.name);
+        if let Err(e) = pin_artifact(cachix, &pin, &artifact.store_path, &environment).await {
+            tracing::warn!(project = %project.name, branch = %request.branch, error = %e, "failed to pin artifact in cachix");
+        }
     }
 
     if let Some(pr_number) = crate::forgejo::pr_number_from_branch(&request.branch)
