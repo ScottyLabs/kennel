@@ -11,7 +11,11 @@ let
 
   # TMPDIR differs per nix develop shell, so sockets use the runtime dir
   paths = pkgs.writeText "scottylabs-paths.sh" ''
-    SCOTTYLABS_ROOT=$(${lib.getExe pkgs.git} rev-parse --show-toplevel 2>/dev/null || pwd)
+    # .scottylabs and the linked configs belong in the checkout root
+    if ! SCOTTYLABS_ROOT=$(${lib.getExe pkgs.git} rev-parse --show-toplevel 2>/dev/null); then
+      echo "$PWD is not inside a git checkout, run nix develop from the project's repository" >&2
+      exit 1
+    fi
     export SCOTTYLABS_ROOT
     export SCOTTYLABS_STATE="$SCOTTYLABS_ROOT/.scottylabs"
     _scottylabs_id=$(printf %s "$SCOTTYLABS_ROOT" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-12)
