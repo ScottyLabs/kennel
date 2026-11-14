@@ -122,6 +122,9 @@ in
     };
   };
 
+  # TODO: https://github.com/NixOS/nixpkgs/issues/355486
+  config.scottylabs.shell.packages = [ pkgs.git ];
+
   config.devShells.default = pkgs.mkShell {
     packages =
       cfg.packages
