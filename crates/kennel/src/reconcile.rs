@@ -417,13 +417,19 @@ async fn restart_service(
 
     if let Ok(vault_endpoint) = std::env::var("VAULT_ENDPOINT") {
         let env_str = request.environment.to_string();
-        if let Ok(secrets) = crate::secrets::resolve(
+        let secrets = crate::secrets::resolve(
             std::path::Path::new(config_store_path),
             &env_str,
             &vault_endpoint,
             project.secret_namespace.as_deref(),
-        ) {
-            env_vars.extend(secrets);
+        );
+
+        match secrets {
+            Ok(secrets) => env_vars.extend(secrets),
+            Err(e) => {
+                tracing::warn!(unit = %unit_name, error = %e, "could not resolve secrets, skipping restart");
+                return;
+            }
         }
     }
 
