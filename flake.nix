@@ -107,15 +107,7 @@
         {
           scottylabs = {
             project.name = "kennel";
-            rust = {
-              enable = true;
-              cranelift.excludePackages = [
-                "aws-lc-sys"
-                "aws-lc-rs"
-                "rustls"
-                "linkme"
-              ];
-            };
+            rust.enable = true;
             sqlite.enable = true;
 
             shell = {

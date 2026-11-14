@@ -35,6 +35,11 @@ let
     else
       "-C link-arg=-fuse-ld=lld";
 
+  # cranelift omits fp-armv8 on aarch64, which rustc reports as an ABI mismatch with LLVM-built crates
+  rustFlags =
+    linkerFlags
+    + lib.optionalString hostPlatform.isAarch64 " -C unsafe-allow-abi-mismatch=target-feature";
+
   cargoConfig = (pkgs.formats.toml { }).generate "cargo-config.toml" {
     profile.dev.package = lib.genAttrs cfg.cranelift.excludePackages (_: {
       codegen-backend = "llvm";
@@ -75,6 +80,8 @@ in
         "aws-lc-rs"
         "rustls"
         "zmij"
+        "secretspec"
+        "linkme"
       ];
       description = "Crates built with LLVM instead of cranelift";
     };
@@ -127,8 +134,8 @@ in
         CARGO_UNSTABLE_CODEGEN_BACKEND = "true";
         CARGO_PROFILE_DEV_CODEGEN_BACKEND = "cranelift";
         CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND = "llvm";
-        RUSTFLAGS = linkerFlags;
-        RUSTDOCFLAGS = linkerFlags;
+        RUSTFLAGS = rustFlags;
+        RUSTDOCFLAGS = rustFlags;
         RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
         RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
         RUSTC_WRAPPER = lib.getExe pkgs.sccache;
