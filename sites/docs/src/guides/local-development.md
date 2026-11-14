@@ -12,6 +12,19 @@ curl -sSf -L https://install.lix.systems/lix | sh -s -- install \
 
 If Lix or Nix is already installed, add the same two settings to `/etc/nix/nix.conf` and restart the daemon with `sudo systemctl restart nix-daemon` on Linux or `sudo launchctl kickstart -k system/org.nixos.nix-daemon` on macOS.
 
+The warning `ignoring the client-specified setting 'trusted-public-keys'` is harmless, since it only means Nix skipped the copy of the key in the project's `nixConfig`. If it's followed by `not signed by any of the keys in 'trusted-public-keys'`, the running daemon doesn't have the key. Check that both settings are in `/etc/nix/nix.conf` and restart the daemon with the command above, since it only reads the file at startup.
+
+### `HTTP error 401` or `Bad credentials` from GitHub
+
+Nix is sending a GitHub token that has expired or been revoked. GitHub rejects requests with a bad token outright, even for public repositories that would download fine without one. Find where the token is set with:
+
+```bash
+sudo grep -rs access-tokens ~/.config/nix/ /etc/nix/
+echo "$NIX_CONFIG"
+```
+
+Replace the token with a fresh one, such as the output of `gh auth token`. Nix doesn't run commands in `nix.conf`, so paste the token itself. Deleting the `access-tokens` line also fixes the error, but without a token GitHub allows only 60 requests an hour, shared by everyone on the same IP address.
+
 ### iets
 
 [iets](https://github.com/numtide/iets) is a faster replacement for the `nix` command, including `nix develop`. For anything it doesn't support yet, it runs Lix instead.
