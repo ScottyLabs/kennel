@@ -5,3 +5,11 @@ reason = "Marvin timing attack needs RSA private-key operations; rsa sits under 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0235"
 reason = "rkyv is an optional rust_decimal feature that is never enabled; it stays in the lockfile but out of the build graph"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0387"
+reason = "crypto-bigint 0.5 backs only the NIST and X448 curves under secretspec's key generator, which makes Ed25519, Curve25519 and RSA keys"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0459"
+reason = "the bundled SQLite opens only kennel's own database, and sqlx-sqlite 0.9 caps libsqlite3-sys below the fixed 0.39"
