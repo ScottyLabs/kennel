@@ -8,7 +8,10 @@ On every system in the flake's `systems`, the shared module checks:
 
 On `scottylabs.ci.system` (`x86_64-linux` by default), it also checks:
 
-- `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests), run in the build sandbox without network access, with an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. Clippy and `cargo-test` run in the Rust checks below, and the commit message hooks run only locally
+- `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests), run in the build sandbox without network access. When `scottylabs.postgres` is enabled, it gets an empty PostgreSQL database in `DATABASE_URL`. A few hooks run elsewhere instead:
+  - Clippy and `cargo-test` run in the Rust checks below
+  - `cabal-test` runs when `buildHaskellService` builds the package
+  - The commit message hooks run only locally
 - `clippy` (denying warnings) and `test` for each `buildRustService` target, built against its cached dependencies. `test` also gets an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. cargo-mutants runs only on demand (see [`buildRustService`](../reference/build-helpers.md#buildrustservice))
 - `kennel`: the deploy manifest, which builds every service and site
 - `<target>-<check>`: each check a target adds in its `checks`

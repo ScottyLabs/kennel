@@ -38,8 +38,8 @@ in
         Enable the Haskell toolchain. Adds GHC, cabal-install,
         [HLS](https://github.com/haskell/haskell-language-server),
         [hlint](https://github.com/ndmitchell/hlint), and
-        [fourmolu](https://github.com/fourmolu/fourmolu). Runs hlint on every
-        commit.
+        [fourmolu](https://github.com/fourmolu/fourmolu). Runs hlint and
+        `cabal test` on every commit.
       '';
     };
 
@@ -63,6 +63,19 @@ in
 
     treefmt.programs.fourmolu.enable = true;
 
-    pre-commit.settings.hooks.hlint.enable = true;
+    # buildHaskellService runs the test suites when it builds the package
+    scottylabs.hooksCheck.skip = [ "cabal-test" ];
+
+    pre-commit.settings.hooks = {
+      hlint.enable = true;
+      cabal-test = {
+        enable = true;
+        name = "cabal-test";
+        entry = "cabal test all";
+        files = "\\.(hs|cabal)$";
+        pass_filenames = false;
+        language = "system";
+      };
+    };
   };
 }
