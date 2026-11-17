@@ -38,6 +38,8 @@ in
     description = "System that gets all checks, with other systems getting only `devShell`.";
   };
 
+  config.scottylabs.ci.checks.links = "${lib.getExe pkgs.lychee} --no-progress .";
+
   config.apps.ci = {
     type = "app";
     program = "${run}";

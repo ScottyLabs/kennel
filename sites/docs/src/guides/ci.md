@@ -34,10 +34,16 @@ jobs:
 
 Governance requires the resulting `CI / checks` and `CI / checks-1` statuses, along with `nixbot/nix-eval`, before anything merges into `main`.
 
-The workflow runs `nix run .#ci`, which runs every check in `scottylabs.ci.checks`. By default these are security scans of the lockfiles with [osv-scanner](https://github.com/google/osv-scanner) and of the code with [semgrep](https://semgrep.dev). [vulnix](https://github.com/nix-community/vulnix) can also scan each service and site's runtime closure once `scottylabs.security.vulnix.enable` is set. Add a check of your own as a shell script:
+The workflow runs `nix run .#ci`, which runs every check in `scottylabs.ci.checks`. These always include:
+
+- [osv-scanner](https://github.com/google/osv-scanner), for known vulnerabilities in the lockfiles
+- [semgrep](https://semgrep.dev), for insecure patterns in the code
+- [lychee](https://lychee.cli.rs), for broken links in Markdown, HTML, and text files
+
+[vulnix](https://github.com/nix-community/vulnix) can also scan each service and site's runtime closure once `scottylabs.security.vulnix.enable` is set. Add a check of your own as a shell script:
 
 ```nix
-scottylabs.ci.checks.links = "${lib.getExe pkgs.lychee} docs/";
+scottylabs.ci.checks.openapi = "curl -fsS https://api.example.org/openapi.json | diff - openapi.json";
 ```
 
 ## Custom workflows

@@ -15,25 +15,6 @@ let
 in
 {
   options.scottylabs.security = {
-    osvScanner.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Scan lockfiles (`Cargo.lock`, `uv.lock`, ...) against the
-        [OSV.dev](https://osv.dev) vulnerability database via
-        [osv-scanner](https://github.com/google/osv-scanner).
-      '';
-    };
-
-    semgrep.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Run [semgrep](https://semgrep.dev)'s default (`auto`) ruleset,
-        excluding `.forgejo`.
-      '';
-    };
-
     vulnix.enable = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -52,17 +33,15 @@ in
   };
 
   config.scottylabs.ci.checks = lib.mkMerge [
-    (lib.mkIf cfg.osvScanner.enable {
+    {
       # TODO: deno.lock is unsupported
       osv-scanner = ''
         rc=0
         ${lib.getExe pkgs.osv-scanner} scan source . || rc=$?
         [ "$rc" -eq 0 ] || [ "$rc" -eq 128 ]
       '';
-    })
-    (lib.mkIf cfg.semgrep.enable {
       semgrep = "${lib.getExe' semgrep "semgrep"} --config auto --error --exclude .forgejo .";
-    })
+    }
     (lib.mkIf (cfg.vulnix.enable && targets != [ ]) {
       vulnix = "${lib.getExe pkgs.vulnix} --closure ${
         lib.optionalString (cfg.vulnix.whitelist != null) "-w ${lib.escapeShellArg cfg.vulnix.whitelist}"
