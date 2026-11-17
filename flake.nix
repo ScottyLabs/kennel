@@ -152,10 +152,16 @@
 
           apps.login = {
             type = "app";
-            program = "${pkgs.writeShellScript "scottylabs-login" ''
-              export BAO_ADDR=https://secrets.scottylabs.org
-              ${pkgs.openbao}/bin/bao login -method=oidc
-            ''}";
+            program = pkgs.lib.getExe (
+              pkgs.writeShellApplication {
+                name = "scottylabs-login";
+                runtimeInputs = [ pkgs.openbao ];
+                text = ''
+                  export BAO_ADDR=https://secrets.scottylabs.org
+                  bao login -method=oidc
+                '';
+              }
+            );
           };
         };
     };

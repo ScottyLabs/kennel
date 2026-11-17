@@ -146,25 +146,37 @@ in
           block-ai-coauthors = {
             enable = true;
             name = "block-ai-coauthors";
-            entry = "${pkgs.writeShellScript "block-ai-coauthors" ''
-              if grep -iqE '^[[:space:]]*co-authored-by:.*(claude|cursor|copilot|codex)' "$1"; then
-                echo "AI tool co-author trailers are not allowed. Remove the Co-authored-by line." >&2
-                exit 1
-              fi
-            ''}";
+            entry = lib.getExe (
+              pkgs.writeShellApplication {
+                name = "block-ai-coauthors";
+                runtimeInputs = [ pkgs.gnugrep ];
+                text = ''
+                  if grep -iqE '^[[:space:]]*co-authored-by:.*(claude|cursor|copilot|codex)' "$1"; then
+                    echo "AI tool co-author trailers are not allowed. Remove the Co-authored-by line." >&2
+                    exit 1
+                  fi
+                '';
+              }
+            );
             stages = [ "commit-msg" ];
           };
 
           block-ai-slop = {
             enable = true;
             name = "block-ai-slop";
-            entry = "${pkgs.writeShellScript "block-ai-slop" ''
-              [ "$#" -eq 0 ] && exit 0
-              if ${pkgs.ripgrep}/bin/rg --color=never -n '[\x{2012}-\x{2015}\x{2018}\x{2019}\x{201A}\x{201C}\x{201D}\x{201E}\x{2026}\x{2190}-\x{2194}\x{21D0}\x{21D2}\x{21D4}\x{279C}\x{27A1}\x{2713}\x{2714}\x{2705}\x{2611}\x{2717}\x{2718}\x{2715}\x{2716}\x{274C}]' "$@"; then
-                echo "Non-ASCII characters are not allowed (em and en dashes, smart quotes, ellipsis, arrows, check and x marks). Replace them with plain ASCII." >&2
-                exit 1
-              fi
-            ''}";
+            entry = lib.getExe (
+              pkgs.writeShellApplication {
+                name = "block-ai-slop";
+                runtimeInputs = [ pkgs.ripgrep ];
+                text = ''
+                  [ "$#" -eq 0 ] && exit 0
+                  if rg --color=never -n '[\x{2012}-\x{2015}\x{2018}\x{2019}\x{201A}\x{201C}\x{201D}\x{201E}\x{2026}\x{2190}-\x{2194}\x{21D0}\x{21D2}\x{21D4}\x{279C}\x{27A1}\x{2713}\x{2714}\x{2705}\x{2611}\x{2717}\x{2718}\x{2715}\x{2716}\x{274C}]' "$@"; then
+                    echo "Non-ASCII characters are not allowed (em and en dashes, smart quotes, ellipsis, arrows, check and x marks). Replace them with plain ASCII." >&2
+                    exit 1
+                  fi
+                '';
+              }
+            );
             types = [ "text" ];
             language = "system";
           };

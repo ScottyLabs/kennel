@@ -33,13 +33,16 @@ let
     pythonSet.mkVirtualEnv "${config.scottylabs.project.name}-dev-env" workspace.deps.all;
 
   # pytest exits 5 when it collects no tests
-  pytest = pkgs.writeShellScript "pytest" ''
-    cd ${lib.escapeShellArg cfg.dir}
-    python -m pytest "$@"
-    rc=$?
-    [ "$rc" -eq 5 ] && exit 0
-    exit "$rc"
-  '';
+  pytest = pkgs.writeShellApplication {
+    name = "pytest";
+    text = ''
+      cd ${lib.escapeShellArg cfg.dir}
+      rc=0
+      python -m pytest "$@" || rc=$?
+      [ "$rc" -eq 5 ] && exit 0
+      exit "$rc"
+    '';
+  };
 in
 {
   options.scottylabs.python = {
@@ -147,7 +150,7 @@ in
       pytest = {
         enable = true;
         name = "pytest";
-        entry = "${pytest}";
+        entry = lib.getExe pytest;
         files = "\\.py$";
         pass_filenames = false;
         language = "system";

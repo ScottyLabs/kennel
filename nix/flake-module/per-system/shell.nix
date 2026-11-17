@@ -46,8 +46,7 @@ let
     name: body:
     pkgs.writeShellApplication {
       inherit name;
-      # the paths script is a store path shellcheck cannot follow
-      excludeShellChecks = [ "SC1091" ];
+      extraShellCheckFlags = [ "-x" ];
       text = ''
         source ${paths}
         cd "$SCOTTYLABS_ROOT"

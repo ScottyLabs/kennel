@@ -14,11 +14,17 @@ let
 
   script =
     name: body:
-    pkgs.writeShellScript name ''
-      source ${config.scottylabs.shell.environment}
-      cd "$SCOTTYLABS_ROOT"
-      ${body}
-    '';
+    lib.getExe (
+      pkgs.writeShellApplication {
+        inherit name;
+        extraShellCheckFlags = [ "-x" ];
+        text = ''
+          source ${config.scottylabs.shell.environment}
+          cd "$SCOTTYLABS_ROOT"
+          ${body}
+        '';
+      }
+    );
 
   daemon =
     name: p:
