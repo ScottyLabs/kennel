@@ -123,6 +123,7 @@ in
 
       jsrCache = runCommand "${name}-jsr" {
         nativeBuildInputs = [ fetchJsr ];
+        preferLocalBuild = true;
         SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
         outputHashMode = "recursive";
         outputHash =
@@ -152,38 +153,43 @@ in
       ) (lib.groupBy (e: e.name) jsrEntries);
     in
     # The npm cache deno reads is the extracted tarball plus a packument per package
-    runCommand "${name}-deno-cache" { } ''
-      mkdir -p "$out/npm/registry.npmjs.org" "$out/remote/https/jsr.io"
-      ${lib.concatStringsSep "\n" (
-        map (e: ''
-          dest="$out/npm/registry.npmjs.org/${e.name}/${e.version}"
-          mkdir -p "$dest"
-          tar -xzf ${e.tarball} -C "$dest" --strip-components=1 --delay-directory-restore
-        '') npmEntries
-      )}
-      ${lib.concatStringsSep "\n" (
-        lib.mapAttrsToList (pkg: file: ''
-          cp ${file} "$out/npm/registry.npmjs.org/${pkg}/registry.json"
-        '') packuments
-      )}
-      ${lib.concatStringsSep "\n" (
-        map (f: ''
-          {
-            cat ${f.file}
-            printf '\n// denoCacheMetadata=%s' ${
-              lib.escapeShellArg (
-                builtins.toJSON {
-                  headers = { };
-                  inherit (f) url;
-                  time = 0;
-                }
-              )
-            }
-          } > "$out/remote/https/jsr.io/${builtins.hashString "sha256" (lib.removePrefix "https://jsr.io" f.url)}"
-        '') jsrPackages
-      )}
-      ${lib.optionalString (jsrEntries != [ ]) ''cp -r ${jsrCache}/. "$out/remote/https/jsr.io/"''}
-    '';
+    runCommand "${name}-deno-cache"
+      {
+        # only unpacks tarballs already in the local store
+        preferLocalBuild = true;
+      }
+      ''
+        mkdir -p "$out/npm/registry.npmjs.org" "$out/remote/https/jsr.io"
+        ${lib.concatStringsSep "\n" (
+          map (e: ''
+            dest="$out/npm/registry.npmjs.org/${e.name}/${e.version}"
+            mkdir -p "$dest"
+            tar -xzf ${e.tarball} -C "$dest" --strip-components=1 --delay-directory-restore
+          '') npmEntries
+        )}
+        ${lib.concatStringsSep "\n" (
+          lib.mapAttrsToList (pkg: file: ''
+            cp ${file} "$out/npm/registry.npmjs.org/${pkg}/registry.json"
+          '') packuments
+        )}
+        ${lib.concatStringsSep "\n" (
+          map (f: ''
+            {
+              cat ${f.file}
+              printf '\n// denoCacheMetadata=%s' ${
+                lib.escapeShellArg (
+                  builtins.toJSON {
+                    headers = { };
+                    inherit (f) url;
+                    time = 0;
+                  }
+                )
+              }
+            } > "$out/remote/https/jsr.io/${builtins.hashString "sha256" (lib.removePrefix "https://jsr.io" f.url)}"
+          '') jsrPackages
+        )}
+        ${lib.optionalString (jsrEntries != [ ]) ''cp -r ${jsrCache}/. "$out/remote/https/jsr.io/"''}
+      '';
 
   # patchelf linux addons, dropping musl packages it cannot fix
   patchAddons = lib.optionalString stdenv.hostPlatform.isLinux ''
