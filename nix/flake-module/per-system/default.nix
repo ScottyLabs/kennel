@@ -2,12 +2,12 @@ kennelInputs: [
   (import ./core.nix kennelInputs)
   (import ./shell.nix kennelInputs)
   ./hooks.nix
-  (import ./processes.nix kennelInputs)
+  ./processes.nix
   ./kennel.nix
   ./checks.nix
   ./secrets.nix
   ./ci.nix
-  (import ./security.nix kennelInputs)
+  ./security.nix
   (import ./rust.nix kennelInputs)
   ./deno.nix
   (import ./python.nix kennelInputs)

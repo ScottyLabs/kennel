@@ -147,38 +147,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-pitchfork": {
-      "locked": {
-        "lastModified": 1794174645,
-        "narHash": "sha256-JxwKVhDG+EEUhpkSULBAv+f0APglnWOArg227J1EWUo=",
-        "owner": "ap-1",
-        "repo": "nixpkgs",
-        "rev": "009e3966fd020815a3b251c3f45e1bc74019d7b3",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ap-1",
-        "ref": "pitchfork",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-semgrep": {
-      "locked": {
-        "lastModified": 1794177463,
-        "narHash": "sha256-2k9vPqWGbNsR1hcYDkH3kJ8MR9kOGPYYrDorxQ0ECFw=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "91c7535628c543445974573b6a394f7b65263788",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "91c7535628c543445974573b6a394f7b65263788",
-        "type": "github"
-      }
-    },
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
@@ -254,8 +222,6 @@
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
         "nixpkgs-garage": "nixpkgs-garage",
-        "nixpkgs-pitchfork": "nixpkgs-pitchfork",
-        "nixpkgs-semgrep": "nixpkgs-semgrep",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",

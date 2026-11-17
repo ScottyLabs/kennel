@@ -1,4 +1,3 @@
-kennelInputs:
 {
   lib,
   config,
@@ -8,9 +7,6 @@ kennelInputs:
 
 let
   cfg = config.scottylabs.processes;
-
-  pitchfork =
-    kennelInputs.nixpkgs-pitchfork.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pitchfork;
 
   script =
     name: body:
@@ -92,7 +88,7 @@ in
 
   config = lib.mkIf (cfg != { }) {
     scottylabs.shell = {
-      packages = [ pitchfork ];
+      packages = [ pkgs.pitchfork ];
       files.".config/pitchfork.toml" = toml;
     };
   };

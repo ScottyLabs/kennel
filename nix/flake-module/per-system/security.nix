@@ -1,4 +1,3 @@
-kennelInputs:
 {
   lib,
   config,
@@ -8,7 +7,6 @@ kennelInputs:
 
 let
   cfg = config.scottylabs.security;
-  semgrep = kennelInputs.nixpkgs-semgrep.legacyPackages.${pkgs.stdenv.hostPlatform.system}.semgrep;
   targets = map (t: t.package) (
     builtins.attrValues config.services ++ builtins.attrValues config.sites
   );
@@ -40,7 +38,7 @@ in
         ${lib.getExe pkgs.osv-scanner} scan source . || rc=$?
         [ "$rc" -eq 0 ] || [ "$rc" -eq 128 ]
       '';
-      semgrep = "${lib.getExe' semgrep "semgrep"} --config auto --error --exclude .forgejo .";
+      semgrep = "${lib.getExe' pkgs.semgrep "semgrep"} --config auto --error --exclude .forgejo .";
     }
     (lib.mkIf (cfg.vulnix.enable && targets != [ ]) {
       vulnix = "${lib.getExe pkgs.vulnix} --closure ${
