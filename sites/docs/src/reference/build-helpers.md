@@ -14,7 +14,7 @@ Helpers build with your flake's `pkgs`, which comes from kennel's nixpkgs.
 
 ## `buildRustService`
 
-Builds a Rust crate with [crane](https://crane.dev), caching dependencies separately from the build.
+Builds a Rust crate with [crane](https://crane.dev) and the dev shell's nightly toolchain, caching dependencies separately from the build.
 
 ### `src`
 

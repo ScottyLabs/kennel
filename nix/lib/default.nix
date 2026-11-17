@@ -2,6 +2,7 @@
   pkgs,
   kennelInputs,
   rustCheckSetup,
+  rustToolchain,
 }:
 
 {
@@ -11,6 +12,7 @@
     inherit pkgs;
     inherit (kennelInputs) crane;
     checkSetup = rustCheckSetup;
+    toolchain = rustToolchain;
   };
 
   buildHaskellService = import ./build-haskell-service.nix { inherit pkgs; };

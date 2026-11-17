@@ -45,5 +45,6 @@ kennelInputs:
   config._module.args.helpers = import ../../lib {
     inherit pkgs kennelInputs;
     rustCheckSetup = config.scottylabs.rust.checkSetup;
+    rustToolchain = config.scottylabs.rust.toolchain;
   };
 }

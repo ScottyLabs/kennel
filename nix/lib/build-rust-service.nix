@@ -2,6 +2,7 @@
   pkgs,
   crane,
   checkSetup,
+  toolchain,
 }:
 
 {
@@ -16,7 +17,7 @@
 }:
 
 let
-  craneLib = crane.mkLib pkgs;
+  craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
   fromToml = craneLib.crateNameFromCargoToml { cargoToml = src + "/Cargo.toml"; };
 
   scopedSrc =

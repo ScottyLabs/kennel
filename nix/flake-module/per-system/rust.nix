@@ -91,7 +91,7 @@ in
       default = toolchain;
       defaultText = lib.literalMD "the latest nightly with every component the shell needs";
       readOnly = true;
-      description = "The Rust toolchain in the dev shell";
+      description = "The Rust toolchain for the dev shell and `buildRustService`";
     };
 
     checkSetup = {
@@ -134,7 +134,7 @@ in
         CARGO_UNSTABLE_CODEGEN_BACKEND = "true";
         CARGO_PROFILE_DEV_CODEGEN_BACKEND = "cranelift";
         CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND = "llvm";
-        RUSTFLAGS = rustFlags;
+        RUSTFLAGS = rustFlags + " -Z unstable-options --jobs-frontend=8";
         RUSTDOCFLAGS = rustFlags;
         RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
         RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";
