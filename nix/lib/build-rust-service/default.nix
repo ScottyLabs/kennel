@@ -20,6 +20,10 @@ let
   craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
   fromToml = craneLib.crateNameFromCargoToml { cargoToml = src + "/Cargo.toml"; };
 
+  hasDenyToml = builtins.pathExists (src + "/deny.toml");
+
+  denyConfig = import ./deny.nix { inherit pkgs src; };
+
   scopedSrc =
     if paths == null then
       src
@@ -32,6 +36,7 @@ let
             (src + "/Cargo.lock")
           ]
           ++ map (p: src + "/${p}") (paths ++ extraSources)
+          ++ pkgs.lib.optional hasDenyToml (src + "/deny.toml")
         );
       };
 
@@ -93,6 +98,14 @@ package
         // {
           inherit cargoArtifacts;
           nativeBuildInputs = nativeBuildInputs ++ checkSetup.nativeBuildInputs;
+        }
+      );
+      deny = craneLib.cargoDeny (
+        commonArgs
+        // {
+          cargoExtraArgs = "--locked";
+          cargoDenyChecks = "bans licenses";
+          cargoDenyExtraArgs = "--offline" + pkgs.lib.optionalString (!hasDenyToml) " --config ${denyConfig}";
         }
       );
     };

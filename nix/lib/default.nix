@@ -8,7 +8,7 @@
 {
   buildDenoTask = pkgs.callPackage ./build-deno-task.nix { };
 
-  buildRustService = import ./build-rust-service.nix {
+  buildRustService = import ./build-rust-service {
     inherit pkgs;
     inherit (kennelInputs) crane;
     checkSetup = rustCheckSetup;
