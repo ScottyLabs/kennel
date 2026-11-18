@@ -1,0 +1,19 @@
+id: no-sleep-in-tests
+language: rust
+severity: error
+message: Await the operation or a signal from it instead of sleeping
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: (^|::)sleep(_until)?$
+  inside:
+    kind: function_item
+    stopBy: end
+    follows:
+      kind: attribute_item
+      regex: ^#\[(tokio::)?test\b
+      # past the test's other attributes, like #[ignore]
+      stopBy:
+        not:
+          kind: attribute_item

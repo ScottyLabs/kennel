@@ -41,13 +41,17 @@ let
     + lib.optionalString hostPlatform.isAarch64 " -C unsafe-allow-abi-mismatch=target-feature";
 
   clippyDenyFlags = lib.concatMapStrings (lint: " -D ${lint}") (
-    import ../../lib/build-rust-service/clippy-lints.nix
+    import ../../../lib/build-rust-service/clippy-lints.nix
   );
 
   cargoConfig = (pkgs.formats.toml { }).generate "cargo-config.toml" {
     profile.dev.package = lib.genAttrs cfg.cranelift.excludePackages (_: {
       codegen-backend = "llvm";
     });
+  };
+
+  astGrepConfig = (pkgs.formats.yaml { }).generate "sgconfig.yml" {
+    ruleDirs = [ "${./ast-grep}" ];
   };
 in
 {
@@ -60,8 +64,9 @@ in
         [cranelift](https://github.com/rust-lang/rustc_codegen_cranelift),
         clippy, rustfmt, the [wild](https://github.com/davidlattimore/wild)
         linker, and [sccache](https://github.com/mozilla/sccache). Runs clippy,
-        `cargo test`, and [cargo-machete](https://github.com/bnjbvr/cargo-machete)
-        on every commit.
+        `cargo test`, [cargo-machete](https://github.com/bnjbvr/cargo-machete),
+        and kennel's [ast-grep](https://ast-grep.github.io) rules on every
+        commit.
       '';
     };
 
@@ -205,6 +210,13 @@ in
         entry = lib.getExe pkgs.cargo-machete;
         files = "Cargo\\.toml$";
         pass_filenames = false;
+        language = "system";
+      };
+      ast-grep-rust = {
+        enable = true;
+        name = "ast-grep-rust";
+        entry = "${lib.getExe pkgs.ast-grep} scan --config ${astGrepConfig}";
+        files = "\\.rs$";
         language = "system";
       };
     };
