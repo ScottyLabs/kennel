@@ -116,6 +116,8 @@ in
         # the sandbox has no system CA store for TLS clients built in tests
         SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         preConfigure = cfg.hooksCheck.setup;
+        # TODO: https://github.com/oxc-project/oxc/issues/20331
+        NIXBUILDNET_MIN_MEM = "8192";
       });
     };
 
