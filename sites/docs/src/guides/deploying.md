@@ -143,6 +143,16 @@ It also needs a root `deno.json` that excludes that directory, so the `deno chec
 
 For a SvelteKit app, `svelte-check` type-checks it (enable `scottylabs.deno.svelte.enable`).
 
+The oxlint hook also enforces the [landmines](https://github.com/interfere-inc/landmines) and [anti-slop](https://github.com/dmmulroy/anti-slop) rules. These apply automatically unless the project has its own `.oxlintrc.json`, which then has to extend kennel's config from `.scottylabs`, where the dev shell links it:
+
+```json
+{
+  "extends": ["./.scottylabs/oxlint/oxlintrc.json"]
+}
+```
+
+A nested config such as `apps/web/.oxlintrc.json` replaces the root one for its directory, so it needs the same `extends` with a path relative to itself, like `../../.scottylabs/oxlint/oxlintrc.json`.
+
 If a service serves a frontend, give the service the frontend's store path through `env`. That way, changing the frontend doesn't rebuild the service:
 
 ```nix

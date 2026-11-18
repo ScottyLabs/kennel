@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "anti-slop": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791937113,
+        "narHash": "sha256-S+8TNTjmuwSBIuANG63a0eg6W72Bd9gZXueL8uyWOqE=",
+        "owner": "dmmulroy",
+        "repo": "anti-slop",
+        "rev": "13909c9e07590f5a85d93c62712259fe14a883f7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dmmulroy",
+        "repo": "anti-slop",
+        "type": "github"
+      }
+    },
     "collar": {
       "inputs": {
         "flake-parts": [
@@ -216,6 +232,7 @@
     },
     "root": {
       "inputs": {
+        "anti-slop": "anti-slop",
         "collar": "collar",
         "crane": "crane",
         "flake-parts": "flake-parts",

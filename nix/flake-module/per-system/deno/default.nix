@@ -1,3 +1,4 @@
+kennelInputs:
 {
   lib,
   config,
@@ -8,7 +9,7 @@
 let
   cfg = config.scottylabs.deno;
   inherit (config.scottylabs) root;
-  denoLib = pkgs.callPackage ../../lib/deno.nix { };
+  denoLib = pkgs.callPackage ../../../lib/deno.nix { };
 
   oxlintPlugins = [
     "oxc"
@@ -19,6 +20,11 @@ let
     "react"
     "jsx-a11y"
   ];
+
+  oxlint = import ./oxlint {
+    inherit pkgs;
+    inherit (kennelInputs) anti-slop;
+  };
 
   # A workspace member without its own lock resolves from the root deno.lock
   lockfiles = lib.unique (
@@ -78,7 +84,12 @@ in
         Enable the Deno toolchain. Adds [Deno](https://deno.com),
         [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and
         [oxfmt](https://oxc.rs/docs/guide/usage/formatter). Runs oxlint,
-        `deno check`, and `deno test` on every commit.
+        `deno check`, and `deno test` on every commit. oxlint applies safe fixes
+        and also enforces the
+        [landmines](https://github.com/interfere-inc/landmines) and
+        [anti-slop](https://github.com/dmmulroy/anti-slop) rules in
+        `.scottylabs/oxlint/oxlintrc.json`, which a project's own
+        `.oxlintrc.json` must list in `extends` to keep them.
       '';
     };
 
@@ -128,7 +139,8 @@ in
         setup = ''
           export DENO_DIR="$TMPDIR/deno"
           export OXLINT_TSGOLINT_PATH=${lib.getExe pkgs.tsgolint}
-          mkdir -p "$DENO_DIR"
+          mkdir -p "$DENO_DIR" .scottylabs
+          ln -s ${oxlint.bundle} .scottylabs/oxlint
         ''
         + lib.concatMapStrings (cache: ''
           cp -rn ${cache}/. "$DENO_DIR/"
@@ -157,6 +169,9 @@ in
         hook = lib.concatMapStrings (dir: ''
           (cd "$SCOTTYLABS_ROOT"/${lib.escapeShellArg dir} && deno install${lib.optionalString cfg.svelte.enable " && deno run -A npm:@sveltejs/kit/svelte-kit sync"})
         '') cfg.dirs;
+
+        # the path a project's .oxlintrc.json extends
+        files.".scottylabs/oxlint" = oxlint.bundle;
       };
     };
 
@@ -168,6 +183,7 @@ in
     pre-commit.settings.hooks = {
       oxlint = {
         enable = true;
+        package = oxlint.wrapper;
         args = [ "--no-error-on-unmatched-pattern" ];
         settings = {
           plugins = oxlintPlugins;
@@ -178,6 +194,21 @@ in
             "perf"
           ];
           typeAware = true;
+          fix = [ "safe" ];
+          # agent tool directories hold vendored skill scripts
+          ignorePattern = [
+            ".agent/**"
+            ".agents/**"
+            ".claude/**"
+            ".codex/**"
+            ".continue/**"
+            ".cursor/**"
+            ".gemini/**"
+            ".opencode/**"
+            ".pi/**"
+            ".roo/**"
+            ".windsurf/**"
+          ];
           allow = [
             "prefer-readonly-parameter-types"
             "no-warning-comments"

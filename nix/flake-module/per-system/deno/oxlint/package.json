@@ -1,0 +1,10 @@
+{
+  "name": "kennel-oxlint-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@interfere/landmines": "0.1.0",
+    "@oxlint/plugins": "1.91.0"
+  }
+}

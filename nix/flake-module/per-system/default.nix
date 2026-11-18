@@ -9,7 +9,7 @@ kennelInputs: [
   ./ci.nix
   ./security.nix
   (import ./rust.nix kennelInputs)
-  ./deno.nix
+  (import ./deno kennelInputs)
   (import ./python.nix kennelInputs)
   ./haskell.nix
   ./postgres.nix

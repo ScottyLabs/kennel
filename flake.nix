@@ -67,6 +67,12 @@
       # collar's kennel input is this flake
       inputs.scottylabs.follows = "";
     };
+
+    # oxlint plugin with no npm release
+    anti-slop = {
+      url = "github:dmmulroy/anti-slop";
+      flake = false;
+    };
   };
 
   outputs =
