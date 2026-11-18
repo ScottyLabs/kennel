@@ -130,6 +130,7 @@ in
           statix.enable = true;
           deadnix.enable = true;
           gitleaks.enable = true;
+          shellcheck.enable = true;
           editorconfig-checker.enable = cfg.editorconfig.enable;
           commitizen.enable = cfg.conventionalCommits.enable;
 
