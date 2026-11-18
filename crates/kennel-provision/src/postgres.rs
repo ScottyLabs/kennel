@@ -223,10 +223,20 @@ impl ResourceProvider for PostgresProvider {
         for db in existing {
             if !active_dbs.contains(&db) {
                 tracing::info!(db = %db, "dropping orphaned database");
-                let _ = tokio::process::Command::new("dropdb")
+                let dropped = tokio::process::Command::new("dropdb")
                     .args(["-h", &self.socket_dir, "--if-exists", &db])
                     .output()
                     .await;
+
+                match dropped {
+                    Ok(output) if output.status.success() => {}
+                    Ok(output) => tracing::warn!(
+                        db = %db,
+                        stderr = %String::from_utf8_lossy(&output.stderr),
+                        "dropdb failed for orphaned database"
+                    ),
+                    Err(e) => tracing::warn!(db = %db, error = %e, "failed to run dropdb"),
+                }
             }
         }
 

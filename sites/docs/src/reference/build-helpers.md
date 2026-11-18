@@ -62,7 +62,7 @@ Type: `listOf package`, default: `[ ]`
 
 Options forwarded to crane's `buildPackage`. `doCheck` defaults to `false` and `meta.mainProgram` to `pname`. `cargoExtraArgs` defaults to `"--locked"` and applies to the dependency build, clippy, and tests as well as the package. In a workspace, set it to `"--locked -p kennel"` to build one member.
 
-The package carries `passthru.checks.clippy`, `passthru.checks.test`, and `passthru.checks.deny`, which the flake module adds to `checks` for every service, site, and tool, so nixbot runs clippy (denying warnings), `cargo test`, and [cargo-deny](https://embarkstudios.github.io/cargo-deny/) on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
+The flake module adds the package's `passthru.checks` (clippy, `cargo test`, and [cargo-deny](https://embarkstudios.github.io/cargo-deny/)) to `checks` for every service, site, and tool, so nixbot runs them on every push. The other languages' linters and tests run in the `hooks` check (see [Continuous Integration](../guides/ci.md)).
 
 The `deny` check runs `cargo deny check bans licenses`. Without a `deny.toml` in `src`, it uses [kennel's default](https://git.cmu.dev/ScottyLabs/kennel/src/branch/main/nix/lib/build-rust-service/deny.toml), which:
 

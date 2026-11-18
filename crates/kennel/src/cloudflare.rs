@@ -177,7 +177,9 @@ mod tests {
     #[test]
     fn picks_longest_matching_zone() {
         let c = mk(&[("scottylabs.org", "z1"), ("apps.scottylabs.org", "z2")]);
-        let (zone, _) = c.match_zone("foo.apps.scottylabs.org").unwrap();
+        let (zone, _) = c
+            .match_zone("foo.apps.scottylabs.org")
+            .expect("a configured zone matches the domain");
         assert_eq!(zone, "apps.scottylabs.org");
     }
 

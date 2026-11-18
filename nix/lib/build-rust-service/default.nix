@@ -89,7 +89,9 @@ package
         commonArgs
         // {
           inherit cargoArtifacts;
-          cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+          cargoClippyExtraArgs =
+            "--all-targets -- --deny warnings"
+            + pkgs.lib.concatMapStrings (lint: " --deny ${lint}") (import ./clippy-lints.nix);
         }
       );
       test = craneLib.cargoTest (

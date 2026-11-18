@@ -40,6 +40,10 @@ let
     linkerFlags
     + lib.optionalString hostPlatform.isAarch64 " -C unsafe-allow-abi-mismatch=target-feature";
 
+  clippyDenyFlags = lib.concatMapStrings (lint: " -D ${lint}") (
+    import ../../lib/build-rust-service/clippy-lints.nix
+  );
+
   cargoConfig = (pkgs.formats.toml { }).generate "cargo-config.toml" {
     profile.dev.package = lib.genAttrs cfg.cranelift.excludePackages (_: {
       codegen-backend = "llvm";
@@ -134,7 +138,7 @@ in
         CARGO_UNSTABLE_CODEGEN_BACKEND = "true";
         CARGO_PROFILE_DEV_CODEGEN_BACKEND = "cranelift";
         CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND = "llvm";
-        RUSTFLAGS = rustFlags + " -Z unstable-options --jobs-frontend=8";
+        RUSTFLAGS = rustFlags + " -Z unstable-options --jobs-frontend=8" + clippyDenyFlags;
         RUSTDOCFLAGS = rustFlags;
         RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
         RUST_LOG = "${builtins.replaceStrings [ "-" ] [ "_" ] projectName}=debug";

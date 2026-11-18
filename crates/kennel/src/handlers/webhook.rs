@@ -26,8 +26,8 @@ pub async fn handle(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<StatusCode, StatusCode> {
-    verify_signature(&headers, &body, &state.config.webhook_secret).map_err(|_| {
-        tracing::warn!("webhook signature verification failed");
+    verify_signature(&headers, &body, &state.config.webhook_secret).map_err(|e| {
+        tracing::warn!(error = %e, "webhook signature verification failed");
         StatusCode::UNAUTHORIZED
     })?;
 
@@ -115,17 +115,23 @@ async fn teardown_branch(
     project: &::entity::projects::Model,
     branch: &str,
 ) -> anyhow::Result<()> {
-    let _ = state
+    if let Err(e) = state
         .store
         .deploy_requests()
         .delete_by_project_branch(&project.id, branch)
-        .await;
+        .await
+    {
+        tracing::warn!(branch, error = %e, "failed to delete deploy requests for branch");
+    }
 
-    let _ = state
+    if let Err(e) = state
         .store
         .artifacts()
         .delete_by_project_branch(&project.id, branch)
-        .await;
+        .await
+    {
+        tracing::warn!(branch, error = %e, "failed to delete artifacts for branch");
+    }
 
     let deployments = state
         .store

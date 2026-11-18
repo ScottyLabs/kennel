@@ -96,7 +96,9 @@ impl ValkeyProvider {
         let keep = kennel_config::constants::VALKEY_BACKUP_KEEP;
         if files.len() > keep {
             for path in &files[..files.len() - keep] {
-                let _ = std::fs::remove_file(path);
+                if let Err(e) = std::fs::remove_file(path) {
+                    tracing::warn!(path = %path.display(), error = %e, "failed to prune valkey backup");
+                }
             }
         }
     }

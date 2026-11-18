@@ -12,7 +12,7 @@ On `scottylabs.ci.system` (`x86_64-linux` by default), it also checks:
   - Clippy and `cargo-test` run in the Rust checks below
   - `cabal-test` runs when `buildHaskellService` builds the package
   - The commit message hooks run only locally
-- `clippy` (denying warnings), `test`, and `deny` for each `buildRustService` target, built against its cached dependencies. `test` also gets an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. cargo-mutants runs only on demand (see [`buildRustService`](../reference/build-helpers.md#buildrustservice))
+- `clippy`, `test`, and `deny` for each `buildRustService` target, built against its cached dependencies. `test` also gets an empty PostgreSQL database in `DATABASE_URL` when `scottylabs.postgres` is enabled. cargo-mutants runs only on demand (see [`buildRustService`](../reference/build-helpers.md#buildrustservice))
 - `kennel`: the deploy manifest, which builds every service and site
 - `<target>-<check>`: each check a target adds in its `checks`
 

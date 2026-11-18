@@ -215,10 +215,12 @@ impl ResourceProvider for GarageProvider {
                     && !active_buckets.contains(name)
                 {
                     tracing::info!(bucket = %name, "deleting orphaned garage bucket");
-                    if let Some(id) = bucket["id"].as_str() {
-                        let _ = self
+                    if let Some(id) = bucket["id"].as_str()
+                        && let Err(e) = self
                             .api_post(&format!("/v2/DeleteBucket?id={id}"), None)
-                            .await;
+                            .await
+                    {
+                        tracing::warn!(bucket = %name, error = %e, "failed to delete orphaned garage bucket");
                     }
                 }
             }

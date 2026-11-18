@@ -109,7 +109,10 @@ async fn unit_health(
     if health.active
         && let Some(port) = deployment.port
     {
-        health.app_healthy = Some(crate::health::probe(port as u16).await);
+        let port = u16::try_from(port).map_err(|e| {
+            anyhow::anyhow!("deployment {} has invalid port {port}: {e}", deployment.id)
+        })?;
+        health.app_healthy = Some(crate::health::probe(port).await);
     }
     Ok(health)
 }

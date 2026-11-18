@@ -1,0 +1,17 @@
+[
+  "clippy::undocumented_unsafe_blocks"
+  "clippy::multiple_unsafe_ops_per_block"
+  "clippy::unnecessary_safety_comment"
+  "clippy::unwrap_used"
+  "clippy::unwrap_in_result"
+  "clippy::as_conversions"
+  "clippy::cast_possible_truncation"
+  "clippy::map_err_ignore"
+  "clippy::unused_result_ok"
+  "clippy::let_underscore_must_use"
+  "clippy::allow_attributes"
+  "clippy::allow_attributes_without_reason"
+  "clippy::ignore_without_reason"
+  "clippy::assertions_on_result_states"
+  "clippy::tests_outside_test_module"
+]

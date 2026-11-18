@@ -489,6 +489,10 @@ async fn deploy_static_site(
 
     let link = site_dir.join(name);
     let temp = site_dir.join(format!("{name}.new"));
+    #[expect(
+        clippy::let_underscore_must_use,
+        reason = "the temp link is usually absent, and the symlink below fails if it remains"
+    )]
     let _ = tokio::fs::remove_file(&temp).await;
 
     #[cfg(unix)]
@@ -749,7 +753,9 @@ async fn deploy_service(
     let healthy = wait_for_healthy(port).await;
     if !healthy {
         tracing::error!(service = %name, port, "healthcheck failed, stopping unit");
-        let _ = systemd.stop_unit(&unit_name).await;
+        if let Err(e) = systemd.stop_unit(&unit_name).await {
+            tracing::warn!(unit = %unit_name, error = %e, "failed to stop unhealthy unit");
+        }
         return Err(StageError {
             stage: FailureStage::Healthcheck,
             error: anyhow::anyhow!(
@@ -948,8 +954,10 @@ pub async fn recover_collected_artifact(
             true
         }
         Err(e) => {
-            if let Some(unit_name) = &deployment.unit_name {
-                let _ = systemd.stop_unit(unit_name).await;
+            if let Some(unit_name) = &deployment.unit_name
+                && let Err(stop_err) = systemd.stop_unit(unit_name).await
+            {
+                tracing::warn!(unit = %unit_name, error = %stop_err, "failed to stop unit");
             }
 
             tracing::error!(
@@ -965,8 +973,14 @@ pub async fn recover_collected_artifact(
 
 pub async fn remove_gc_roots(deployment_id: &str) {
     let dir = PathBuf::from(kennel_config::constants::GC_ROOTS_DIR);
-    let _ = tokio::fs::remove_file(dir.join(deployment_id)).await;
-    let _ = tokio::fs::remove_file(dir.join(format!("{deployment_id}-config"))).await;
+
+    for root in [deployment_id.to_owned(), format!("{deployment_id}-config")] {
+        if let Err(e) = tokio::fs::remove_file(dir.join(&root)).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(root = %root, error = %e, "failed to remove gc root");
+        }
+    }
 }
 
 /// Generated domain of a deployment, and its custom domain if it is in prod
@@ -1062,11 +1076,12 @@ pub fn service_user(unit_name: &str) -> String {
 
 fn allocate_port(unit_name: &str) -> u16 {
     use kennel_config::constants::{PORT_RANGE_SIZE, PORT_RANGE_START};
-    let hash = unit_name
-        .as_bytes()
-        .iter()
-        .fold(0u32, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u32));
-    PORT_RANGE_START + (hash % PORT_RANGE_SIZE as u32) as u16
+    let hash = unit_name.as_bytes().iter().fold(0u32, |acc, &b| {
+        acc.wrapping_mul(31).wrapping_add(u32::from(b))
+    });
+    let offset = hash % u32::from(PORT_RANGE_SIZE);
+
+    PORT_RANGE_START + u16::try_from(offset).expect("the remainder is below PORT_RANGE_SIZE, a u16")
 }
 
 pub async fn find_executable(store_path: &str) -> anyhow::Result<String> {

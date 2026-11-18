@@ -30,18 +30,24 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
         match deploy::deploy_request(state, request, &artifact).await {
             Ok(deploy::DeployOutcome::Deployed) => {
-                let _ = state
+                if let Err(e) = state
                     .store
                     .deploy_requests()
                     .set_status(&request.id, "deployed")
-                    .await;
+                    .await
+                {
+                    tracing::error!(request_id = %request.id, error = %e, "failed to mark deploy request deployed");
+                }
             }
             Ok(deploy::DeployOutcome::SkippedPreview) => {
-                let _ = state
+                if let Err(e) = state
                     .store
                     .deploy_requests()
                     .set_status(&request.id, "skipped")
-                    .await;
+                    .await
+                {
+                    tracing::error!(request_id = %request.id, error = %e, "failed to mark deploy request skipped");
+                }
             }
             Err(e) => {
                 // errors without a stage count as internal
@@ -62,11 +68,14 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                 }
 
                 tracing::error!(request_id = %request.id, stage = stage.as_str(), error = %e, "deploy failed during reconciliation");
-                let _ = state
+                if let Err(e) = state
                     .store
                     .deploy_requests()
                     .set_failed(&request.id, stage)
-                    .await;
+                    .await
+                {
+                    tracing::error!(request_id = %request.id, error = %e, "failed to mark deploy request failed");
+                }
             }
         }
     }
@@ -110,7 +119,9 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     // Stop units that have no corresponding deployment record
     for orphan in actual_units.difference(&desired_units) {
         tracing::warn!(unit = %orphan, "stopping orphaned unit");
-        let _ = systemd.stop_unit(orphan).await;
+        if let Err(e) = systemd.stop_unit(orphan).await {
+            tracing::warn!(unit = %orphan, error = %e, "failed to stop orphaned unit");
+        }
     }
 
     // Re-pin each live gc root, re-fetch collected artifacts, and restart down units
@@ -162,7 +173,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
         if !existing_routes.contains(&route_id) {
             if deployment.service_type == "static" {
-                let _ = caddy
+                if let Err(e) = caddy
                     .add_static_route(
                         &route_id,
                         &deployment.domain,
@@ -170,11 +181,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                         &env_dir,
                         deployment.spa,
                     )
-                    .await;
-            } else if let Some(port) = deployment.port {
-                let _ = caddy
-                    .add_proxy_route(&route_id, &deployment.domain, port as u16, &env_dir)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(route = %route_id, error = %e, "failed to add caddy route");
+                }
+            } else if let Some(port) = proxy_port(deployment)
+                && let Err(e) = caddy
+                    .add_proxy_route(&route_id, &deployment.domain, port, &env_dir)
+                    .await
+            {
+                tracing::warn!(route = %route_id, error = %e, "failed to add caddy route");
             }
         }
 
@@ -182,7 +198,7 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
             let custom_route_id = format!("kennel-{}-custom", deployment.id);
             if !existing_routes.contains(&custom_route_id) {
                 if deployment.service_type == "static" {
-                    let _ = caddy
+                    if let Err(e) = caddy
                         .add_static_route(
                             &custom_route_id,
                             custom_domain,
@@ -190,11 +206,16 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
                             &env_dir,
                             deployment.spa,
                         )
-                        .await;
-                } else if let Some(port) = deployment.port {
-                    let _ = caddy
-                        .add_proxy_route(&custom_route_id, custom_domain, port as u16, &env_dir)
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(route = %custom_route_id, error = %e, "failed to add caddy route");
+                    }
+                } else if let Some(port) = proxy_port(deployment)
+                    && let Err(e) = caddy
+                        .add_proxy_route(&custom_route_id, custom_domain, port, &env_dir)
+                        .await
+                {
+                    tracing::warn!(route = %custom_route_id, error = %e, "failed to add caddy route");
                 }
             }
 
@@ -211,10 +232,12 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
 
             if let Some(redirect_domain) = deploy::www_redirect_domain(custom_domain) {
                 let redirect_route_id = format!("kennel-{}-redirect", deployment.id);
-                if !existing_routes.contains(&redirect_route_id) {
-                    let _ = caddy
+                if !existing_routes.contains(&redirect_route_id)
+                    && let Err(e) = caddy
                         .add_redirect_route(&redirect_route_id, &redirect_domain, custom_domain)
-                        .await;
+                        .await
+                {
+                    tracing::warn!(route = %redirect_route_id, error = %e, "failed to add caddy route");
                 }
                 deploy::ensure_dns_record(state, &project_name, &redirect_domain).await;
             }
@@ -251,6 +274,19 @@ pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     tracing::debug!(deployments = deployments.len(), "reconciliation complete");
 
     Ok(())
+}
+
+/// Warns when the stored port doesn't fit in a u16
+fn proxy_port(deployment: &::entity::deployments::Model) -> Option<u16> {
+    let port = deployment.port?;
+
+    match u16::try_from(port) {
+        Ok(port) => Some(port),
+        Err(e) => {
+            tracing::warn!(deployment = %deployment.id, port, error = %e, "deployment port out of range");
+            None
+        }
+    }
 }
 
 pub async fn run_loop(state: Arc<AppState>, cancel: CancellationToken) {

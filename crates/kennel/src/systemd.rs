@@ -28,7 +28,12 @@ impl SystemdClient {
         let conn = Connection::system().await?;
         let client = Self { conn };
         // Subscribe to systemd job and unit signals
-        let _: Result<(), zbus::Error> = client.manager_proxy().await?.call("Subscribe", &()).await;
+        let subscribed: zbus::Result<()> =
+            client.manager_proxy().await?.call("Subscribe", &()).await;
+        if let Err(e) = subscribed {
+            tracing::warn!(error = %e, "failed to subscribe to systemd signals");
+        }
+
         Ok(client)
     }
 
@@ -61,20 +66,29 @@ impl SystemdClient {
             .call("StopUnit", &(service_unit.as_str(), "replace"))
             .await;
         if let Ok(job) = stop {
-            let _ = tokio::time::timeout(kennel_config::constants::UNIT_STOP_TIMEOUT, async {
-                while let Some(signal) = job_removed.next().await {
-                    if let Ok((_, removed, _, _)) =
-                        signal
-                            .body()
-                            .deserialize::<(u32, zbus::OwnedObjectPath, String, String)>()
-                        && removed == job
-                    {
-                        break;
+            let stopped =
+                tokio::time::timeout(kennel_config::constants::UNIT_STOP_TIMEOUT, async {
+                    while let Some(signal) = job_removed.next().await {
+                        if let Ok((_, removed, _, _)) =
+                            signal
+                                .body()
+                                .deserialize::<(u32, zbus::OwnedObjectPath, String, String)>()
+                            && removed == job
+                        {
+                            break;
+                        }
                     }
-                }
-            })
-            .await;
+                })
+                .await;
+            if stopped.is_err() {
+                tracing::warn!(unit = %service_unit, "timed out waiting for the previous unit to stop");
+            }
         }
+
+        #[expect(
+            clippy::let_underscore_must_use,
+            reason = "fails when no failed unit is loaded, which is the usual case"
+        )]
         let _: Result<(), zbus::Error> = proxy
             .call("ResetFailedUnit", &(service_unit.as_str(),))
             .await;
@@ -86,7 +100,8 @@ impl SystemdClient {
             ("RestartUSec", 5_000_000u64.into()),
             (
                 "StartLimitIntervalUSec",
-                (kennel_config::constants::UNIT_START_LIMIT_INTERVAL.as_micros() as u64).into(),
+                u64::try_from(kennel_config::constants::UNIT_START_LIMIT_INTERVAL.as_micros())?
+                    .into(),
             ),
             (
                 "StartLimitBurst",

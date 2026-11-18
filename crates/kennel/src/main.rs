@@ -14,7 +14,7 @@ mod systemd;
 mod teardown;
 mod vault;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use cloudflare::CloudflareClient;
 use forgejo::ForgejoClient;
 use sea_orm::Database;
@@ -73,7 +73,7 @@ impl AppConfig {
 }
 
 fn read_secret_file(var: &str) -> Result<String> {
-    let path = std::env::var(var).map_err(|_| anyhow::anyhow!("{var} must be set"))?;
+    let path = std::env::var(var).with_context(|| format!("{var} must be set"))?;
     let value = std::fs::read_to_string(&path)
         .map_err(|e| anyhow::anyhow!("failed to read {var} from {path}: {e}"))?;
     Ok(value.trim().to_string())
@@ -130,7 +130,9 @@ async fn main() -> Result<()> {
         .await?;
 
     cancel.cancel();
-    let _ = reconcile_handle.await;
+    if let Err(e) = reconcile_handle.await {
+        tracing::error!(error = %e, "reconcile task failed");
+    }
 
     tracing::info!("shutdown complete");
     Ok(())
@@ -163,8 +165,8 @@ fn build_cloudflare_client() -> Result<Option<CloudflareClient>> {
 }
 
 fn build_forgejo_client() -> Result<ForgejoClient> {
-    let token_file = std::env::var("FORGEJO_API_TOKEN_FILE")
-        .map_err(|_| anyhow::anyhow!("FORGEJO_API_TOKEN_FILE must be set"))?;
+    let token_file =
+        std::env::var("FORGEJO_API_TOKEN_FILE").context("FORGEJO_API_TOKEN_FILE must be set")?;
     let token = std::fs::read_to_string(&token_file)
         .map_err(|e| anyhow::anyhow!("failed to read forgejo token from {token_file}: {e}"))?
         .trim()

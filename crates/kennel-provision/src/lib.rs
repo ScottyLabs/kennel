@@ -15,8 +15,7 @@ pub struct ResourceRequest {
     pub system_user: String,
 }
 
-// Permit async methods whose futures aren't `Send`
-#[allow(async_fn_in_trait)]
+#[expect(async_fn_in_trait, reason = "provider futures don't need to be Send")]
 pub trait ResourceProvider {
     fn name(&self) -> &str;
     async fn provision(

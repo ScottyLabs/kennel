@@ -26,15 +26,23 @@ pub async fn teardown_deployment(
             .join(&deployment.project_id)
             .join(&deployment.branch_slug)
             .join(&deployment.service_name);
-        let _ = tokio::fs::remove_file(&link).await;
+        if let Err(e) = tokio::fs::remove_file(&link).await
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(link = %link.display(), error = %e, "failed to remove site link");
+        }
     }
 
-    let _ = tokio::fs::remove_dir_all(crate::deploy::public_env_dir(
+    let env_dir = crate::deploy::public_env_dir(
         &deployment.project_id,
         &deployment.branch_slug,
         &deployment.service_name,
-    ))
-    .await;
+    );
+    if let Err(e) = tokio::fs::remove_dir_all(&env_dir).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        tracing::warn!(dir = %env_dir.display(), error = %e, "failed to remove public env dir");
+    }
 
     // Remove caddy routes
     if let Err(e) = caddy.remove_route(&route_id).await {

@@ -31,34 +31,34 @@ pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoRespo
         out,
         "# HELP kennel_deploy_requests Branch deploy intents grouped by status"
     )
-    .ok();
-    writeln!(out, "# TYPE kennel_deploy_requests gauge").ok();
+    .map_err(internal)?;
+    writeln!(out, "# TYPE kennel_deploy_requests gauge").map_err(internal)?;
     for (status, count) in &request_counts {
-        writeln!(out, "kennel_deploy_requests{{status=\"{status}\"}} {count}").ok();
+        writeln!(out, "kennel_deploy_requests{{status=\"{status}\"}} {count}").map_err(internal)?;
     }
 
     writeln!(
         out,
         "# HELP kennel_deployments Active deployments tracked by kennel"
     )
-    .ok();
-    writeln!(out, "# TYPE kennel_deployments gauge").ok();
-    writeln!(out, "kennel_deployments {deployments_count}").ok();
+    .map_err(internal)?;
+    writeln!(out, "# TYPE kennel_deployments gauge").map_err(internal)?;
+    writeln!(out, "kennel_deployments {deployments_count}").map_err(internal)?;
 
     writeln!(
         out,
         "# HELP kennel_projects Projects registered with kennel"
     )
-    .ok();
-    writeln!(out, "# TYPE kennel_projects gauge").ok();
-    writeln!(out, "kennel_projects {projects_count}").ok();
+    .map_err(internal)?;
+    writeln!(out, "# TYPE kennel_projects gauge").map_err(internal)?;
+    writeln!(out, "kennel_projects {projects_count}").map_err(internal)?;
 
     writeln!(
         out,
         "# HELP kennel_deploy_failures Deploy requests currently failed, by the stage that failed"
     )
-    .ok();
-    writeln!(out, "# TYPE kennel_deploy_failures gauge").ok();
+    .map_err(internal)?;
+    writeln!(out, "# TYPE kennel_deploy_failures gauge").map_err(internal)?;
     // Every stage is emitted so an alert on one stage never sees missing data
     for stage in FailureStage::ALL {
         let label = stage.as_str();
@@ -66,7 +66,7 @@ pub async fn scrape(State(state): State<Arc<AppState>>) -> Result<impl IntoRespo
             .iter()
             .find(|(s, _)| s == label)
             .map_or(0, |(_, n)| *n);
-        writeln!(out, "kennel_deploy_failures{{stage=\"{label}\"}} {count}").ok();
+        writeln!(out, "kennel_deploy_failures{{stage=\"{label}\"}} {count}").map_err(internal)?;
     }
 
     let mut headers = HeaderMap::new();
