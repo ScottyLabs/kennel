@@ -15,6 +15,7 @@ let
     "oxc"
     "unicorn"
     "typescript"
+    "vitest"
   ]
   ++ lib.optionals cfg.react.enable [
     "react"
@@ -185,6 +186,13 @@ in
         enable = true;
         package = oxlint.wrapper;
         args = [ "--no-error-on-unmatched-pattern" ];
+        types_or = [
+          "javascript"
+          "jsx"
+          "ts"
+          "tsx"
+          "svelte"
+        ];
         settings = {
           plugins = oxlintPlugins;
           deny = [
