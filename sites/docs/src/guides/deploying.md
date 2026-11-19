@@ -14,9 +14,9 @@ Kennel's flake exports a [flake-parts](https://flake.parts) module that sets up 
 ```nix
 {
   nixConfig = {
-    extra-substituters = [ "https://scottylabs.cachix.org" ];
+    extra-substituters = [ "https://cache.scottylabs.org" ];
     extra-trusted-public-keys = [
-      "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
+      "deploy-01.scottylabs.org-1:TtFRYjsx76lUXkCDvobNkTFZGOeLZFKTzdKX9oyiCcY="
     ];
   };
 

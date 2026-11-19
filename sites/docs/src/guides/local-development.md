@@ -2,12 +2,12 @@
 
 ## Installing Nix
 
-Install [Lix](https://lix.systems/install/) with the ScottyLabs binary cache. Without the cache, `nix develop` builds ScottyLabs' own packages from source on your machine, which can take a long time.
+Install [Lix](https://lix.systems/install/) with the ScottyLabs binary cache. Without it, `nix develop` builds ScottyLabs' own packages from source on your machine, which can take a long time.
 
 ```bash
 curl -sSf -L https://install.lix.systems/lix | sh -s -- install \
-  --extra-conf "extra-substituters = https://scottylabs.cachix.org" \
-  --extra-conf "extra-trusted-public-keys = scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
+  --extra-conf "extra-substituters = https://cache.scottylabs.org" \
+  --extra-conf "extra-trusted-public-keys = deploy-01.scottylabs.org-1:TtFRYjsx76lUXkCDvobNkTFZGOeLZFKTzdKX9oyiCcY="
 ```
 
 If Lix or Nix is already installed, add the same two settings to `/etc/nix/nix.conf` and restart the daemon with `sudo systemctl restart nix-daemon` on Linux or `sudo launchctl kickstart -k system/org.nixos.nix-daemon` on macOS.
