@@ -163,6 +163,38 @@
         "type": "github"
       }
     },
+    "nixpkgs-oxlint": {
+      "locked": {
+        "lastModified": 1794976841,
+        "narHash": "sha256-HW2d7/kp6IPQUh0XR05AOZSQzQ0swtAt7ZcONs/SQfM=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "e5fce2c8934b4f890746204316b6a379e9d37e54",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "e5fce2c8934b4f890746204316b6a379e9d37e54",
+        "type": "github"
+      }
+    },
+    "nixpkgs-tsrs": {
+      "locked": {
+        "lastModified": 1794980197,
+        "narHash": "sha256-H7/Ngy2RK1SHTDmZIXxxfD44Y+goo6Rfw4/52T7kDPs=",
+        "owner": "ap-1",
+        "repo": "nixpkgs",
+        "rev": "0c864f08ec7b010e8db86c09c3c3f918a73452ac",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ap-1",
+        "repo": "nixpkgs",
+        "rev": "0c864f08ec7b010e8db86c09c3c3f918a73452ac",
+        "type": "github"
+      }
+    },
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
@@ -239,6 +271,8 @@
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
         "nixpkgs-garage": "nixpkgs-garage",
+        "nixpkgs-oxlint": "nixpkgs-oxlint",
+        "nixpkgs-tsrs": "nixpkgs-tsrs",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
         "ricochet": "ricochet",

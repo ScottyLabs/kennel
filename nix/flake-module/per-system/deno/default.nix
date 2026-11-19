@@ -11,20 +11,16 @@ let
   inherit (config.scottylabs) root;
   denoLib = pkgs.callPackage ../../../lib/build-deno-task/deno.nix { };
 
-  oxlintPlugins = [
-    "oxc"
-    "unicorn"
-    "typescript"
-    "vitest"
-  ]
-  ++ lib.optionals cfg.react.enable [
-    "react"
-    "jsx-a11y"
-  ];
-
   oxlint = import ./oxlint {
-    inherit pkgs;
-    inherit (kennelInputs) anti-slop;
+    inherit pkgs kennelInputs;
+    react = cfg.react.enable;
+  };
+
+  tsrs = pkgs.callPackage "${kennelInputs.nixpkgs-tsrs}/pkgs/by-name/ts/tsrs/package.nix" {
+    rustPlatform = pkgs.makeRustPlatform {
+      cargo = config.scottylabs.rust.toolchain;
+      rustc = config.scottylabs.rust.toolchain;
+    };
   };
 
   # A workspace member without its own lock resolves from the root deno.lock
@@ -71,8 +67,9 @@ in
         and also enforces the
         [landmines](https://github.com/interfere-inc/landmines) and
         [anti-slop](https://github.com/dmmulroy/anti-slop) rules in
-        `.scottylabs/oxlint/oxlintrc.json`, which a project's own
-        `.oxlintrc.json` must list in `extends` to keep them.
+        `.scottylabs/oxlint/oxlintrc.json`, which the project's root
+        `.oxlintrc.json` must list in `extends`. Nested oxlint configs are
+        ignored.
       '';
     };
 
@@ -121,7 +118,7 @@ in
         buildInputs = lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.stdenv.cc.cc.lib;
         setup = ''
           export DENO_DIR="$TMPDIR/deno"
-          export OXLINT_TSGOLINT_PATH=${lib.getExe pkgs.tsgolint}
+          export OXLINT_TSGOLINT_PATH=${lib.getExe' tsrs "tsrs-lint"}
           mkdir -p "$DENO_DIR" .scottylabs
           ln -s ${oxlint.bundle} .scottylabs/oxlint
         ''
@@ -143,7 +140,7 @@ in
         packages = [ pkgs.deno ] ++ lib.optional cfg.svelte.enable pkgs.svelte-check;
 
         # oxlint prefers node_modules/.bin/tsgolint over PATH
-        env.OXLINT_TSGOLINT_PATH = lib.getExe pkgs.tsgolint;
+        env.OXLINT_TSGOLINT_PATH = lib.getExe' tsrs "tsrs-lint";
 
         exports = ''
           export DENO_DIR="$SCOTTYLABS_STATE/deno"
@@ -175,39 +172,7 @@ in
           "tsx"
           "svelte"
         ];
-        settings = {
-          plugins = oxlintPlugins;
-          deny = [
-            "correctness"
-            "suspicious"
-            "pedantic"
-            "perf"
-          ];
-          typeAware = true;
-          fix = [ "safe" ];
-          # agent tool directories hold vendored skill scripts
-          ignorePattern = [
-            ".agent/**"
-            ".agents/**"
-            ".claude/**"
-            ".codex/**"
-            ".continue/**"
-            ".cursor/**"
-            ".gemini/**"
-            ".opencode/**"
-            ".pi/**"
-            ".roo/**"
-            ".windsurf/**"
-          ];
-          allow = [
-            "prefer-readonly-parameter-types"
-            "no-warning-comments"
-          ]
-          ++ lib.optionals cfg.react.enable [
-            "react-in-jsx-scope"
-            "jsx-uses-react"
-          ];
-        };
+        settings.fix = [ "safe" ];
       };
       svelte-check = lib.mkIf cfg.svelte.enable {
         enable = true;

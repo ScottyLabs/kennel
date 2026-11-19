@@ -12,6 +12,10 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     # TODO: https://github.com/NixOS/nixpkgs/pull/585360
     nixpkgs-garage.url = "github:ap-1/nixpkgs/garage-darwin";
+    # TODO: https://github.com/NixOS/nixpkgs/pull/589662
+    nixpkgs-oxlint.url = "github:nixos/nixpkgs/e5fce2c8934b4f890746204316b6a379e9d37e54";
+    # TODO: https://github.com/NixOS/nixpkgs/pull/589760
+    nixpkgs-tsrs.url = "github:ap-1/nixpkgs/0c864f08ec7b010e8db86c09c3c3f918a73452ac";
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
