@@ -99,7 +99,12 @@
       };
 
       perSystem =
-        { pkgs, helpers, ... }:
+        {
+          pkgs,
+          helpers,
+          system,
+          ...
+        }:
         let
           kennel = helpers.buildRustService {
             src = ./.;
@@ -153,6 +158,10 @@
             default = kennel;
             docs-options = docsGen.generated;
           };
+
+          checks = pkgs.lib.mapAttrs' (name: pkgs.lib.nameValuePair "fixture-${name}") (
+            import ./nix/fixture { inherit inputs flakeModule system; }
+          );
 
           tools.kennel.package = kennel;
 
