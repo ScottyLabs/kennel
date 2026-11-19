@@ -5,6 +5,7 @@ kennelInputs: [
   ./processes.nix
   ./kennel.nix
   ./checks.nix
+  ./conventions
   ./secrets.nix
   ./ci.nix
   ./security.nix

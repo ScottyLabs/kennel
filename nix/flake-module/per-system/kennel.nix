@@ -11,9 +11,6 @@ let
   specPath = cfg.root + "/secretspec.toml";
   spec = lib.optionalAttrs (builtins.pathExists specPath) (lib.importTOML specPath);
 
-  # SvelteKit's $env/dynamic/public only exposes PUBLIC_ names
-  unprefixed = lib.filter (name: !lib.hasPrefix "PUBLIC_" name) (spec.scopes.public.secrets or [ ]);
-
   schemaVersion = lib.toInt (
     lib.head (
       builtins.match ".*KENNEL_CONFIG_SCHEMA_VERSION: u32 = ([0-9]+);.*" (
@@ -43,8 +40,8 @@ let
     package = lib.mkOption {
       type = lib.types.package;
       description = ''
-        The service. Kennel runs its `meta.mainProgram`, or the first
-        executable in `bin/`, which must answer `/api/health` on `$PORT`.
+        Package whose `meta.mainProgram` kennel runs, answering `/api/health`
+        on `$PORT`.
       '';
     };
     inherit checks;
@@ -157,19 +154,16 @@ in
           readOnly = true;
           internal = true;
           description = "`kennel.json` and `secretspec.toml` kennel deploys from";
-          default =
-            lib.throwIf (unprefixed != [ ])
-              "secretspec.toml: [scopes.public] names must start with PUBLIC_, found ${lib.concatStringsSep ", " unprefixed}"
-              (
-                pkgs.linkFarm "kennel-${cfg.project.name}" (
-                  {
-                    "kennel.json" = kennelJson;
-                  }
-                  // lib.optionalAttrs (spec != { }) {
-                    "secretspec.toml" = pkgs.writeText "secretspec.toml" (builtins.readFile specPath);
-                  }
-                )
-              );
+          default = cfg.conventions.enforce (
+            pkgs.linkFarm "kennel-${cfg.project.name}" (
+              {
+                "kennel.json" = kennelJson;
+              }
+              // lib.optionalAttrs (spec != { }) {
+                "secretspec.toml" = pkgs.writeText "secretspec.toml" (builtins.readFile specPath);
+              }
+            )
+          );
         };
       };
     };

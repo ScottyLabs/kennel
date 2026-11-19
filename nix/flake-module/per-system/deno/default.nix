@@ -68,8 +68,8 @@ in
         [landmines](https://github.com/interfere-inc/landmines) and
         [anti-slop](https://github.com/dmmulroy/anti-slop) rules in
         `.scottylabs/oxlint/oxlintrc.json`, which the project's root
-        `.oxlintrc.json` must list in `extends`. Nested oxlint configs are
-        ignored.
+        `.oxlintrc.json` must list in `extends`. Other oxlint configs aren't
+        allowed.
       '';
     };
 

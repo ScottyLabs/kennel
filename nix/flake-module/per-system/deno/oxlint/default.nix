@@ -32,13 +32,10 @@ assert pkgs.lib.assertMsg (plugins == oxlint.version)
 {
   inherit bundle;
 
-  # requires the repo's oxlint config to extend the bundle's
+  # lints with kennel's config unless the project has its own
   wrapper = pkgs.writeShellApplication {
     name = "oxlint";
-    runtimeInputs = [
-      oxlint
-      pkgs.jq
-    ];
+    runtimeInputs = [ oxlint ];
     runtimeEnv.KENNEL_OXLINT_CONFIG = "${bundle}/oxlintrc.json";
     text = builtins.readFile ./oxlint.sh;
   };

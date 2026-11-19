@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
 
 config=$KENNEL_OXLINT_CONFIG
-for candidate in .oxlintrc.json .oxlintrc.jsonc oxlint.config.ts oxlint.config.mts; do
-  if [ -e "$candidate" ]; then
-    config=$candidate
-    break
-  fi
-done
-
-if [ "$config" != "$KENNEL_OXLINT_CONFIG" ] && ! oxlint --print-config --config "$config" \
-  | jq -e '.jsPlugins // [] | any(.name == "anti-slop")' >/dev/null; then
-  echo "$config: add \"./.scottylabs/oxlint/oxlintrc.json\" to \"extends\" so kennel's oxlint config applies" >&2
-  exit 1
+if [ -e .oxlintrc.json ]; then
+  config=.oxlintrc.json
 fi
 
 ignore=(

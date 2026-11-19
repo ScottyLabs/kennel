@@ -105,7 +105,7 @@ perSystem =
 
 The attribute name is the target's name, so this deploys an `api` service and an `app` site. Kennel never deploys the `cli` tool, though nixbot still runs its clippy and tests on every push. You can use `nix build .#services.x86_64-linux.api.package` to build one locally.
 
-A service unit runs the package's `meta.mainProgram`, which `buildRustService` sets to `pname`. Without one, kennel runs the first executable in `bin/`.
+A service unit runs the package's `meta.mainProgram`, which `buildRustService` sets to `pname`. For other packages, set it with `lib.addMetaAttrs { mainProgram = "api"; } package`.
 
 Besides `package`, a target takes:
 
@@ -151,7 +151,7 @@ The oxlint hook also enforces the [landmines](https://github.com/interfere-inc/l
 }
 ```
 
-The hook ignores nested configs like `apps/web/.oxlintrc.json`, since oxlint doesn't merge them with the root one. Scope settings to a directory with `overrides` in the root config instead.
+Other oxlint configs, such as a nested `apps/web/.oxlintrc.json` or an `oxlint.config.ts`, fail the flake's evaluation, since oxlint doesn't merge them with the root one. Scope settings to a directory with `overrides` in the root config instead.
 
 If a service serves a frontend, give the service the frontend's store path through `env`. That way, changing the frontend doesn't rebuild the service:
 

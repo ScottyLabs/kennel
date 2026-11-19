@@ -128,41 +128,43 @@ in
   # TODO: https://github.com/NixOS/nixpkgs/issues/355486
   config.scottylabs.shell.packages = [ pkgs.git ];
 
-  config.devShells.default = pkgs.mkShell {
-    packages =
-      cfg.packages
-      ++ scripts
-      ++ config.pre-commit.settings.enabledPackages
-      ++ [
-        config.pre-commit.settings.package
-        kennelInputs.collar.packages.${pkgs.stdenv.hostPlatform.system}.collar
-      ];
+  config.devShells.default = config.scottylabs.conventions.enforce (
+    pkgs.mkShell {
+      packages =
+        cfg.packages
+        ++ scripts
+        ++ config.pre-commit.settings.enabledPackages
+        ++ [
+          config.pre-commit.settings.package
+          kennelInputs.collar.packages.${pkgs.stdenv.hostPlatform.system}.collar
+        ];
 
-    shellHook = ''
-      source ${paths}
+      shellHook = ''
+        source ${paths}
 
-      _scottylabs_exclude() {
-        local exclude
-        exclude=$(${lib.getExe pkgs.git} -C "$SCOTTYLABS_ROOT" rev-parse --git-path info/exclude 2>/dev/null) || return 0
-        [[ $exclude = /* ]] || exclude="$SCOTTYLABS_ROOT/$exclude"
-        mkdir -p "$(dirname "$exclude")"
-        grep -qxF "$1" "$exclude" 2>/dev/null || echo "$1" >> "$exclude"
-      }
+        _scottylabs_exclude() {
+          local exclude
+          exclude=$(${lib.getExe pkgs.git} -C "$SCOTTYLABS_ROOT" rev-parse --git-path info/exclude 2>/dev/null) || return 0
+          [[ $exclude = /* ]] || exclude="$SCOTTYLABS_ROOT/$exclude"
+          mkdir -p "$(dirname "$exclude")"
+          grep -qxF "$1" "$exclude" 2>/dev/null || echo "$1" >> "$exclude"
+        }
 
-      # an indirect gc root keeps the linked store path alive until the link changes
-      _scottylabs_link() {
-        mkdir -p "$(dirname "$SCOTTYLABS_ROOT/$1")"
-        nix-store --add-root "$SCOTTYLABS_ROOT/$1" --realise "$2" >/dev/null
-        _scottylabs_exclude "/$1"
-      }
+        # an indirect gc root keeps the linked store path alive until the link changes
+        _scottylabs_link() {
+          mkdir -p "$(dirname "$SCOTTYLABS_ROOT/$1")"
+          nix-store --add-root "$SCOTTYLABS_ROOT/$1" --realise "$2" >/dev/null
+          _scottylabs_exclude "/$1"
+        }
 
-      _scottylabs_exclude /.scottylabs/
+        _scottylabs_exclude /.scottylabs/
 
-      ${cfg.initHook}
-      source ${environment}
-      ${cfg.hook}
-      ${links}
-      unset -f _scottylabs_exclude _scottylabs_link
-    '';
-  };
+        ${cfg.initHook}
+        source ${environment}
+        ${cfg.hook}
+        ${links}
+        unset -f _scottylabs_exclude _scottylabs_link
+      '';
+    }
+  );
 }
