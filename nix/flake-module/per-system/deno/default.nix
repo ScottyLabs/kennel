@@ -9,7 +9,7 @@ kennelInputs:
 let
   cfg = config.scottylabs.deno;
   inherit (config.scottylabs) root;
-  denoLib = pkgs.callPackage ../../../lib/deno.nix { };
+  denoLib = pkgs.callPackage ../../../lib/build-deno-task/deno.nix { };
 
   oxlintPlugins = [
     "oxc"
@@ -55,25 +55,7 @@ let
       denoLib.fetchJsr
       pkgs.jq
     ];
-    text = ''
-      status=0
-      for lock in "$@"; do
-        file="$(dirname "$lock")/deno.jsr.hash"
-        if [ "$(jq '.jsr // {} | length' "$lock")" = 0 ]; then
-          continue
-        fi
-        tmp=$(mktemp -d)
-        fetch-jsr "$lock" "$tmp/cache"
-        hash=$(nix --extra-experimental-features nix-command hash path "$tmp/cache")
-        rm -rf "$tmp"
-        if [ "$(cat "$file" 2>/dev/null)" != "$hash" ]; then
-          echo "$hash" > "$file"
-          echo "updated $file"
-          status=1
-        fi
-      done
-      exit "$status"
-    '';
+    text = builtins.readFile ./jsr-hash.sh;
   };
 in
 {

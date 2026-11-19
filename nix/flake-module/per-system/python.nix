@@ -15,7 +15,7 @@ let
   devEnv =
     let
       inherit
-        (import ../../lib/python-set.nix
+        (import ../../lib/build-python-service/python-set.nix
           {
             inherit pkgs;
             inherit (kennelInputs) uv2nix pyproject-nix pyproject-build-systems;

@@ -6,7 +6,7 @@
 }:
 
 {
-  buildDenoTask = pkgs.callPackage ./build-deno-task.nix { };
+  buildDenoTask = pkgs.callPackage ./build-deno-task { };
 
   buildRustService = import ./build-rust-service {
     inherit pkgs;
@@ -17,7 +17,7 @@
 
   buildHaskellService = import ./build-haskell-service.nix { inherit pkgs; };
 
-  buildPythonService = import ./build-python-service.nix {
+  buildPythonService = import ./build-python-service {
     inherit pkgs;
     inherit (kennelInputs) uv2nix pyproject-nix pyproject-build-systems;
   };
