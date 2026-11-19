@@ -93,38 +93,6 @@ helpers.buildRustService {
 }
 ```
 
-## `buildHaskellService`
-
-Builds a Haskell project with GHC 9.14 and strips it to its static executables. Dependencies come from the nixpkgs Haskell package set rather than Hackage, so version bounds must accept the versions nixpkgs has. Use `overrides` for exceptions.
-
-### `pname`
-
-Package name to build. Must be a key of `localPackages`; its executables become the service binaries.
-
-Type: `str`, required
-
-### `localPackages`
-
-The project's cabal packages, package name to source directory. Every package builds inside the same extended set, so intra-project dependencies resolve to each other. List the same directories as `scottylabs.haskell.localPackages` so that the shell and the build resolve identical dependencies.
-
-Type: `attrsOf path`, required
-
-### `overrides`
-
-A final overlay over the package set, to jailbreak or pin a dependency the set's version cannot satisfy (for example `final: prev: { some-dep = pkgs.haskell.lib.doJailbreak prev.some-dep; }`).
-
-Type: `function`, default: `_final: _prev: { }`
-
-```nix
-helpers.buildHaskellService {
-  pname = "reviewd";
-  localPackages = {
-    kernel-effects = ./kernel-effects;
-    reviewd = ./reviewd;
-  };
-}
-```
-
 ## `buildDenoTask`
 
 Builds a Deno project, or a single member of a Deno workspace, that has npm dependencies, running a `deno task` and copying its output directory. On Linux it patches the prebuilt native addons and drops the musl variants, which cannot be patched against a glibc host.
@@ -236,29 +204,6 @@ Type: `function`, default: `_final: _prev: { }`
 ```nix
 helpers.buildPythonService {
   src = ./.;
-}
-```
-
-## `buildMdbook`
-
-Builds an [mdBook](https://rust-lang.github.io/mdBook/) site to the result.
-
-### `src`
-
-Directory holding `book.toml`.
-
-Type: `path`, required
-
-### `name`
-
-Derivation name.
-
-Type: `str`, default: `"docs"`
-
-```nix
-helpers.buildMdbook {
-  src = ./sites/docs;
-  name = "kennel-docs";
 }
 ```
 

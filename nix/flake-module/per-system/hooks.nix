@@ -95,7 +95,6 @@ in
           "*.jsx"
           "*.mjs"
           "*.cjs"
-          "*.hs"
           "*.yml"
           "*.yaml"
           "*.sh"

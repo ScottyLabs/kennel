@@ -10,9 +10,9 @@ import sys
 from collections import defaultdict
 
 # indent, comment token, spaces after the token, text
-LINE = re.compile(r"^(\s*)(///|//!|//|#|--)(?=\s|$)(\s*)(.*?)\s*$")
-# markdown list item or haddock `-- |` prefix
-MARKER = re.compile(r"^(?:[-*+|]|\d+[.)])\s+")
+LINE = re.compile(r"^(\s*)(///|//!|//|#)(?=\s|$)(\s*)(.*?)\s*$")
+# markdown list item
+MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
 FENCE = re.compile(r"^(```|~~~)")
 # endings that close a clause or open a code block or table row
 ENDS_BLOCK = re.compile(r"[.,:!?;{\[=|\\]$")
@@ -33,7 +33,7 @@ def parse(line):
 
 
 def comment_lines(ast_grep, config, files):
-    """Map each file to the (line, column) of every line inside a comment node.
+    """Map each file to the (line, column) where each of its comments starts.
 
     Uses ast-grep to skip `#` and `//` inside strings.
     """
@@ -56,13 +56,8 @@ def comment_lines(ast_grep, config, files):
     found = defaultdict(set)
     for raw in out.splitlines():
         node = json.loads(raw)
-        start, end = node["range"]["start"], node["range"]["end"]
-        # rust doc comments include their newline and end at column 0 of the next line
-        last = end["line"] - (end["column"] == 0 and end["line"] > start["line"])
-        # haskell merges consecutive `--` lines into one node
-        found[node["file"]].update(
-            (line, start["column"]) for line in range(start["line"], last + 1)
-        )
+        start = node["range"]["start"]
+        found[node["file"]].add((start["line"], start["column"]))
     return found
 
 

@@ -105,12 +105,12 @@ perSystem =
 
 The attribute name is the target's name, so this deploys an `api` service and an `app` site. Kennel never deploys the `cli` tool, though nixbot still runs its clippy and tests on every push. You can use `nix build .#services.x86_64-linux.api.package` to build one locally.
 
-A service unit runs the package's `meta.mainProgram`, which `buildRustService` and `buildHaskellService` set to `pname`. Without one, kennel runs the first executable in `bin/`.
+A service unit runs the package's `meta.mainProgram`, which `buildRustService` sets to `pname`. Without one, kennel runs the first executable in `bin/`.
 
 Besides `package`, a target takes:
 
 - `customDomain`: a domain the target is also served on in production
-- `spa`: for sites, serve `index.html` for unmatched routes (single-page apps). It defaults to `false`, which serves files directly, suitable for pre-rendered sites like mdbook docs.
+- `spa`: for sites, serve `index.html` for unmatched routes (single-page apps). It defaults to `false`, which serves files directly, suitable for pre-rendered sites like Zensical docs.
 - `env`: for services, extra variables in the service's environment (see [Runtime environment](#runtime-environment))
 - `checks`: extra checks nixbot builds alongside the package's own (see [Continuous Integration](./ci.md))
 

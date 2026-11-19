@@ -15,21 +15,10 @@
     toolchain = rustToolchain;
   };
 
-  buildHaskellService = import ./build-haskell-service.nix { inherit pkgs; };
-
   buildPythonService = import ./build-python-service {
     inherit pkgs;
     inherit (kennelInputs) uv2nix pyproject-nix pyproject-build-systems;
   };
-
-  buildMdbook =
-    {
-      src,
-      name ? "docs",
-    }:
-    pkgs.runCommand name { nativeBuildInputs = [ pkgs.mdbook ]; } ''
-      mdbook build ${src} --dest-dir "$out"
-    '';
 
   buildZensical =
     {

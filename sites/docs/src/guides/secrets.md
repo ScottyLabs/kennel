@@ -128,6 +128,5 @@ Runtime `load()` reads `secretspec.toml` from disk, not only at build time. Kenn
 - [Rust](https://secretspec.dev/sdk/rust/)
 - [TypeScript](https://secretspec.dev/sdk/nodejs/)
 - [Python](https://secretspec.dev/sdk/python/)
-- [Haskell](https://secretspec.dev/sdk/haskell/)
 
 See the [SDK overview](https://secretspec.dev/sdk/overview/) for the full list of supported languages.
