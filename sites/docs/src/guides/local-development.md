@@ -14,6 +14,16 @@ If Lix or Nix is already installed, add the same two settings to `/etc/nix/nix.c
 
 The warning `ignoring the client-specified setting 'trusted-public-keys'` is harmless, since it only means Nix skipped the copy of the key in the project's `nixConfig`. If it's followed by `not signed by any of the keys in 'trusted-public-keys'`, the running daemon doesn't have the key. Check that both settings are in `/etc/nix/nix.conf` and restart the daemon with the command above, since it only reads the file at startup.
 
+### Checking the install
+
+```bash
+nix --version                       # names Lix, not Nix
+nix config show substituters        # lists https://cache.scottylabs.org
+nix config show trusted-public-keys # lists deploy-01.scottylabs.org-1:...
+```
+
+If either setting is missing, the install flags above didn't land in `/etc/nix/nix.conf`. Add them there and restart the daemon. The symptom of a missing cache is a first `nix develop` that compiles a Rust toolchain instead of downloading one.
+
 ### `HTTP error 401` or `Bad credentials` from GitHub
 
 Nix is sending a GitHub token that has expired or been revoked. GitHub rejects requests with a bad token outright, even for public repositories that would download fine without one. Find where the token is set with:
@@ -55,6 +65,36 @@ in
   nix.package = inputs.iets.lib.mkClassic pkgs iets pkgs.lixPackageSets.stable.lix;
 }
 ```
+
+## The dev shell
+
+Everything a project needs is in its dev shell: its language toolchains, `treefmt`, `prek`, `bao`, `secretspec`, [collar](#collar), and [pitchfork](#local-services) when the project runs local services. Nothing is installed globally, and two projects can pin different toolchain versions without colliding.
+
+Enter it from inside the checkout:
+
+```bash
+git clone https://git.cmu.dev/ScottyLabs/<project>.git
+cd <project>
+nix develop
+```
+
+The shell is built for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` on every push, so the first entry downloads it rather than building it, as long as the ScottyLabs cache is configured. Later entries are near-instant.
+
+Run `nix develop` from the repository itself. The shell keeps per-project state in `.scottylabs` at the checkout root, such as the git hooks' store roots and the configs it links into the tree, so outside a checkout it refuses to start:
+
+```
+/home/you is not inside a git checkout, run nix develop from the project's repository
+```
+
+Entry also fails when the project breaks one of kennel's conventions, printing every violation at once, such as a `secretspec.toml` missing a profile header or a `flake.nix` that doesn't list the binary cache. Fix each line it prints and enter again.
+
+On entry the shell installs the project's [git hooks](#git-hooks) and loads the project's secrets for the `dev` profile. The first time on a machine, [log in to OpenBao](./secrets.md#local-development) so there is a token to resolve them with, otherwise entry warns and leaves the secrets unset:
+
+```bash
+nix run git+https://git.cmu.dev/ScottyLabs/kennel#login
+```
+
+Projects that have not yet moved to the kennel flake module still use `devenv shell` instead of `nix develop`. Everything else on this page applies to both.
 
 ## collar
 
