@@ -17,7 +17,7 @@ The warning `ignoring the client-specified setting 'trusted-public-keys'` is har
 ### Checking the install
 
 ```bash
-nix --version                       # names Lix, not Nix
+nix --version                       
 nix config show substituters        # lists https://cache.scottylabs.org
 nix config show trusted-public-keys # lists deploy-01.scottylabs.org-1:...
 ```
