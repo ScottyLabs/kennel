@@ -182,9 +182,33 @@ in
             types = [ "text" ];
             language = "system";
           };
+
+          # stop before other hooks when committing outside the dev shell
+          dev-shell = {
+            enable = true;
+            name = "dev-shell";
+            entry = lib.getExe (
+              pkgs.writeShellApplication {
+                name = "require-dev-shell";
+                text = ''
+                  if [ -z "''${SCOTTYLABS_STATE:-}" ]; then
+                    echo "not in the dev shell, run nix develop first" >&2
+                    exit 1
+                  fi
+                '';
+              }
+            );
+            pass_filenames = false;
+            always_run = true;
+            fail_fast = true;
+            before = lib.remove "dev-shell" (lib.attrNames config.pre-commit.settings.hooks);
+            language = "system";
+          };
         };
       };
     };
+
+    scottylabs.hooksCheck.skip = [ "dev-shell" ]; # skipped in CI
 
     scottylabs.shell = {
       # treefmt with the hook's config
