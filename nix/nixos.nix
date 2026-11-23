@@ -124,17 +124,6 @@ in
       '';
     };
 
-    cachixCache = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      example = "scottylabs";
-      description = ''
-        Cachix cache where kennel pins every deployed manifest to keep it out
-        of Cachix garbage collection, or null to disable pinning. The token
-        comes from `CACHIX_AUTH_TOKEN` in `environmentFile`.
-      '';
-    };
-
     resources = {
       postgres = {
         enable = mkOption {
@@ -309,8 +298,7 @@ in
           cfg.nixPackage
         ]
         ++ optional cfg.resources.postgres.enable pkgs.postgresql
-        ++ optional cfg.resources.valkey.enable pkgs.valkey
-        ++ optional (cfg.cachixCache != null) pkgs.cachix;
+        ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
         environment = {
           HOME = "/var/lib/kennel";
@@ -347,9 +335,6 @@ in
         }
         // optionalAttrs (cfg.grafanaUrl != null) {
           GRAFANA_URL = cfg.grafanaUrl;
-        }
-        // optionalAttrs (cfg.cachixCache != null) {
-          CACHIX_CACHE = cfg.cachixCache;
         };
 
         serviceConfig = {
@@ -399,15 +384,7 @@ in
       '';
     };
 
-    nix.settings = {
-      extra-substituters = [ "https://scottylabs.cachix.org" ];
-      # Lets kennel substitute artifacts as an untrusted user without --accept-flake-config
-      trusted-substituters = [ "https://scottylabs.cachix.org" ];
-      extra-trusted-public-keys = [
-        "scottylabs.cachix.org-1:hajjEX5SLi/Y7yYloiXTt2IOr3towcTGRhMh1vu6Tjg="
-      ];
-      # re-query cachix when retrying a fetch
-      narinfo-cache-negative-ttl = mkDefault 0;
-    };
+    # re-query substituters when retrying a fetch
+    nix.settings.narinfo-cache-negative-ttl = mkDefault 0;
   };
 }

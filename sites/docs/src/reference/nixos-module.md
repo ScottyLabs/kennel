@@ -44,7 +44,6 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
 - A Caddy virtualhost for the kennel domain with automatic TLS, plus the admin API for dynamic route management
 - tmpfiles rules for `/var/lib/kennel` subdirectories
 - Firewall rules for ports 80 and 443
-- The ScottyLabs Cachix cache as a trusted substituter, which kennel fetches artifacts from
 
 ## PostgreSQL extensions
 

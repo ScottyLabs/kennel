@@ -47,7 +47,6 @@ pub struct AppConfig {
     pub nixbot_token: String,
     pub custom_domains_file: Option<String>,
     pub grafana_url: Option<String>,
-    pub cachix_cache: Option<String>,
 }
 
 impl AppConfig {
@@ -67,7 +66,6 @@ impl AppConfig {
             nixbot_token: read_secret_file("NIXBOT_TOKEN_FILE")?,
             custom_domains_file: std::env::var("CUSTOM_DOMAINS_FILE").ok(),
             grafana_url: std::env::var("GRAFANA_URL").ok(),
-            cachix_cache: std::env::var("CACHIX_CACHE").ok(),
         })
     }
 }
