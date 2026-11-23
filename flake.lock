@@ -139,11 +139,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795410776,
-        "narHash": "sha256-U01nvTnyAECmDORjK3mHR7DQjnKzU30c0tbUNEoQq24=",
+        "lastModified": 1795419671,
+        "narHash": "sha256-6lXDUh3OwDYt5kAB+e/hLxCUDWgnkc6aF1QIxUSvuCo=",
         "owner": "ap-1",
         "repo": "mobile-apps.nix",
-        "rev": "7d92f1708400c09da579a8792353d8ccc35b8f67",
+        "rev": "dc4729c8d03a3856b586ad96b896614b1b204922",
         "type": "github"
       },
       "original": {
