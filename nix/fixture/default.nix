@@ -33,6 +33,8 @@
             enable = true;
             appUrl = "http://localhost:3000";
           };
+          android.enable = true;
+          ios.enable = true;
         };
 
         # the fixture has no flake.nix

@@ -12,6 +12,8 @@ kennelInputs: [
   (import ./rust kennelInputs)
   (import ./deno kennelInputs)
   (import ./python.nix kennelInputs)
+  (import ./android.nix kennelInputs)
+  (import ./ios.nix kennelInputs)
   ./postgres.nix
   ./sqlite.nix
   ./valkey.nix

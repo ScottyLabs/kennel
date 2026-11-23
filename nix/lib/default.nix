@@ -20,6 +20,14 @@
     inherit (kennelInputs) uv2nix pyproject-nix pyproject-build-systems;
   };
 
+  inherit
+    (pkgs.callPackage ./build-mobile-app.nix {
+      mobile = kennelInputs.mobile-apps.lib.mkLib pkgs;
+    })
+    buildAndroidApp
+    buildIosApp
+    ;
+
   buildZensical =
     {
       src,

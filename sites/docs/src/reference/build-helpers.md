@@ -167,6 +167,84 @@ helpers.buildDenoTask {
 }
 ```
 
+## `buildAndroidApp`
+
+Builds a [Capacitor](https://capacitorjs.com) app's Android project into a release APK. To fill the Gradle lockfile, start it as `{}` and run from the repository root:
+
+```bash
+$(nix build .#checks.x86_64-linux.android.mitmCache.updateScript --print-out-paths)
+```
+
+### `src`
+
+Workspace root holding `deno.lock`, the app, and each workspace member's `deno.json`.
+
+Type: `path`, required
+
+### `pname`
+
+Package name.
+
+Type: `str`, required
+
+### `version`
+
+Package version.
+
+Type: `str`, required
+
+### `app`
+
+The Capacitor app's directory, relative to `src`.
+
+Type: `str`, required
+
+### `web`
+
+The app's built web assets, usually a `buildDenoTask`.
+
+Type: `package`, required
+
+### `gradleDeps`
+
+Gradle lockfile.
+
+Type: `path`, required
+
+```nix
+helpers.buildAndroidApp {
+  src = nativeSrc;
+  pname = "quest-android";
+  version = "0.1.0";
+  app = "apps/mobile";
+  web = mobile;
+  gradleDeps = ./apps/mobile/android/deps.json;
+}
+```
+
+## `buildIosApp`
+
+Builds a Capacitor app for the iOS simulator with [xtool](https://xtool.sh), from the Xcode project in `<app>/ios/App`. Xcode must be in the builder's Nix store; without it, the build fails with steps to add it.
+
+Takes the arguments of `buildAndroidApp` except `gradleDeps`, plus:
+
+### `swiftpmDepsHash`
+
+Hash of the SwiftPM dependencies.
+
+Type: `str`, required
+
+```nix
+helpers.buildIosApp {
+  src = nativeSrc;
+  pname = "quest-ios";
+  version = "0.1.0";
+  app = "apps/mobile";
+  web = mobile;
+  swiftpmDepsHash = "sha256-...";
+}
+```
+
 ## `buildPythonService`
 
 Builds a [uv](https://docs.astral.sh/uv/) project into a virtual environment with [uv2nix](https://github.com/pyproject-nix/uv2nix), resolving every dependency from `uv.lock` as a Nix derivation. The result is a relocatable venv exposing each `[project.scripts]` entry under `bin/`, consumed as `${pkg}/bin/<script>`.

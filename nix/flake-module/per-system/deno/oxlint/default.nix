@@ -6,7 +6,7 @@
 
 let
   inherit (kennelInputs) anti-slop;
-  inherit (kennelInputs.nixpkgs-oxlint.legacyPackages.${pkgs.stdenv.hostPlatform.system}) oxlint;
+  inherit (pkgs) oxlint;
   plugins = (pkgs.lib.importJSON ./package-lock.json).packages."node_modules/@oxlint/plugins".version;
 
   # node resolves anti-slop's imports from the node_modules beside it

@@ -131,13 +131,34 @@
         "type": "github"
       }
     },
+    "mobile-apps": {
+      "inputs": {
+        "nixpkgs-xtool": "nixpkgs-xtool",
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795410776,
+        "narHash": "sha256-U01nvTnyAECmDORjK3mHR7DQjnKzU30c0tbUNEoQq24=",
+        "owner": "ap-1",
+        "repo": "mobile-apps.nix",
+        "rev": "7d92f1708400c09da579a8792353d8ccc35b8f67",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ap-1",
+        "repo": "mobile-apps.nix",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1794537146,
-        "narHash": "sha256-Wpz/7x/YWnDIBu7yj6ixe8j6fIMsidd9Y+o1PqPF3iM=",
+        "lastModified": 1795085501,
+        "narHash": "sha256-S5keGWzaKpuXo9MNoIC2FfTIuTyTnx8P4NhYJMEsTLI=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "d5cc6833999746cffdfe0598f7bc801a57b887a9",
+        "rev": "0bb8272318b4ca41bf0edc6224df3e3e3046b70d",
         "type": "github"
       },
       "original": {
@@ -163,22 +184,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-oxlint": {
-      "locked": {
-        "lastModified": 1794976841,
-        "narHash": "sha256-HW2d7/kp6IPQUh0XR05AOZSQzQ0swtAt7ZcONs/SQfM=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "e5fce2c8934b4f890746204316b6a379e9d37e54",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "e5fce2c8934b4f890746204316b6a379e9d37e54",
-        "type": "github"
-      }
-    },
     "nixpkgs-tsrs": {
       "locked": {
         "lastModified": 1794980197,
@@ -192,6 +197,22 @@
         "owner": "ap-1",
         "repo": "nixpkgs",
         "rev": "0c864f08ec7b010e8db86c09c3c3f918a73452ac",
+        "type": "github"
+      }
+    },
+    "nixpkgs-xtool": {
+      "locked": {
+        "lastModified": 1795262791,
+        "narHash": "sha256-oKifJGgefGyDCCG/0QENDVySgLDey/CC4vZ+XnypaSs=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c3b998651c54ff8237b32d2e82055d372d76f140",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c3b998651c54ff8237b32d2e82055d372d76f140",
         "type": "github"
       }
     },
@@ -269,9 +290,9 @@
         "crane": "crane",
         "flake-parts": "flake-parts",
         "git-hooks": "git-hooks",
+        "mobile-apps": "mobile-apps",
         "nixpkgs": "nixpkgs",
         "nixpkgs-garage": "nixpkgs-garage",
-        "nixpkgs-oxlint": "nixpkgs-oxlint",
         "nixpkgs-tsrs": "nixpkgs-tsrs",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
