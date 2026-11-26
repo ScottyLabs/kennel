@@ -17,9 +17,10 @@ let
     valkey = [ "VALKEY_URL" ];
     garage = [
       "S3_ENDPOINT"
+      "S3_REGION"
       "S3_BUCKET"
-      "AWS_ACCESS_KEY_ID"
-      "AWS_SECRET_ACCESS_KEY"
+      "S3_ACCESS_KEY"
+      "S3_SECRET_KEY"
     ];
   };
 

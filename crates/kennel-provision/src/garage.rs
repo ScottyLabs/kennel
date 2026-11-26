@@ -58,6 +58,17 @@ impl GarageProvider {
             Ok(serde_json::from_str(&text)?)
         }
     }
+
+    async fn s3_region(&self) -> anyhow::Result<String> {
+        let info = self.api_get("/v2/GetNodeInfo?node=self").await?;
+
+        info["success"]
+            .as_object()
+            .and_then(|nodes| nodes.values().next())
+            .and_then(|node| node["connectionParameters"]["region"].as_str())
+            .map(String::from)
+            .ok_or_else(|| anyhow::anyhow!("garage node info has no S3 region: {info}"))
+    }
 }
 
 impl ResourceProvider for GarageProvider {
@@ -154,11 +165,14 @@ impl ResourceProvider for GarageProvider {
         )
         .await?;
 
+        let s3_region = self.s3_region().await?;
+
         let mut env = HashMap::new();
         env.insert("S3_ENDPOINT".into(), self.s3_endpoint.clone());
+        env.insert("S3_REGION".into(), s3_region);
         env.insert("S3_BUCKET".into(), bucket_name);
-        env.insert("AWS_ACCESS_KEY_ID".into(), access_key_id);
-        env.insert("AWS_SECRET_ACCESS_KEY".into(), secret_access_key);
+        env.insert("S3_ACCESS_KEY".into(), access_key_id);
+        env.insert("S3_SECRET_KEY".into(), secret_access_key);
         Ok(env)
     }
 
