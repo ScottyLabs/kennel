@@ -22,7 +22,7 @@ nix config show substituters        # lists https://cache.scottylabs.org
 nix config show trusted-public-keys # lists deploy-01.scottylabs.org-1:...
 ```
 
-If either setting is missing, the install flags above didn't land in `/etc/nix/nix.conf`. Add them there and restart the daemon. The symptom of a missing cache is a first `nix develop` that compiles a Rust toolchain instead of downloading one.
+If either setting is missing, the install flags above weren't applied in `/etc/nix/nix.conf`. Add them there and restart the daemon as described above. The symptom of a missing cache is a first `nix develop` that compiles a Rust toolchain instead of downloading one.
 
 ### `HTTP error 401` or `Bad credentials` from GitHub
 
