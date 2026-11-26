@@ -290,7 +290,7 @@ in
         path = [
           cfg.nixPackage
         ]
-        ++ optional cfg.resources.postgres.enable pkgs.postgresql
+        ++ optional cfg.resources.postgres.enable config.services.postgresql.package
         ++ optional cfg.resources.valkey.enable pkgs.valkey;
 
         environment = {

@@ -10,8 +10,8 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    # TODO: https://github.com/NixOS/nixpkgs/pull/585360
-    nixpkgs-garage.url = "github:ap-1/nixpkgs/garage-darwin";
+    # TODO: https://github.com/NixOS/nixpkgs/pull/593390, https://github.com/NixOS/nixpkgs/pull/593395
+    nixpkgs-garage.url = "github:ap-1/nixpkgs/garage-3-webadmin";
     # TODO: https://github.com/NixOS/nixpkgs/pull/589760
     nixpkgs-tsrs.url = "github:ap-1/nixpkgs/0c864f08ec7b010e8db86c09c3c3f918a73452ac";
 

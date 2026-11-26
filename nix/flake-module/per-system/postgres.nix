@@ -8,7 +8,8 @@
 let
   cfg = config.scottylabs.postgres;
   projectName = config.scottylabs.project.name;
-  postgres = pkgs.postgresql_18.withPackages cfg.extensions;
+  package = pkgs.postgresql_19;
+  postgres = package.withPackages cfg.extensions;
 
   sqlNames = {
     pgvector = "vector";
@@ -34,7 +35,7 @@ in
       type = lib.types.bool;
       default = false;
       description = ''
-        Run PostgreSQL 18 locally over a Unix socket, with a database named
+        Run PostgreSQL 19 locally over a Unix socket, with a database named
         after `scottylabs.project.name`, and export `DATABASE_URL`. The `hooks`
         check, `buildRustService`'s `test` check, and its `mutants` build each
         get an empty database of their own the same way. Kennel provisions a
@@ -67,7 +68,8 @@ in
       processes = {
         postgres = {
           run = ''
-            data="$SCOTTYLABS_STATE/postgres"
+            # Clusters don't open across major versions
+            data="$SCOTTYLABS_STATE/postgres-${package.psqlSchema}"
             mkdir -p "$SCOTTYLABS_RUNTIME/postgres"
             if [ ! -s "$data/PG_VERSION" ]; then
               ${postgres}/bin/initdb --no-instructions --auth=trust -D "$data"
@@ -92,7 +94,7 @@ in
 
       kennel = {
         resources = [ "postgres" ];
-        postgresExtensions = map sqlName (cfg.extensions pkgs.postgresql_18.pkgs);
+        postgresExtensions = map sqlName (cfg.extensions package.pkgs);
       };
     };
   };

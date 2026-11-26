@@ -20,7 +20,7 @@ let
   accessKey = "GK${builtins.substring 0 24 digest}";
   secretKey = digest;
 
-  package = kennelInputs.nixpkgs-garage.legacyPackages.${pkgs.stdenv.hostPlatform.system}.garage_2;
+  package = kennelInputs.nixpkgs-garage.legacyPackages.${pkgs.stdenv.hostPlatform.system}.garage_3;
   garage = "${lib.getExe package} -c \"$SCOTTYLABS_STATE/garage/garage.toml\"";
 in
 {
