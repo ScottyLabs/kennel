@@ -6,7 +6,7 @@ On every system in the flake's `systems`, the shared module checks:
 
 - `devShell`: the dev shell, so developers on `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` can get it from the binary cache
 
-On `scottylabs.ci.system` (`x86_64-linux` by default), it also checks:
+On `x86_64-linux`, it also checks:
 
 - `hooks`: every pre-commit hook your modules enable (formatting, linting, type-checking, tests), run in the build sandbox without network access. When `scottylabs.postgres` is enabled, it gets an empty PostgreSQL database in `DATABASE_URL`. A few hooks run elsewhere instead:
   - Clippy and `cargo-test` run in the Rust checks below

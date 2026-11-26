@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-pub const DEFAULT_API_HOST: &str = "0.0.0.0";
+pub const API_HOST: &str = "127.0.0.1";
 pub const DEFAULT_API_PORT: u16 = 3000;
 pub const DEFAULT_EPHEMERAL_DOMAIN: &str = "scottylabs.net";
+pub const CADDY_ADMIN_URL: &str = "http://localhost:2019";
 pub const CADDY_SERVER_NAME: &str = "srv0";
 
 pub const DEFAULT_DB_PATH: &str = "/var/lib/kennel/kennel.db";

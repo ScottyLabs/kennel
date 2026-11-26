@@ -19,10 +19,7 @@ The kennel NixOS module configures the kennel service, Caddy, systemd integratio
       cloudflare.zones."scottylabs.org" = "<zone-id>";
     };
 
-    resources.postgres = {
-      enable = true;
-      socketDir = "/run/postgresql";
-    };
+    resources.postgres.enable = true;
 
     secrets = {
       enable = true;

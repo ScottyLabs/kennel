@@ -41,7 +41,7 @@ kennelInputs:
 
         scottylabs.root = self.outPath;
 
-        checks = lib.mkIf (system == config.scottylabs.ci.system) {
+        checks = lib.mkIf (system == "x86_64-linux") {
           kennel = config.scottylabs.kennel.manifest;
         };
       };

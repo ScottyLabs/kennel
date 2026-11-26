@@ -42,15 +42,10 @@ let
         lib.attrNames target.checks
       )
     );
-
-  deploys = config.services != { } || config.sites != { };
 in
 lib.optional (
   !dnsLabel cfg.project.name
 ) "scottylabs.project.name: \"${cfg.project.name}\" ${labelRule}"
-++ lib.optional (
-  deploys && cfg.ci.system != "x86_64-linux"
-) "scottylabs.ci.system: must be x86_64-linux"
 ++ forTargets [ "services" ] service
 ++ forTargets [ "services" "sites" ] hostname
 ++ forTargets [ "services" "sites" "tools" ] checkNames

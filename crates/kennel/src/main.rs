@@ -39,10 +39,8 @@ pub struct AppState {
 }
 
 pub struct AppConfig {
-    pub api_host: String,
     pub api_port: u16,
     pub ephemeral_domain: String,
-    pub caddy_admin_url: String,
     pub webhook_secret: String,
     pub nixbot_token: String,
     pub custom_domains_file: Option<String>,
@@ -52,16 +50,12 @@ pub struct AppConfig {
 impl AppConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            api_host: std::env::var("API_HOST")
-                .unwrap_or_else(|_| kennel_config::constants::DEFAULT_API_HOST.into()),
             api_port: std::env::var("API_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(kennel_config::constants::DEFAULT_API_PORT),
             ephemeral_domain: std::env::var("EPHEMERAL_DOMAIN")
                 .unwrap_or_else(|_| kennel_config::constants::DEFAULT_EPHEMERAL_DOMAIN.into()),
-            caddy_admin_url: std::env::var("CADDY_ADMIN_URL")
-                .unwrap_or_else(|_| "http://localhost:2019".into()),
             webhook_secret: read_secret_file("WEBHOOK_SECRET_FILE")?,
             nixbot_token: read_secret_file("NIXBOT_TOKEN_FILE")?,
             custom_domains_file: std::env::var("CUSTOM_DOMAINS_FILE").ok(),
@@ -119,7 +113,11 @@ async fn main() -> Result<()> {
     let reconcile_handle = tokio::spawn(reconcile::run_loop(state.clone(), cancel.clone()));
 
     let app = http::router(state.clone());
-    let addr = format!("{}:{}", state.config.api_host, state.config.api_port);
+    let addr = format!(
+        "{}:{}",
+        kennel_config::constants::API_HOST,
+        state.config.api_port
+    );
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!(addr = %addr, "listening");
 

@@ -144,7 +144,7 @@ async fn teardown_branch(
     }
 
     let systemd = SystemdClient::connect().await?;
-    let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
+    let caddy = CaddyClient::default();
 
     for deployment in &deployments {
         if let Err(e) = teardown_deployment(state, deployment, &systemd, &caddy).await {

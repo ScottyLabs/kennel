@@ -16,7 +16,7 @@ in
 {
   checks = lib.mkMerge [
     { devShell = config.devShells.default; }
-    (lib.mkIf (system == config.scottylabs.ci.system) targetChecks)
+    (lib.mkIf (system == "x86_64-linux") targetChecks)
   ];
 
   # Run on demand with `nix build .#<target>-mutants`

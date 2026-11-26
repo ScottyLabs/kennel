@@ -42,12 +42,6 @@ in
     '';
   };
 
-  options.scottylabs.ci.system = lib.mkOption {
-    type = lib.types.str;
-    default = "x86_64-linux";
-    description = "System that gets all checks, with other systems getting only `devShell`.";
-  };
-
   config.scottylabs.ci.checks.links = "${lib.getExe pkgs.lychee} --no-progress .";
 
   config.apps.ci = {

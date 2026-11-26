@@ -201,7 +201,7 @@ pub async fn deploy_request(
     }
 
     let branch_slug = sanitize(&request.branch);
-    let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
+    let caddy = CaddyClient::default();
 
     let existing = state
         .store

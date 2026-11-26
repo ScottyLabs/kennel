@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 pub async fn run_once(state: &AppState) -> anyhow::Result<()> {
     let systemd = SystemdClient::connect().await?;
-    let caddy = CaddyClient::new(state.config.caddy_admin_url.clone());
+    let caddy = CaddyClient::default();
 
     // Deploy pending intents whose artifacts nixbot has reported
     let pending = state

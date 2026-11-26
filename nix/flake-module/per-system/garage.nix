@@ -17,6 +17,8 @@ let
   rpcPort = toString (basePort + 1);
   adminPort = toString (basePort + 2);
   adminToken = builtins.substring 32 32 digest;
+  accessKey = "GK${builtins.substring 0 24 digest}";
+  secretKey = digest;
 
   package = kennelInputs.nixpkgs-garage.legacyPackages.${pkgs.stdenv.hostPlatform.system}.garage_2;
   garage = "${lib.getExe package} -c \"$SCOTTYLABS_STATE/garage/garage.toml\"";
@@ -33,20 +35,6 @@ in
         `S3_BUCKET`. Kennel provisions a bucket for each deployment.
       '';
     };
-
-    accessKey = lib.mkOption {
-      type = lib.types.str;
-      default = "GK${builtins.substring 0 24 digest}";
-      defaultText = lib.literalMD "derived from `scottylabs.project.name`";
-      description = "S3 access key for the local bucket";
-    };
-
-    secretKey = lib.mkOption {
-      type = lib.types.str;
-      default = digest;
-      defaultText = lib.literalMD "derived from `scottylabs.project.name`";
-      description = "S3 secret key for the local bucket";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -56,8 +44,8 @@ in
         env = {
           S3_ENDPOINT = "http://127.0.0.1:${s3Port}";
           S3_REGION = "garage";
-          S3_ACCESS_KEY = cfg.accessKey;
-          S3_SECRET_KEY = cfg.secretKey;
+          S3_ACCESS_KEY = accessKey;
+          S3_SECRET_KEY = secretKey;
           S3_BUCKET = projectName;
         };
       };
@@ -96,8 +84,8 @@ in
               ${garage} layout apply --version 1
             fi
             ${garage} bucket info ${projectName} >/dev/null 2>&1 || ${garage} bucket create ${projectName}
-            ${garage} key info ${cfg.accessKey} >/dev/null 2>&1 || ${garage} key import --yes -n ${projectName} ${cfg.accessKey} ${cfg.secretKey}
-            ${garage} bucket allow --read --write --owner ${projectName} --key ${cfg.accessKey}
+            ${garage} key info ${accessKey} >/dev/null 2>&1 || ${garage} key import --yes -n ${projectName} ${accessKey} ${secretKey}
+            ${garage} bucket allow --read --write --owner ${projectName} --key ${accessKey}
           '';
           depends = [ "garage" ];
           oneshot = true;

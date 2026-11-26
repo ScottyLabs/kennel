@@ -1,19 +1,13 @@
+use kennel_config::constants::{CADDY_ADMIN_URL, CADDY_SERVER_NAME};
 use reqwest::Client;
 use std::collections::HashSet;
 
+#[derive(Default)]
 pub struct CaddyClient {
     client: Client,
-    admin_url: String,
 }
 
 impl CaddyClient {
-    pub fn new(admin_url: String) -> Self {
-        Self {
-            client: Client::new(),
-            admin_url,
-        }
-    }
-
     /// Serves the site at `store_path`, with its public values from `env_dir`
     pub async fn add_static_route(
         &self,
@@ -102,7 +96,7 @@ impl CaddyClient {
     }
 
     pub async fn remove_route(&self, route_id: &str) -> anyhow::Result<()> {
-        let url = format!("{}/id/{}", self.admin_url, route_id);
+        let url = format!("{CADDY_ADMIN_URL}/id/{route_id}");
         let resp = self.client.delete(&url).send().await?;
 
         if resp.status().as_u16() == 404 {
@@ -119,11 +113,7 @@ impl CaddyClient {
 
     /// Returns the set of `@id` values for all routes on the kennel server
     pub async fn list_route_ids(&self) -> anyhow::Result<HashSet<String>> {
-        let url = format!(
-            "{}/config/apps/http/servers/{}/routes",
-            self.admin_url,
-            kennel_config::constants::CADDY_SERVER_NAME
-        );
+        let url = format!("{CADDY_ADMIN_URL}/config/apps/http/servers/{CADDY_SERVER_NAME}/routes");
         let resp = self.client.get(&url).send().await?;
         if !resp.status().is_success() {
             return Ok(HashSet::new());
@@ -138,7 +128,7 @@ impl CaddyClient {
     // Upsert a route by its @id
     async fn add_route(&self, config: &serde_json::Value) -> anyhow::Result<()> {
         if let Some(id) = config["@id"].as_str() {
-            let url = format!("{}/id/{}", self.admin_url, id);
+            let url = format!("{CADDY_ADMIN_URL}/id/{id}");
             let resp = self.client.patch(&url).json(config).send().await?;
             if resp.status().is_success() {
                 return Ok(());
@@ -152,11 +142,7 @@ impl CaddyClient {
             // Route doesn't exist yet, fall through to POST
         }
 
-        let url = format!(
-            "{}/config/apps/http/servers/{}/routes",
-            self.admin_url,
-            kennel_config::constants::CADDY_SERVER_NAME
-        );
+        let url = format!("{CADDY_ADMIN_URL}/config/apps/http/servers/{CADDY_SERVER_NAME}/routes");
         let resp = self.client.post(&url).json(config).send().await?;
 
         anyhow::ensure!(

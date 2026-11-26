@@ -9,6 +9,15 @@ with lib;
 
 let
   cfg = config.services.kennel;
+
+  # nixpkgs builds PostgreSQL with this socket directory
+  postgresSocketDir = trim (
+    head (
+      splitString "," (config.services.postgresql.settings.unix_socket_directories or "/run/postgresql")
+    )
+  );
+  valkeySocket = config.services.redis.servers.kennel.unixSocket;
+  garageAdminEndpoint = "http://localhost:${last (splitString ":" config.services.garage.settings.admin.api_bind_addr)}";
 in
 {
   options.services.kennel = {
@@ -45,18 +54,10 @@ in
       '';
     };
 
-    api = {
-      host = mkOption {
-        type = types.str;
-        default = "0.0.0.0";
-        description = "API server bind address";
-      };
-
-      port = mkOption {
-        type = types.port;
-        default = 3000;
-        description = "API server port";
-      };
+    api.port = mkOption {
+      type = types.port;
+      default = 3000;
+      description = "Port the API server listens on at 127.0.0.1, behind Caddy";
     };
 
     domains = {
@@ -108,12 +109,6 @@ in
       description = "Base URL of Grafana for Logs Drilldown links in commit statuses";
     };
 
-    caddy.adminUrl = mkOption {
-      type = types.str;
-      default = "http://localhost:2019";
-      description = "Caddy admin API URL";
-    };
-
     customDomainsFile = mkOption {
       type = types.nullOr types.str;
       default = null;
@@ -131,14 +126,10 @@ in
           default = false;
           description = ''
             Whether to enable PostgreSQL resource provisioning. Kennel
-            creates a database per deployment using the specified socket
-            directory for peer authentication.
+            creates a database per deployment on the host's
+            `services.postgresql`, over its Unix socket with peer
+            authentication.
           '';
-        };
-        socketDir = mkOption {
-          type = types.path;
-          default = "/run/postgresql";
-          description = "PostgreSQL Unix socket directory";
         };
       };
 
@@ -147,14 +138,10 @@ in
           type = types.bool;
           default = false;
           description = ''
-            Whether to enable Valkey resource provisioning. Kennel allocates
-            a DB number per deployment from the shared instance.
+            Whether to enable Valkey resource provisioning. Kennel runs
+            `services.redis.servers.kennel` and allocates a DB number per
+            deployment from it.
           '';
-        };
-        socketPath = mkOption {
-          type = types.path;
-          default = "/run/valkey/valkey.sock";
-          description = "Valkey Unix socket path";
         };
       };
 
@@ -164,14 +151,10 @@ in
           default = false;
           description = ''
             Whether to enable Garage S3 resource provisioning. Kennel creates
-            a bucket and API key per deployment. Requires
+            a bucket and API key per deployment on the host's
+            `services.garage`, through its admin API. Requires
             `GARAGE_ADMIN_TOKEN` in the environment file.
           '';
-        };
-        adminEndpoint = mkOption {
-          type = types.str;
-          default = "http://localhost:3903";
-          description = "Garage admin API endpoint";
         };
         s3Endpoint = mkOption {
           type = types.str;
@@ -235,6 +218,16 @@ in
         assertion = cfg.resources.garage.enable -> cfg.environmentFile != null;
         message = "An environmentFile containing GARAGE_ADMIN_TOKEN is required when Garage is enabled";
       }
+      {
+        assertion =
+          cfg.resources.garage.enable
+          -> config.services.garage.enable && config.services.garage.settings ? admin.api_bind_addr;
+        message = "Kennel's Garage resource needs services.garage with settings.admin.api_bind_addr on this host";
+      }
+      {
+        assertion = cfg.resources.postgres.enable -> config.services.postgresql.enable;
+        message = "Kennel's PostgreSQL resource needs services.postgresql on this host";
+      }
     ];
 
     # Skip kennel.slice units in switch-to-configuration's failed-unit sweep
@@ -250,13 +243,21 @@ in
     ];
 
     users = {
-      users.${cfg.user} = mkIf (cfg.user == "kennel") {
-        isSystemUser = true;
-        inherit (cfg) group;
-        description = "Kennel service user";
-      };
+      users.${cfg.user} = mkMerge [
+        (mkIf (cfg.user == "kennel") {
+          isSystemUser = true;
+          inherit (cfg) group;
+          description = "Kennel service user";
+        })
+        (mkIf cfg.resources.valkey.enable { extraGroups = [ "redis-kennel" ]; })
+      ];
 
       groups.${cfg.group} = mkIf (cfg.group == "kennel") { };
+    };
+
+    services.redis = mkIf cfg.resources.valkey.enable {
+      package = mkDefault pkgs.valkey;
+      servers.kennel.enable = true;
     };
 
     security.polkit.enable = true;
@@ -281,16 +282,8 @@ in
           "network.target"
           "caddy.service"
         ]
-        ++ optional (
-          cfg.resources.postgres.enable && config.services.postgresql.enable
-        ) "postgresql.service"
-        ++ optionals cfg.resources.valkey.enable (
-          mapAttrsToList (name: _: "redis-${name}.service") (
-            filterAttrs (
-              _: s: s.enable && s.unixSocket == cfg.resources.valkey.socketPath
-            ) config.services.redis.servers
-          )
-        );
+        ++ optional cfg.resources.postgres.enable "postgresql.service"
+        ++ optional cfg.resources.valkey.enable "redis-kennel.service";
         wants = [ "caddy.service" ];
         wantedBy = [ "multi-user.target" ];
 
@@ -304,23 +297,21 @@ in
           HOME = "/var/lib/kennel";
           RUST_LOG = "info,sqlx=warn";
           DATABASE_PATH = "/var/lib/kennel/kennel.db";
-          API_HOST = cfg.api.host;
           API_PORT = toString cfg.api.port;
           EPHEMERAL_DOMAIN = cfg.domains.ephemeral;
-          CADDY_ADMIN_URL = cfg.caddy.adminUrl;
           WEBHOOK_SECRET_FILE = cfg.webhookSecretFile;
           NIXBOT_TOKEN_FILE = cfg.nixbotTokenFile;
           FORGEJO_API_URL = cfg.forgejo.apiUrl;
           FORGEJO_API_TOKEN_FILE = cfg.forgejo.apiTokenFile;
         }
         // optionalAttrs cfg.resources.postgres.enable {
-          POSTGRES_SOCKET_DIR = cfg.resources.postgres.socketDir;
+          POSTGRES_SOCKET_DIR = postgresSocketDir;
         }
         // optionalAttrs cfg.resources.valkey.enable {
-          VALKEY_SOCKET_PATH = cfg.resources.valkey.socketPath;
+          VALKEY_SOCKET_PATH = valkeySocket;
         }
         // optionalAttrs cfg.resources.garage.enable {
-          GARAGE_ADMIN_ENDPOINT = cfg.resources.garage.adminEndpoint;
+          GARAGE_ADMIN_ENDPOINT = garageAdminEndpoint;
           GARAGE_S3_ENDPOINT = cfg.resources.garage.s3Endpoint;
         }
         // optionalAttrs cfg.secrets.enable {
@@ -353,8 +344,8 @@ in
             "/run/kennel"
             "/nix/var/nix/gcroots/kennel"
           ]
-          ++ optional cfg.resources.postgres.enable cfg.resources.postgres.socketDir
-          ++ optional cfg.resources.valkey.enable (dirOf cfg.resources.valkey.socketPath);
+          ++ optional cfg.resources.postgres.enable postgresSocketDir
+          ++ optional cfg.resources.valkey.enable (dirOf valkeySocket);
 
           Delegate = "yes";
 
@@ -380,7 +371,7 @@ in
         }
       '';
       virtualHosts.${cfg.domain}.extraConfig = ''
-        reverse_proxy localhost:${toString cfg.api.port}
+        reverse_proxy 127.0.0.1:${toString cfg.api.port}
       '';
     };
 

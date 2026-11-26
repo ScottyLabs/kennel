@@ -106,7 +106,7 @@ in
     };
 
     # pre-commit hooks in the build sandbox
-    checks = lib.mkIf (system == config.scottylabs.ci.system) {
+    checks = lib.mkIf (system == "x86_64-linux") {
       hooks = config.pre-commit.settings.run.overrideAttrs (old: {
         name = "${cfg.project.name}-hooks";
         nativeBuildInputs = old.nativeBuildInputs ++ cfg.hooksCheck.nativeBuildInputs;
